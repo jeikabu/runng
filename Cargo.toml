@@ -1,6 +1,12 @@
 [package]
-name = "runng"
+name = "runng-sys"
 version = "0.1.0"
 authors = ["Jake Woltersdorf <jake@playruyi.com>"]
 
+license = "MIT"
+
 [dependencies]
+
+[build-dependencies]
+bindgen = "0.40"
+cmake = "0.1"
