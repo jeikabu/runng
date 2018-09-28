@@ -17,11 +17,14 @@ environment:
       target: i686-pc-windows-msvc
 
 install:
+  # Download rustup and install rust
   - appveyor DownloadFile https://win.rustup.rs/ -FileName rustup-init.exe
   - rustup-init -yv --default-toolchain %channel% --default-host %target%
   - set PATH=%PATH%;%USERPROFILE%\.cargo\bin
   - rustc -vV
   - cargo -vV
+  # Install ninja (used to build nng)
+  - choco install ninja
 
 build: false
 
