@@ -42,10 +42,12 @@ for:
       - image: Ubuntu
   install:
     - sudo apt-get update
+    # Need cmake/ninja/clang to build nng
     - sudo apt-get --yes install cmake ninja-build build-essential clang-3.9
     # Download and run rustup to install Rust (need "-y" to avoid waiting for input)
     - curl https://sh.rustup.rs -sSf > rustup-init.sh
     - sh rustup-init.sh -y
+    # Add cargo to PATH
     - source $HOME/.cargo/env
   
 
@@ -57,7 +59,7 @@ build: false
 
 test_script:
   # Run only our tests (not tests in dependencies)
-  - cargo test --verbose -- tests::
+  - cargo test --verbose -- "tests::"
 
 # after_test:
 #   - cmd: codecov -f "coverage.xml" -t 2a07cd3d-8620-4495-8c14-3252b10b90bd
