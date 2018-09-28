@@ -42,7 +42,7 @@ for:
       - image: Ubuntu
   install:
     - sudo apt-get update
-    - sudo apt-get --yes install cmake ninja-build
+    - sudo apt-get --yes install cmake ninja-build build-essential clang-3.9
     # Download and run rustup to install Rust (need "-y" to avoid waiting for input)
     - curl https://sh.rustup.rs -sSf > rustup-init.sh
     - sh rustup-init.sh -y
