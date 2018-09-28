@@ -42,7 +42,7 @@ for:
       - image: Ubuntu
   install:
     - sudo apt-get update
-    - sudo apt-get install cmake ninja-build
+    - sudo apt-get --yes install cmake ninja-build
     # Download and run rustup to install Rust
     - curl https://sh.rustup.rs -sSf | sh
   
