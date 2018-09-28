@@ -1,5 +1,5 @@
 [package]
-name = "nng-sys"
+name = "runng-sys"
 version = "0.1.0"
 authors = ["Jake Woltersdorf <jeikabu@gmail.com>"]
 
