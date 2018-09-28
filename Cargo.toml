@@ -6,6 +6,7 @@ authors = ["Jake Woltersdorf <jeikabu@gmail.com>"]
 description = "Bindings to nng (Nanomsg-Next-Generation)"
 keywords = ["nng", "nanomsg"]
 license = "MIT"
+repository = "https://github.com/jeikabu/runng"
 
 [dependencies]
 
