@@ -8,7 +8,7 @@ use std::{
 };
 
 fn main() {
-    // https://docs.rs/cmake/0.1.34/cmake/
+    // https://docs.rs/cmake/
     let dst = Config::new("nng")
         .generator("Ninja")
         .define("CMAKE_BUILD_TYPE", "Release")
@@ -26,7 +26,8 @@ fn main() {
     // https://docs.rs/bindgen
     let bindings = bindgen::Builder::default()
         .header("wrapper.h")
-        .clang_arg("-Inng/src/")
+        // This is needed if use `#include <nng.h>` instead of `#include "path/nng.h"`
+        //.clang_arg("-Inng/src/")
         .generate()
         .expect("Unable to generate bindings");
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
