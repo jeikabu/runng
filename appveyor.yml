@@ -56,7 +56,8 @@ install:
 build: false
 
 test_script:
-  - cargo test --verbose
+  # Run only our tests (not tests in dependencies)
+  - cargo test --verbose -- tests::
 
 # after_test:
 #   - cmd: codecov -f "coverage.xml" -t 2a07cd3d-8620-4495-8c14-3252b10b90bd
