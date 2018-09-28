@@ -3,6 +3,8 @@ name = "nng-sys"
 version = "0.1.0"
 authors = ["Jake Woltersdorf <jeikabu@gmail.com>"]
 
+description = "Bindings to nng (Nanomsg-Next-Generation)"
+keywords = ["nng", "nanomsg"]
 license = "MIT"
 
 [dependencies]
