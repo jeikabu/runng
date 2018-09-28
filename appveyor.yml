@@ -24,8 +24,6 @@ for:
     - set PATH=%PATH%;%USERPROFILE%\.cargo\bin
     # Install ninja (used to build nng)
     - choco install ninja
-
-for:
 -
   matrix:
     only:
