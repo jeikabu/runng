@@ -8,5 +8,4 @@ license = "MIT"
 [dependencies]
 
 [build-dependencies]
-bindgen = "0.40"
 cmake = "0.1"
