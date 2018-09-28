@@ -1,7 +1,7 @@
 # Based off https://github.com/starkat99/appveyor-rust
 
 image: 
-- Visual Studio 2017
+#- Visual Studio 2017
 - Ubuntu
 
 environment:
@@ -43,8 +43,9 @@ for:
   install:
     - sudo apt-get update
     - sudo apt-get --yes install cmake ninja-build
-    # Download and run rustup to install Rust
-    - curl https://sh.rustup.rs -sSf | sh
+    # Download and run rustup to install Rust (need "-y" to avoid waiting for input)
+    - curl https://sh.rustup.rs -sSf > rustup-init.sh
+    - sh rustup-init.sh -y
   
 
 install:
