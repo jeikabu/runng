@@ -13,6 +13,10 @@ addons:
 rust:
   - stable
 
+before_install:
+  #- if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update          ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install ninja; fi
+
 script:
   - cargo build
   - cargo test -- "tests::"
