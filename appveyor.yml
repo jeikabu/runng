@@ -4,19 +4,31 @@ image:
 - Visual Studio 2017
 - Ubuntu
 
+environment:
+  matrix:
+    # Stable 64-bit MSVC
+    - target: x86_64-pc-windows-msvc
+      channel: stable
+    # Stable 32-bit MSVC
+    - target: i686-pc-windows-msvc
+      channel: stable
+    - target: ubuntu-dummy
+      channel: stable
+
+matrix:
+  exclude:
+    - image: Ubuntu
+      target: x86_64-pc-windows-msvc
+    - image: Ubuntu
+      target: i686-pc-windows-msvc
+    - image: Visual Studio 2017
+      target: ubuntu-dummy
+
 for:
 -
   matrix:
     only:
       - image: Visual Studio 2017
-  environment:
-    matrix:
-      # Stable 64-bit MSVC
-      - channel: stable
-        target: x86_64-pc-windows-msvc
-      # Stable 32-bit MSVC
-      - channel: stable
-        target: i686-pc-windows-msvc
   install:
     # Download rustup and install rust
     - appveyor DownloadFile https://win.rustup.rs/ -FileName rustup-init.exe
