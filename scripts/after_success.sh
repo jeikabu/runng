@@ -15,7 +15,7 @@ if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
     make install DESTDIR=../../kcov-build
     cd ../../
     rm -rf $KCOV_DIR
-    for file in target/debug/runng_sys-[^\.d]; do 
+    for file in target/debug/runng_sys-*[^\.d]; do 
         mkdir -p "target/cov/$(basename $file)"
         # Arguments at the end are what would be passed to `cargo test`
         ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file" -- "tests::"
