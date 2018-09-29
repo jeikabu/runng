@@ -7,16 +7,26 @@ sudo: false
 addons:
   apt:
     packages:
+      # To build nng
       - cmake
       - ninja-build
+      # To build kcov
+      - libcurl4-openssl-dev
+      - libelf-dev
+      - libdw-dev
+      - gcc
+      - binutils-dev
+      - libiberty-dev
 
 rust:
   - stable
 
 before_install:
-  #- if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update          ; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install ninja; fi
+  - ./scripts/install.sh
 
 script:
   - cargo build
   - cargo test -- "tests::"
+
+after_success:
+  - ./scripts/after_success.sh
