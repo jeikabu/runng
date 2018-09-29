@@ -12,8 +12,9 @@ environment:
     # Stable 32-bit MSVC
     - target: i686-pc-windows-msvc
       channel: stable
-    #- target: ubuntu-dummy
-    #  channel: stable
+    # Dummy target so linux always has something to build
+    - target: ubuntu-dummy
+      channel: stable
 
 matrix:
   exclude:
@@ -21,8 +22,9 @@ matrix:
       target: x86_64-pc-windows-msvc
     - image: Ubuntu
       target: i686-pc-windows-msvc
-    #- image: Visual Studio 2017
-    #  target: ubuntu-dummy
+    # Windows should ignore dummy linux configuration
+    - image: Visual Studio 2017
+      target: ubuntu-dummy
 
 for:
 -

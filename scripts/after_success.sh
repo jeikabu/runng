@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 
+TARBALL="v36.tar.gz"
+KCOV_DIR="kcov-36"
+
 if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
-    set TARBALL=v36.tar.gz
-    set KCOV_DIR=kcov-36
     # https://github.com/codecov/example-rust
     wget https://github.com/SimonKagstrom/kcov/archive/$TARBALL
     tar xzf $TARBALL
