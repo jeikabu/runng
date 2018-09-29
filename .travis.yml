@@ -22,7 +22,8 @@ addons:
       - libiberty-dev
 
 before_install:
-  - ./scripts/install.sh
+  # Using `source` so can update PATH environment variable
+  - source ./scripts/install.sh
 
 script:
   - cargo build
