@@ -1,9 +1,12 @@
 language: rust
+rust:
+  - stable
+
 os:
   - linux
   - osx
-sudo: false
 
+sudo: required
 addons:
   apt:
     packages:
@@ -17,9 +20,6 @@ addons:
       - gcc
       - binutils-dev
       - libiberty-dev
-
-rust:
-  - stable
 
 before_install:
   - ./scripts/install.sh
