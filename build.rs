@@ -8,7 +8,7 @@ use std::{
 };
 
 fn main() {
-    // https://docs.rs/cmake/
+    // Run cmake to build nng
     let dst = Config::new("nng")
         .generator("Ninja")
         .define("CMAKE_BUILD_TYPE", "Release")
@@ -20,6 +20,7 @@ fn main() {
     // -L native=/path/runng/target/debug/build/runng-sys-abc1234/out
     // That contains output from cmake
     println!("cargo:rustc-link-search=native={}", dst.join("lib").display());
+    // Tell rustc to use nng static library
     println!("cargo:rustc-link-lib=static=nng");
 
     // https://rust-lang-nursery.github.io/rust-bindgen

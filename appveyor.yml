@@ -17,19 +17,19 @@ environment:
 
 # Visual Studio developer environment for x86/x64
 # https://www.appveyor.com/docs/lang/cpp/#visual-studio
-for:
--
-  matrix:
-    only:
-      - platform: x86
-  init:
-    - call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars32.bat"
--
-  matrix:
-    only:
-      - platform: x64
-  init:
-    - call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64.bat"
+# for:
+# -
+#   matrix:
+#     only:
+#       - platform: x86
+#   init:
+#     - call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars32.bat"
+# -
+#   matrix:
+#     only:
+#       - platform: x64
+#   init:
+#     - call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64.bat"
 
 install:
   # Download rustup and install rust
@@ -47,5 +47,5 @@ install:
 build: false
 
 test_script:
-  # Run only our tests (not tests in dependencies)
+  # Run only our tests (bindgen also generates tests)
   - cargo test --verbose -- "tests::"
