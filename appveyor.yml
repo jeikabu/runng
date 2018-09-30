@@ -40,6 +40,8 @@ install:
   - choco install ninja
   - rustc -vV
   - cargo -vV
+  - echo %LIBCLANG_PATH%
+  - dir %LIBCLANG_PATH%
 
 # Skip build step since `cargo test` does it
 build: false
