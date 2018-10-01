@@ -1,9 +1,9 @@
 [package]
 name = "runng"
-version = "0.1.0"
-authors = ["Jake Woltersdorf <jeikabu@gmail.com>"]
+version = "0.1.1"
+authors = ["Jake W <jeikabu@gmail.com>"]
 
-description = "Bindings to nng (Nanomsg-Next-Generation) aka Nanomsg2"
+description = "High-level wrapper around nng (Nanomsg-Next-Generation) aka Nanomsg2"
 keywords = ["nng", "nanomsg"]
 license = "MIT"
 repository = "https://github.com/jeikabu/runng"
