@@ -17,6 +17,9 @@ extern crate runng_sys;
 //         INngResult<TSocket> Listen<TSocket>(INngResult<TSocket> socketRes, string url) where TSocket : ISocket;
 //     }
 
+mod protocols;
+mod transports;
+
 use runng_sys::*;
 
 use std::{
@@ -105,8 +108,6 @@ impl Factory for Latest {
         Ok(0)
     }
 }
-
-mod protocols;
 
 #[cfg(test)]
 mod tests {
