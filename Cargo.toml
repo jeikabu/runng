@@ -1,20 +1,5 @@
-[package]
-name = "runng-sys"
-version = "0.1.2"
-authors = ["Jake Woltersdorf <jeikabu@gmail.com>"]
-
-description = "Bindings to nng (Nanomsg-Next-Generation) aka Nanomsg2"
-keywords = ["nng", "nanomsg"]
-license = "MIT"
-repository = "https://github.com/jeikabu/runng-sys"
-
-[badges]
-appveyor = { repository = "jake-ruyi/runng-sys", branch = "master", service = "github" }
-travis-ci = { repository = "jeikabu/runng-sys", branch = "master" }
-codecov = { repository = "jeikabu/runng-sys", branch = "master", service = "github" }
-
-[dependencies]
-
-[build-dependencies]
-cmake = "0.1"
-bindgen = "0.40"
+[workspace]
+members = [
+    "runng",
+    "runng-sys"
+]
