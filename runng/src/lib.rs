@@ -21,8 +21,6 @@ mod protocol;
 mod transport;
 
 use runng_sys::*;
-extern crate num_traits;
-use num_traits::FromPrimitive;
 
 use std::{
     error,
@@ -154,17 +152,27 @@ pub trait Factory {
     fn replier_open(&self) -> NngResult<protocol::Rep0>;
 }
 
-pub struct Socket {
+pub trait Socket {
+    fn socket(&self) -> nng_socket;
+}
+
+pub struct NngSocket {
     socket: nng_socket,
 }
 
-impl Socket {
-    fn new() -> Socket {
-        Socket { socket: nng_socket { id: 0 } }
+impl NngSocket {
+    fn new() -> NngSocket {
+        NngSocket { socket: nng_socket { id: 0 } }
     }
 }
 
-impl Drop for Socket {
+impl Socket for NngSocket {
+    fn socket(&self) -> nng_socket {
+        self.socket
+    }
+}
+
+impl Drop for NngSocket {
     fn drop(&mut self) {
         unsafe {
             let res = nng_close(self.socket);
@@ -191,6 +199,41 @@ impl Factory for Latest {
     fn replier_open(&self) -> NngResult<protocol::Rep0> {
         protocol::Rep0::open()
     }
+}
+
+pub trait Listen: Socket {
+    fn listen(&self, url: &str) -> NngResult<()> {
+        let res = unsafe {
+            nng_listen(self.socket(), to_cstr(url).1, std::ptr::null_mut(), 0)
+            };
+        if res == 0 {
+            Ok(())
+        } else {
+            Err(NngFail::from_i32(res))
+        }
+    }
+}
+
+pub trait Dial: Socket {
+    fn dial(&self, url: &str) -> NngResult<()> {
+        let res = unsafe {
+            nng_dial(self.socket(), to_cstr(url).1, std::ptr::null_mut(), 0)
+        };
+        if res == 0 {
+            Ok(())
+        } else {
+            Err(NngFail::from_i32(res))
+        }
+    }
+}
+
+use std::ffi::CString;
+
+// Return string and pointer so string isn't dropped
+fn to_cstr(string: &str) -> (CString, *const i8) {
+    let url = CString::new(string).unwrap();
+    let ptr = url.as_bytes_with_nul().as_ptr() as *const i8;
+    (url, ptr)
 }
 
 #[cfg(test)]

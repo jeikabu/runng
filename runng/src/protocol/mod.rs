@@ -3,16 +3,16 @@ use runng_sys::*;
 use super::*;
 
 pub struct Req0 {
-    socket: Socket
+    socket: NngSocket
 }
 
 pub struct Rep0 {
-    socket: Socket
+    socket: NngSocket
 }
 
 impl Req0 {
     pub fn open() -> NngResult<Self> {
-        let mut socket = Socket::new();
+        let mut socket = NngSocket::new();
         let res = unsafe { nng_req0_open(&mut socket.socket) };
         if res == 0 {
             Ok(Req0 { socket } )
@@ -24,7 +24,7 @@ impl Req0 {
 
 impl Rep0 {
     pub fn open() -> NngResult<Self> {
-        let mut socket = Socket::new();
+        let mut socket = NngSocket::new();
         let res = unsafe { nng_rep0_open(&mut socket.socket) };
         if res == 0 {
             Ok(Rep0 { socket } )
@@ -33,3 +33,18 @@ impl Rep0 {
         }
     }
 }
+
+impl Socket for Req0 {
+    fn socket(&self) -> nng_socket {
+        self.socket.socket
+    }
+}
+impl Socket for Rep0 {
+    fn socket(&self) -> nng_socket {
+        self.socket.socket
+    }
+}
+
+impl Dial for Req0 {}
+impl Listen for Rep0 {}
+
