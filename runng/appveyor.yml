@@ -4,6 +4,7 @@ image:
 - Visual Studio 2017
 
 environment:
+  LIBCLANG_PATH: C:\Libraries\llvm-5.0.0\bin
   matrix:
     # Stable 64-bit MSVC
     - target: x86_64-pc-windows-msvc
@@ -39,6 +40,8 @@ install:
   - choco install ninja
   - rustc -vV
   - cargo -vV
+  - echo %LIBCLANG_PATH%
+  - dir %LIBCLANG_PATH%
 
 # Skip build step since `cargo test` does it
 build: false
