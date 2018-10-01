@@ -106,9 +106,7 @@ impl Factory for Latest {
     }
 }
 
-pub struct Req0 {
-
-}
+mod protocols;
 
 #[cfg(test)]
 mod tests {
