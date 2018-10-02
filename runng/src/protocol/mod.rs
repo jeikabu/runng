@@ -46,5 +46,7 @@ impl Socket for Rep0 {
 }
 
 impl Dial for Req0 {}
+impl Send for Req0 {}
 impl Listen for Rep0 {}
+impl Recv for Rep0 {}
 

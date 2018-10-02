@@ -9,4 +9,6 @@ fn it_works() {
     let rep = factory.replier_open().unwrap();
     rep.listen("inproc://test").unwrap();
     req.dial("inproc://test").unwrap();
+    req.send().unwrap();
+    rep.recv().unwrap();
 }
