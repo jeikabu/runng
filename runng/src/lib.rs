@@ -17,8 +17,8 @@ extern crate runng_sys;
 //         INngResult<TSocket> Listen<TSocket>(INngResult<TSocket> socketRes, string url) where TSocket : ISocket;
 //     }
 
-mod protocol;
-mod transport;
+pub mod protocol;
+pub mod transport;
 
 use runng_sys::*;
 

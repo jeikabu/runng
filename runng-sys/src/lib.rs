@@ -12,6 +12,12 @@ impl nng_msg {
     }
 }
 
+impl nng_aio {
+    pub fn new() -> nng_aio {
+        nng_aio { _unused: [] }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
