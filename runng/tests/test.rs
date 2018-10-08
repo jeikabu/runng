@@ -4,6 +4,7 @@ extern crate runng_sys;
 use runng::*;
 use runng_sys::nng_msg;
 use runng::protocol::*;
+use runng::socket::*;
 
 #[test]
 fn it_works() {
@@ -19,6 +20,8 @@ fn it_works() {
 #[test]
 fn aio() {
     let factory = Latest::new();
-    let mut aio_ctx = factory.requester_open().unwrap().create_async_context().unwrap();
+    let socket = factory.requester_open().unwrap();
+    socket.dial("inproc://test").unwrap();
+    let ctx = socket.create_async_context().unwrap();
     aio_ctx.send();
 }

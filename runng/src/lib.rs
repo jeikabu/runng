@@ -17,10 +17,17 @@ extern crate runng_sys;
 //         INngResult<TSocket> Listen<TSocket>(INngResult<TSocket> socketRes, string url) where TSocket : ISocket;
 //     }
 
+pub mod aio;
+pub mod ctx;
 pub mod protocol;
+pub mod socket;
 pub mod transport;
 
 use runng_sys::*;
+
+pub use self::aio::*;
+pub use self::ctx::*;
+pub use self::socket::*;
 
 use std::{
     error,
@@ -160,36 +167,6 @@ pub trait Factory {
     fn replier_open(&self) -> NngResult<protocol::Rep0>;
 }
 
-pub trait Socket {
-    fn socket(&self) -> nng_socket;
-}
-
-pub struct NngSocket {
-    socket: nng_socket,
-}
-
-impl NngSocket {
-    fn new() -> NngSocket {
-        NngSocket { socket: nng_socket { id: 0 } }
-    }
-}
-
-impl Socket for NngSocket {
-    fn socket(&self) -> nng_socket {
-        self.socket
-    }
-}
-
-impl Drop for NngSocket {
-    fn drop(&mut self) {
-        unsafe {
-            let res = nng_close(self.socket);
-            if res != 0 {
-                panic!(res);
-            }
-        }
-    }
-}
 
 pub struct Latest {
 }
@@ -209,65 +186,7 @@ impl Factory for Latest {
     }
 }
 
-pub trait Listen: Socket {
-    fn listen(&self, url: &str) -> NngResult<()> {
-        let res = unsafe {
-            nng_listen(self.socket(), to_cstr(url).1, std::ptr::null_mut(), 0)
-            };
-        NngReturn::from(res, ())
-    }
-}
-
-pub trait Dial: Socket {
-    fn dial(&self, url: &str) -> NngResult<()> {
-        let res = unsafe {
-            nng_dial(self.socket(), to_cstr(url).1, std::ptr::null_mut(), 0)
-        };
-        NngReturn::from(res, ())
-    }
-}
-
-use std::ffi::CString;
-
-// Return string and pointer so string isn't dropped
-fn to_cstr(string: &str) -> (CString, *const i8) {
-    let url = CString::new(string).unwrap();
-    let ptr = url.as_bytes_with_nul().as_ptr() as *const i8;
-    (url, ptr)
-}
-
-
-pub trait Send: Socket {
-    fn send(&self) -> NngResult<()> {
-        let mut req_msg = nng_msg::new();
-        let mut req_msg = &mut req_msg as *mut nng_msg;
-        let res = unsafe {
-            let res = nng_msg_alloc(&mut req_msg, 0);
-            if res != 0 {
-                res
-            } else {
-                nng_sendmsg(self.socket(), req_msg, 0)
-            }
-        };
-        NngReturn::from(res, ())
-    }
-}
-
-pub trait Recv: Socket {
-    fn recv(&self) -> NngResult<nng_msg> {
-        let mut recv_msg = nng_msg::new();
-        let mut recv_ptr = &mut recv_msg as *mut nng_msg;
-        let res = unsafe {
-            nng_recvmsg(self.socket(), &mut recv_ptr, 0)
-        };
-        NngReturn::from(res, recv_msg)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn it_works() {
-    }
+// Trait where type exposes a socket, but this shouldn't be part of public API
+trait RawSocket {
+    fn socket(&self) -> nng_socket;
 }
