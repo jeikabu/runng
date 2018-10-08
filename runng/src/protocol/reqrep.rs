@@ -7,6 +7,31 @@ use std::{
     rc::Rc,
 };
 
+pub struct Req0 {
+    socket: NngSocket
+}
+
+pub struct Rep0 {
+    socket: NngSocket
+}
+
+
+impl Req0 {
+    pub fn open() -> NngResult<Self> {
+        let open_func = |socket: &mut nng_socket| unsafe { nng_req0_open(socket) };
+        let socket_create_func = |socket| Req0{ socket };
+        open(open_func, socket_create_func)
+    }
+}
+
+impl Rep0 {
+    pub fn open() -> NngResult<Self> {
+        open(|socket| unsafe { nng_rep0_open(socket) }, 
+            |socket| Rep0{ socket }
+        )
+    }
+}
+
 #[derive(PartialEq)]
 enum ReqRepState {
     Ready,

@@ -5,13 +5,6 @@ pub use self::reqrep::*;
 use runng_sys::*;
 use super::*;
 
-pub struct Req0 {
-    socket: NngSocket
-}
-
-pub struct Rep0 {
-    socket: NngSocket
-}
 
 type NngOpenFunc = unsafe extern "C" fn(*mut runng_sys::nng_socket_s) -> i32;
 
@@ -29,18 +22,3 @@ fn open<T, O, S>(open_func: O, socket_create_func: S) -> NngResult<T>
     }
 }
 
-impl Req0 {
-    pub fn open() -> NngResult<Self> {
-        let open_func = |socket: &mut nng_socket| unsafe { nng_req0_open(socket) };
-        let socket_create_func = |socket| Req0{ socket };
-        open(open_func, socket_create_func)
-    }
-}
-
-impl Rep0 {
-    pub fn open() -> NngResult<Self> {
-        open(|socket| unsafe { nng_rep0_open(socket) }, 
-            |socket| Rep0{ socket }
-        )
-    }
-}

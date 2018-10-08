@@ -1,3 +1,4 @@
+use runng_sys::*;
 use super::*;
 use std::ffi::CString;
 

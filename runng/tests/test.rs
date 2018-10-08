@@ -5,6 +5,10 @@ use runng::*;
 use runng_sys::nng_msg;
 use runng::protocol::*;
 use runng::socket::*;
+use std::{
+    thread,
+    time::Duration
+};
 
 #[test]
 fn it_works() {
@@ -31,5 +35,5 @@ fn aio() {
     requester.dial(url).unwrap();
     let mut req_ctx = requester.create_async_context().unwrap();
     req_ctx.send();
-    std::thread::sleep_ms(1000);
+    std::thread::sleep(Duration::from_secs(1));
 }

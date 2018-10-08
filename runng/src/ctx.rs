@@ -1,3 +1,7 @@
+use aio::{
+    Aio,
+    NngAio,
+};
 use runng_sys::*;
 use super::*;
 
