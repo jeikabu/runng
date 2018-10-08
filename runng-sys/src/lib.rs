@@ -17,11 +17,3 @@ impl nng_aio {
         nng_aio { _unused: [] }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn it_works() {
-    }
-}

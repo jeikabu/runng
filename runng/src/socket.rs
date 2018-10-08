@@ -10,8 +10,8 @@ pub struct NngSocket {
 }
 
 impl NngSocket {
-    pub fn new() -> NngSocket {
-        NngSocket { socket: nng_socket { id: 0 } }
+    pub fn new(socket: nng_socket) -> NngSocket {
+        NngSocket { socket }
     }
 }
 

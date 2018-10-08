@@ -8,20 +8,27 @@ use runng::socket::*;
 
 #[test]
 fn it_works() {
+    let url = "inproc://test";
+
     let factory = Latest::new();
     let req = factory.requester_open().unwrap();
     let rep = factory.replier_open().unwrap();
-    rep.listen("inproc://test").unwrap();
-    req.dial("inproc://test").unwrap();
+    rep.listen(url).unwrap();
+    req.dial(url).unwrap();
     req.send().unwrap();
     rep.recv().unwrap();
 }
 
 #[test]
 fn aio() {
+    let url = "inproc://test2";
+
     let factory = Latest::new();
-    let socket = factory.requester_open().unwrap();
-    socket.dial("inproc://test").unwrap();
-    let ctx = socket.create_async_context().unwrap();
-    aio_ctx.send();
+    let replier = factory.replier_open().unwrap();
+    replier.listen(url).unwrap();
+
+    let requester = factory.requester_open().unwrap();
+    requester.dial(url).unwrap();
+    let mut req_ctx = requester.create_async_context().unwrap();
+    req_ctx.send();
 }
