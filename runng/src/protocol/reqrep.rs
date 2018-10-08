@@ -46,8 +46,7 @@ impl AsyncReqRep for AsyncReqRepContext {
             let ctx = self.ctx.as_ref().unwrap().ctx();
             self.state = ReqRepState::Sending;
 
-            let mut request = nng_msg::new();
-            let mut request = &mut request as *mut nng_msg;
+            let mut request: *mut nng_msg = std::ptr::null_mut();
             // TODO: check result != 0
             let res = nng_msg_alloc(&mut request, 0);
             nng_aio_set_msg(aio, request);

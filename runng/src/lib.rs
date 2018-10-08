@@ -1,4 +1,20 @@
+pub mod aio;
+pub mod ctx;
+pub mod protocol;
+pub mod socket;
+pub mod transport;
+
+pub use self::aio::*;
+pub use self::ctx::*;
+pub use self::socket::*;
+
 extern crate runng_sys;
+
+use runng_sys::*;
+use std::{
+    error,
+    fmt,
+};
 
 // public interface ISocketFactory
 //     {
@@ -16,23 +32,6 @@ extern crate runng_sys;
 //         INngResult<TSocket> Dial<TSocket>(INngResult<TSocket> socketRes, string url) where TSocket : ISocket;
 //         INngResult<TSocket> Listen<TSocket>(INngResult<TSocket> socketRes, string url) where TSocket : ISocket;
 //     }
-
-pub mod aio;
-pub mod ctx;
-pub mod protocol;
-pub mod socket;
-pub mod transport;
-
-use runng_sys::*;
-
-pub use self::aio::*;
-pub use self::ctx::*;
-pub use self::socket::*;
-
-use std::{
-    error,
-    fmt,
-};
 
 #[derive(Debug)]
 pub enum NngError {

@@ -61,8 +61,7 @@ fn to_cstr(string: &str) -> (CString, *const i8) {
 
 pub trait Send: Socket {
     fn send(&self) -> NngResult<()> {
-        let mut req_msg = nng_msg::new();
-        let mut req_msg = &mut req_msg as *mut nng_msg;
+        let mut req_msg: *mut nng_msg = std::ptr::null_mut();
         let res = unsafe {
             let res = nng_msg_alloc(&mut req_msg, 0);
             if res != 0 {
@@ -77,11 +76,10 @@ pub trait Send: Socket {
 
 pub trait Recv: Socket {
     fn recv(&self) -> NngResult<nng_msg> {
-        let mut recv_msg = nng_msg::new();
-        let mut recv_ptr = &mut recv_msg as *mut nng_msg;
-        let res = unsafe {
-            nng_recvmsg(self.socket(), &mut recv_ptr, 0)
-        };
-        NngReturn::from(res, recv_msg)
+        let mut recv_ptr: *mut nng_msg = std::ptr::null_mut();
+        unsafe {
+            let res = nng_recvmsg(self.socket(), &mut recv_ptr, 0);
+            NngReturn::from(res, *recv_ptr)
+        }
     }
 }

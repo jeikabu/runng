@@ -31,4 +31,5 @@ fn aio() {
     requester.dial(url).unwrap();
     let mut req_ctx = requester.create_async_context().unwrap();
     req_ctx.send();
+    std::thread::sleep_ms(1000);
 }

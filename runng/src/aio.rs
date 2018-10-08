@@ -10,13 +10,13 @@ pub trait Aio {
     fn aio(&self) -> *mut nng_aio;
 }
 
-type AioCallback = unsafe extern "C" fn(arg1: *mut ::std::os::raw::c_void);
+type AioCallbackArg = *mut ::std::os::raw::c_void;
+type AioCallback = unsafe extern "C" fn(arg1: AioCallbackArg);
 
 impl NngAio {
-    pub fn new(socket: NngSocket, callback: AioCallback, arg: *mut ::std::os::raw::c_void) -> NngResult<NngAio> {
+    pub fn new(socket: NngSocket, callback: AioCallback, arg: AioCallbackArg) -> NngResult<NngAio> {
         unsafe {
-            let mut tmp_aio = nng_aio::new();
-            let mut tmp_aio = &mut tmp_aio as *mut nng_aio;
+            let mut tmp_aio: *mut nng_aio = std::ptr::null_mut();
             //https://doc.rust-lang.org/stable/book/first-edition/ffi.html#callbacks-from-c-code-to-rust-functions
             let res = nng_aio_alloc(&mut tmp_aio, Some(callback), arg);
             if res != 0 {

@@ -5,15 +5,3 @@
 
 // This matches bindgen::Builder output
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
-
-impl nng_msg {
-    pub fn new() -> nng_msg {
-        nng_msg { _unused: [] }
-    }
-}
-
-impl nng_aio {
-    pub fn new() -> nng_aio {
-        nng_aio { _unused: [] }
-    }
-}

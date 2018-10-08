@@ -20,8 +20,7 @@ fn it_works() {
         assert_eq!(0, nng_dial(req_socket, url, std::ptr::null_mut(), 0));
 
         // Send message
-        let mut req_msg = nng_msg::new();
-        let mut req_msg = &mut req_msg as *mut nng_msg;
+        let mut req_msg: *mut nng_msg = std::ptr::null_mut();
         assert_eq!(0, nng_msg_alloc(&mut req_msg, 0));
         // Add a value to the body of the message
         let val = 0x12345678;
@@ -29,8 +28,7 @@ fn it_works() {
         assert_eq!(0, nng_sendmsg(req_socket, req_msg, 0));
         
         // Receive it
-        let mut recv_msg = nng_msg::new();
-        let mut recv_msg = &mut recv_msg as *mut nng_msg;
+        let mut recv_msg: *mut nng_msg = std::ptr::null_mut();
         assert_eq!(0, nng_recvmsg(rep_socket, &mut recv_msg, 0));
         // Remove our value from the body of the received message
         let mut recv_val: u32 = 0;
