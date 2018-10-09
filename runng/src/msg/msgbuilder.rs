@@ -1,7 +1,7 @@
 extern crate byteorder;
 
 use self::byteorder::{BigEndian, WriteBytesExt};
-use msg::raw::NngMsg;
+use msg::msg::NngMsg;
 use std::{
     os::raw::c_void,
 };

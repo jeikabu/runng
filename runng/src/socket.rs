@@ -60,7 +60,7 @@ fn to_cstr(string: &str) -> (CString, *const i8) {
     (url, ptr)
 }
 
-pub trait Send: Socket {
+pub trait SendMsg: Socket {
     fn send(&self) -> NngResult<()> {
         let mut req_msg: *mut nng_msg = std::ptr::null_mut();
         let res = unsafe {
@@ -75,7 +75,7 @@ pub trait Send: Socket {
     }
 }
 
-pub trait Recv: Socket {
+pub trait RecvMsg: Socket {
     fn recv(&self) -> NngResult<nng_msg> {
         let mut recv_ptr: *mut nng_msg = std::ptr::null_mut();
         unsafe {

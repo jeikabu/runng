@@ -1,11 +1,10 @@
-use ctx::NngCtx;
 use aio::NngAio;
+use ctx::NngCtx;
+use futures::{sync::oneshot};
+use msg::NngMsg;
 use runng_sys::*;
+use std::{rc::Rc};
 use super::*;
-
-use std::{
-    rc::Rc,
-};
 
 pub struct Req0 {
     socket: NngSocket
@@ -39,13 +38,16 @@ enum ReqRepState {
     Receiving,
 }
 
+type MsgFuture = oneshot::Receiver<NngMsg>;
+
 pub trait AsyncReqRep {
-    fn send(&mut self);
+    fn send(&mut self) -> MsgFuture;
 }
 
 pub struct AsyncReqRepContext {
     ctx: Option<NngCtx>,
     state: ReqRepState,
+    sender: Option<oneshot::Sender<NngMsg>>
 }
 
 impl AsyncReqRepContext {
@@ -53,6 +55,7 @@ impl AsyncReqRepContext {
         let ctx = AsyncReqRepContext {
             ctx: None,
             state: ReqRepState::Ready,
+            sender: None,
         };
         Box::new(ctx)
     }
@@ -64,11 +67,12 @@ impl AsyncReqRepContext {
 }
 
 impl AsyncReqRep for AsyncReqRepContext {
-    fn send(&mut self) {
+    fn send(&mut self) -> MsgFuture {
         if self.state != ReqRepState::Ready {
             panic!();
         }
-        
+        let (sender, receiver) = oneshot::channel::<NngMsg>();
+        self.sender = Some(sender);
         unsafe {
             let aio = self.ctx.as_ref().unwrap().aio();
             let ctx = self.ctx.as_ref().unwrap().ctx();
@@ -81,6 +85,8 @@ impl AsyncReqRep for AsyncReqRepContext {
 
             nng_ctx_send(ctx, aio);
         }
+        
+        receiver
     }
 }
 
@@ -100,9 +106,9 @@ impl Socket for Rep0 {
 }
 
 impl Dial for Req0 {}
-impl Send for Req0 {}
+impl SendMsg for Req0 {}
 impl Listen for Rep0 {}
-impl Recv for Rep0 {}
+impl RecvMsg for Rep0 {}
 
 extern fn callback(arg : *mut ::std::os::raw::c_void) {
     unsafe {
@@ -119,6 +125,12 @@ extern fn callback(arg : *mut ::std::os::raw::c_void) {
                     ctx.state = ReqRepState::Ready;
                     return;
                 }
+
+                // TODO: remove this test code
+                let msg = NngMsg::new().unwrap();
+                let sender = std::mem::replace(&mut ctx.sender, None);
+                sender.unwrap().send(msg).unwrap();
+
                 ctx.state = ReqRepState::Receiving;
                 nng_ctx_recv(ctxnng, aionng);
             },
@@ -130,12 +142,13 @@ extern fn callback(arg : *mut ::std::os::raw::c_void) {
                     return;
                 }
                 let msg = nng_aio_get_msg(aionng);
-                //TODO: future returns message
+                let msg = NngMsg::new_msg(msg);
+                let sender = std::mem::replace(&mut ctx.sender, None);
+                sender.unwrap().send(msg).unwrap();
                 ctx.state = ReqRepState::Ready;
             },
         }
     }
-    
 }
 
 impl AsyncReqRepSocket for Req0 {

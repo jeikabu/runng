@@ -1,7 +1,7 @@
-
+pub mod msg;
 pub mod msgbuilder;
-pub mod raw;
 
+pub use self::msg::*;
 pub use self::msgbuilder::*;
 
 use super::*;
