@@ -1,6 +1,7 @@
 pub mod aio;
 pub mod ctx;
 pub mod factory;
+pub mod msg;
 pub mod protocol;
 pub mod result;
 pub mod socket;

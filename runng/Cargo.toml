@@ -15,5 +15,7 @@ codecov = { repository = "jeikabu/runng", branch = "master", service = "github" 
 
 [dependencies]
 runng-sys = { path = "../runng-sys" }
+futures = "0.1"
+byteorder = "1.2"
 
 [build-dependencies]

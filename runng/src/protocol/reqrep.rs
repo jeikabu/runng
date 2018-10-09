@@ -42,10 +42,12 @@ enum ReqRepState {
 pub trait AsyncReqRep {
     fn send(&mut self);
 }
+
 pub struct AsyncReqRepContext {
     ctx: Option<NngCtx>,
     state: ReqRepState,
 }
+
 impl AsyncReqRepContext {
     fn new() -> Box<AsyncReqRepContext> {
         let ctx = AsyncReqRepContext {
@@ -60,6 +62,7 @@ impl AsyncReqRepContext {
         Ok(())
     }
 }
+
 impl AsyncReqRep for AsyncReqRepContext {
     fn send(&mut self) {
         if self.state != ReqRepState::Ready {

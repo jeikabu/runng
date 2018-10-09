@@ -35,5 +35,20 @@ fn aio() {
     requester.dial(url).unwrap();
     let mut req_ctx = requester.create_async_context().unwrap();
     req_ctx.send();
-    std::thread::sleep(Duration::from_secs(1));
+    std::thread::sleep(Duration::from_millis(200));
+}
+
+#[test]
+fn msg() {
+    let mut builder = msg::MsgBuilder::new();
+    let value: u32 = 0x01234567;
+    builder.append_u32(value);
+    let mut msg = builder.build().unwrap();
+    assert_eq!(value, msg.trim_u32().unwrap());
+
+    let data = vec![0, 1, 2, 3, 4, 5, 6, 7];
+    let mut msg = builder.clean().append_slice(&data).build().unwrap();
+    let mut nngmsg = msg::raw::NngMsg::new().unwrap();
+    nngmsg.append(data.as_ptr() as *const ::std::os::raw::c_void, data.len());
+    assert_eq!(nngmsg.body(), msg.body());
 }
