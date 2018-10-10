@@ -1,0 +1,133 @@
+use aio::{NngAio, AioCallback, AioCallbackArg};
+use ctx::NngCtx;
+use futures::{sync::oneshot};
+use msg::NngMsg;
+use runng_sys::*;
+use std::{rc::Rc};
+use super::*;
+
+pub struct Req0 {
+    socket: NngSocket
+}
+
+impl Req0 {
+    pub fn open() -> NngResult<Self> {
+        let open_func = |socket: &mut nng_socket| unsafe { nng_req0_open(socket) };
+        let socket_create_func = |socket| Req0{ socket };
+        open(open_func, socket_create_func)
+    }
+}
+
+#[derive(Debug,PartialEq)]
+enum RequestState {
+    Ready,
+    Sending,
+    Receiving,
+}
+
+pub trait AsyncRequest {
+    fn send(&mut self) -> MsgFuture;
+}
+
+pub struct AsyncRequestContext {
+    ctx: Option<NngCtx>,
+    state: RequestState,
+    sender: Option<oneshot::Sender<NngMsg>>
+}
+
+impl Context for AsyncRequestContext {
+    fn new() -> Box<AsyncRequestContext> {
+        let ctx = AsyncRequestContext {
+            ctx: None,
+            state: RequestState::Ready,
+            sender: None,
+        };
+        Box::new(ctx)
+    }
+    fn init(&mut self, aio: Rc<NngAio>) -> NngResult<()> {
+        let ctx = NngCtx::new(aio)?;
+        self.ctx = Some(ctx);
+        Ok(())
+    }
+}
+
+impl AsyncRequest for AsyncRequestContext {
+    fn send(&mut self) -> MsgFuture {
+        if self.state != RequestState::Ready {
+            panic!();
+        }
+        let (sender, receiver) = oneshot::channel::<NngMsg>();
+        self.sender = Some(sender);
+        unsafe {
+            let aio = self.ctx.as_ref().unwrap().aio();
+            let ctx = self.ctx.as_ref().unwrap().ctx();
+            self.state = RequestState::Sending;
+
+            let mut request: *mut nng_msg = std::ptr::null_mut();
+            // TODO: check result != 0
+            let res = nng_msg_alloc(&mut request, 0);
+            nng_aio_set_msg(aio, request);
+
+            nng_ctx_send(ctx, aio);
+        }
+        
+        receiver
+    }
+}
+
+impl Socket for Req0 {
+    fn socket(&self) -> nng_socket {
+        self.socket.socket()
+    }
+}
+
+impl Dial for Req0 {}
+impl SendMsg for Req0 {}
+
+pub trait AsyncRequestSocket: Socket {
+    fn create_async_context(self) -> NngResult<Box<AsyncRequestContext>>;
+}
+
+impl AsyncRequestSocket for Req0 {
+    fn create_async_context(self) -> NngResult<Box<AsyncRequestContext>> {
+        create_async_context(self.socket, request_callback)
+    }
+}
+
+extern fn request_callback(arg : AioCallbackArg) {
+    unsafe {
+        let ctx = &mut *(arg as *mut AsyncRequestContext);
+        let aionng = ctx.ctx.as_ref().unwrap().aio();
+        let ctxnng = ctx.ctx.as_ref().unwrap().ctx();
+        println!("callback Request:{:?}", ctx.state);
+        match ctx.state {
+            RequestState::Ready => panic!(),
+            RequestState::Sending => {
+                let res = nng_aio_result(aionng);
+                if res != 0 {
+                    //TODO: destroy message and set error
+                    ctx.state = RequestState::Ready;
+                    panic!();
+                    return;
+                }
+
+                ctx.state = RequestState::Receiving;
+                nng_ctx_recv(ctxnng, aionng);
+            },
+            RequestState::Receiving => {
+                let res = nng_aio_result(aionng);
+                if res != 0 {
+                    //TODO: set error
+                    ctx.state = RequestState::Ready;
+                    panic!();
+                    return;
+                }
+                let msg = nng_aio_get_msg(aionng);
+                let msg = NngMsg::new_msg(msg);
+                let sender = ctx.sender.take();
+                ctx.state = RequestState::Ready;
+                sender.unwrap().send(msg).unwrap();
+            },
+        }
+    }
+}
