@@ -24,7 +24,12 @@ impl NngMsg {
         NngMsg { msg }
     }
 
-    fn msg(&self) -> *mut nng_msg {
+    pub fn take(mut self) -> *mut nng_msg {
+        let res = self.msg;
+        self.msg = std::ptr::null_mut();
+        res
+    }
+    pub fn msg(&self) -> *mut nng_msg {
         self.msg
     }
 
@@ -148,6 +153,7 @@ impl NngMsg {
 impl Drop for NngMsg {
     fn drop(&mut self) {
         unsafe {
+            println!("Dropping {:x}", self.msg() as u64);
             nng_msg_free(self.msg());
         }
     }

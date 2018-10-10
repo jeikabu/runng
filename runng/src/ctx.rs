@@ -43,3 +43,11 @@ impl Aio for NngCtx {
         self.aio.aio()
     }
 }
+
+impl Drop for NngCtx {
+    fn drop(&mut self) {
+        unsafe {
+            nng_ctx_close(self.ctx);
+        }
+    }
+}

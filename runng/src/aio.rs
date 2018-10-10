@@ -11,8 +11,8 @@ pub trait Aio {
     fn aio(&self) -> *mut nng_aio;
 }
 
-type AioCallbackArg = *mut ::std::os::raw::c_void;
-type AioCallback = unsafe extern "C" fn(arg1: AioCallbackArg);
+pub type AioCallbackArg = *mut ::std::os::raw::c_void;
+pub type AioCallback = unsafe extern "C" fn(arg1: AioCallbackArg);
 
 impl NngAio {
     pub fn new(socket: NngSocket, callback: AioCallback, arg: AioCallbackArg) -> NngResult<NngAio> {
@@ -36,6 +36,7 @@ impl NngAio {
 impl Drop for NngAio {
     fn drop(&mut self) {
         unsafe {
+            println!("Drop aio {:x}", self.aio as u64);
             nng_aio_free(self.aio);
         }
     }

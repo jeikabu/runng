@@ -25,6 +25,7 @@ impl Socket for NngSocket {
 impl Drop for NngSocket {
     fn drop(&mut self) {
         unsafe {
+            println!("Socket close: {:?}", self.socket);
             let res = nng_close(self.socket);
             if res != 0 {
                 println!("nng_close {:?}", NngFail::from_i32(res));

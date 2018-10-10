@@ -100,6 +100,7 @@ impl NngFail {
     }
 }
 
+#[derive(Debug)]
 pub enum NngReturn {
     Ok,
     Fail(NngFail),

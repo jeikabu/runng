@@ -32,12 +32,19 @@ fn aio() {
     let factory = Latest::new();
     let replier = factory.replier_open().unwrap();
     replier.listen(url).unwrap();
+    let mut rep_ctx = replier.create_async_context().unwrap();
 
     let requester = factory.requester_open().unwrap();
     requester.dial(url).unwrap();
     let mut req_ctx = requester.create_async_context().unwrap();
-    req_ctx.send().wait();
-    //std::thread::sleep(Duration::from_millis(200));
+    let req_future = req_ctx.send();
+    println!("Wait receive...");
+    rep_ctx.receive().wait();
+    println!("Wait send reply...");
+    rep_ctx.reply(msg::NngMsg::new().unwrap()).wait();
+    println!("Wait receive reply...");
+    req_future.wait();
+    println!("Done");
 }
 
 #[test]
