@@ -61,3 +61,22 @@ fn msg() {
     nngmsg.append(data.as_ptr() as *const ::std::os::raw::c_void, data.len());
     assert_eq!(nngmsg.body(), msg.body());
 }
+
+#[test]
+fn pubsub() {
+    let url = "inproc://test3";
+    let factory = Latest::new();
+
+    let publisher = factory.publisher_open().unwrap();
+    publisher.listen(url).unwrap();
+    let mut pub_ctx = publisher.create_async_context().unwrap();
+    let subscriber = factory.subscriber_open().unwrap();
+    subscriber.dial(url).unwrap();
+    let mut sub_ctx = subscriber.create_async_context().unwrap();
+    sub_ctx.subscribe("sub:subscribe");
+
+    // Beginning of message body contains topic
+    let msg = msg::MsgBuilder::new().append_u32(0u32).build().unwrap();
+    pub_ctx.send().wait();
+    sub_ctx.receive().wait();
+}

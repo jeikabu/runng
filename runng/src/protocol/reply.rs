@@ -27,7 +27,7 @@ enum ReplyState {
 
 pub trait AsyncReply {
     fn receive(&mut self) -> MsgFuture;
-    fn reply(&mut self, NngMsg) -> NngResultFuture;
+    fn reply(&mut self, NngMsg) -> NngReturnFuture;
 }
 
 pub struct AsyncReplyContext {
@@ -36,7 +36,7 @@ pub struct AsyncReplyContext {
     request_send: Option<oneshot::Sender<NngMsg>>,
     request_recv: Option<MsgFuture>,
     reply_send: Option<oneshot::Sender<NngReturn>>,
-    reply_recv: Option<NngResultFuture>,
+    reply_recv: Option<NngReturnFuture>,
 }
 
 impl AsyncReplyContext {
@@ -80,7 +80,7 @@ impl AsyncReply for AsyncReplyContext {
         self.request_recv.take().unwrap()
     }
 
-    fn reply(&mut self, msg: NngMsg) -> NngResultFuture {
+    fn reply(&mut self, msg: NngMsg) -> NngReturnFuture {
         if self.state != ReplyState::Wait {
             panic!();
         }

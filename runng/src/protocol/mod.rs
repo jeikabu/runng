@@ -1,8 +1,12 @@
+pub mod publish;
 pub mod reply;
 pub mod request;
+pub mod subscribe;
 
+pub use self::publish::*;
 pub use self::reply::*;
 pub use self::request::*;
+pub use self::subscribe::*;
 
 use futures::{sync::oneshot};
 use msg::NngMsg;
@@ -11,7 +15,7 @@ use std::{rc::Rc};
 use super::*;
 
 type MsgFuture = oneshot::Receiver<NngMsg>;
-type NngResultFuture = oneshot::Receiver<NngReturn>;
+type NngReturnFuture = oneshot::Receiver<NngReturn>;
 
 
 fn open<T, O, S>(open_func: O, socket_create_func: S) -> NngResult<T>
