@@ -37,7 +37,7 @@ fn aio() {
     let requester = factory.requester_open().unwrap();
     requester.dial(url).unwrap();
     let mut req_ctx = requester.create_async_context().unwrap();
-    let req_future = req_ctx.send();
+    let req_future = req_ctx.send(msg::NngMsg::new().unwrap());
     println!("Wait receive...");
     rep_ctx.receive().wait();
     println!("Wait send reply...");
@@ -77,8 +77,8 @@ fn pubsub() {
     sub_ctx.subscribe(topic.as_slice());
 
     // Beginning of message body contains topic
-    let msg = msg::MsgBuilder::new().append_u32(0u32).build().unwrap();
-    pub_ctx.send().wait();
+    let msg = msg::MsgBuilder::new().append_u32(0).build().unwrap();
+    pub_ctx.send(msg).wait();
     println!("Wait receive");
     sub_ctx.receive().wait();
 }

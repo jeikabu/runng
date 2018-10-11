@@ -26,7 +26,7 @@ enum RequestState {
 }
 
 pub trait AsyncRequest {
-    fn send(&mut self) -> MsgFuture;
+    fn send(&mut self, msg: NngMsg) -> MsgFuture;
 }
 
 pub struct AsyncRequestContext {
@@ -44,7 +44,7 @@ impl Context for AsyncRequestContext {
         };
         Box::new(ctx)
     }
-    fn init(&mut self, aio: Rc<NngAio>) -> NngResult<()> {
+    fn init(&mut self, aio: Rc<NngAio>) -> NngReturn {
         let ctx = NngCtx::new(aio)?;
         self.ctx = Some(ctx);
         Ok(())
@@ -52,7 +52,7 @@ impl Context for AsyncRequestContext {
 }
 
 impl AsyncRequest for AsyncRequestContext {
-    fn send(&mut self) -> MsgFuture {
+    fn send(&mut self, msg: NngMsg) -> MsgFuture {
         if self.state != RequestState::Ready {
             panic!();
         }
@@ -63,11 +63,9 @@ impl AsyncRequest for AsyncRequestContext {
             let ctx = self.ctx.as_ref().unwrap().ctx();
             self.state = RequestState::Sending;
 
-            let mut request: *mut nng_msg = std::ptr::null_mut();
-            // TODO: check result != 0
-            let res = nng_msg_alloc(&mut request, 0);
-            nng_aio_set_msg(aio, request);
-
+            // Nng assumes ownership of the message
+            let msg = msg.take();
+            nng_aio_set_msg(aio, msg);
             nng_ctx_send(ctx, aio);
         }
         
@@ -103,17 +101,17 @@ extern fn request_callback(arg : AioCallbackArg) {
         match ctx.state {
             RequestState::Ready => panic!(),
             RequestState::Sending => {
-                let res = NngReturn::from_i32(nng_aio_result(aionng));
+                let res = NngFail::from_i32(nng_aio_result(aionng));
                 match res {
-                    NngReturn::Fail(res) => {
-                        // Nng requries we retrieve the msg and free it
+                    Err(res) => {
+                        // Nng requries we resume ownership of the message
                         let _ = NngMsg::new_msg(nng_aio_get_msg(aionng));
 
                         ctx.state = RequestState::Ready;
                         let sender = ctx.sender.take().unwrap();
                         sender.send(Err(res)).unwrap();
                     },
-                    NngReturn::Ok => {
+                    Ok(()) => {
                         ctx.state = RequestState::Receiving;
                         nng_ctx_recv(ctxnng, aionng);
                     },
@@ -121,13 +119,13 @@ extern fn request_callback(arg : AioCallbackArg) {
             },
             RequestState::Receiving => {
                 let sender = ctx.sender.take().unwrap();
-                let res = NngReturn::from_i32(nng_aio_result(aionng));
+                let res = NngFail::from_i32(nng_aio_result(aionng));
                 match res {
-                    NngReturn::Fail(res) => {
+                    Err(res) => {
                         ctx.state = RequestState::Ready;
                         sender.send(Err(res)).unwrap();
                     },
-                    NngReturn::Ok => {
+                    Ok(()) => {
                         let msg = NngMsg::new_msg(nng_aio_get_msg(aionng));
                         
                         ctx.state = RequestState::Ready;

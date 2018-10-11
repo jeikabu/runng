@@ -24,11 +24,7 @@ impl NngCtx {
         let res = unsafe {
             nng_ctx_open(&mut ctx, aio.socket())
         };
-        if res == 0 {
-            Ok(NngCtx { ctx, aio })
-        } else {
-            Err(NngFail::from_i32(res))
-        }
+        NngFail::succeed_then(res, || NngCtx { ctx, aio })
     }
 }
 

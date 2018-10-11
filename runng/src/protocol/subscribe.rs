@@ -53,7 +53,7 @@ impl AsyncSubscribeContext {
                 let topic_ptr = topic.as_ptr() as *const ::std::os::raw::c_void;
                 let topic_size = std::mem::size_of_val(topic);
                 let res = nng_setopt(aio.socket(), opt, topic_ptr, topic_size);
-                NngReturn::from_i32(res)
+                NngFail::from_i32(res)
             } else {
                 panic!();
             }
@@ -74,7 +74,7 @@ impl Context for AsyncSubscribeContext {
         };
         Box::new(ctx)
     }
-    fn init(&mut self, aio: Rc<NngAio>) -> NngResult<()> {
+    fn init(&mut self, aio: Rc<NngAio>) -> NngReturn {
         self.aio = Some(aio);
         self.start_receive();
         Ok(())
@@ -116,9 +116,9 @@ extern fn subscribe_callback(arg : AioCallbackArg) {
             SubscribeState::Receiving => {
                 let aio = ctx.aio.as_ref().map(|aio| aio.aio());
                 if let Some(aio) = aio {
-                    let res = NngReturn::from_i32(nng_aio_result(aio));
+                    let res = NngFail::from_i32(nng_aio_result(aio));
                     match res {
-                        NngReturn::Fail(res) => {
+                        Err(res) => {
                             match res {
                                 NngFail::Err(NngError::ECLOSED) => {
                                     println!("Closed");
@@ -131,7 +131,7 @@ extern fn subscribe_callback(arg : AioCallbackArg) {
                             let promise = ctx.promise.take().unwrap();
                             promise.send(Err(res)).unwrap();
                         },
-                        NngReturn::Ok => {
+                        Ok(()) => {
                             let msg = NngMsg::new_msg(nng_aio_get_msg(aio));
                             let promise = ctx.promise.take().unwrap();
                             promise.send(Ok(msg)).unwrap();

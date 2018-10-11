@@ -37,20 +37,18 @@ impl Drop for NngSocket {
 
 
 pub trait Listen: Socket {
-    fn listen(&self, url: &str) -> NngResult<()> {
-        let res = unsafe {
-            nng_listen(self.socket(), to_cstr(url).1, std::ptr::null_mut(), 0)
-            };
-        NngReturn::from(res, ())
+    fn listen(&self, url: &str) -> NngReturn {
+        unsafe {
+            NngFail::from_i32(nng_listen(self.socket(), to_cstr(url).1, std::ptr::null_mut(), 0))
+            }
     }
 }
 
 pub trait Dial: Socket {
-    fn dial(&self, url: &str) -> NngResult<()> {
-        let res = unsafe {
-            nng_dial(self.socket(), to_cstr(url).1, std::ptr::null_mut(), 0)
-        };
-        NngReturn::from(res, ())
+    fn dial(&self, url: &str) -> NngReturn {
+        unsafe {
+            NngFail::from_i32(nng_dial(self.socket(), to_cstr(url).1, std::ptr::null_mut(), 0))
+        }
     }
 }
 
@@ -62,7 +60,7 @@ fn to_cstr(string: &str) -> (CString, *const i8) {
 }
 
 pub trait SendMsg: Socket {
-    fn send(&self) -> NngResult<()> {
+    fn send(&self) -> NngReturn {
         let mut req_msg: *mut nng_msg = std::ptr::null_mut();
         let res = unsafe {
             let res = nng_msg_alloc(&mut req_msg, 0);
@@ -72,16 +70,16 @@ pub trait SendMsg: Socket {
                 nng_sendmsg(self.socket(), req_msg, 0)
             }
         };
-        NngReturn::from(res, ())
+        NngFail::from_i32(res)
     }
 }
 
 pub trait RecvMsg: Socket {
     fn recv(&self) -> NngResult<nng_msg> {
-        let mut recv_ptr: *mut nng_msg = std::ptr::null_mut();
         unsafe {
+            let mut recv_ptr: *mut nng_msg = std::ptr::null_mut();
             let res = nng_recvmsg(self.socket(), &mut recv_ptr, 0);
-            NngReturn::from(res, *recv_ptr)
+            NngFail::succeed_then(res, || *recv_ptr)
         }
     }
 }

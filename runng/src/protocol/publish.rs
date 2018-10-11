@@ -24,7 +24,7 @@ enum PublishState {
 }
 
 pub trait AsyncPublish {
-    fn send(&mut self) -> NngReturnFuture;
+    fn send(&mut self, msg: NngMsg) -> NngReturnFuture;
 }
 
 pub struct AsyncPublishContext {
@@ -42,14 +42,14 @@ impl Context for AsyncPublishContext {
         };
         Box::new(ctx)
     }
-    fn init(&mut self, aio: Rc<NngAio>) -> NngResult<()> {
+    fn init(&mut self, aio: Rc<NngAio>) -> NngReturn {
         self.aio = Some(aio);
         Ok(())
     }
 }
 
 impl AsyncPublish for AsyncPublishContext {
-    fn send(&mut self) -> NngReturnFuture {
+    fn send(&mut self, msg: NngMsg) -> NngReturnFuture {
         if self.state != PublishState::Ready {
             panic!();
         }
@@ -59,11 +59,9 @@ impl AsyncPublish for AsyncPublishContext {
             if let Some(ref aio) = self.aio {
                 self.state = PublishState::Sending;
 
-                let mut request: *mut nng_msg = std::ptr::null_mut();
-                // TODO: check result != 0
-                let res = nng_msg_alloc(&mut request, 0);
-                nng_msg_append_u32(request, 0);
-                nng_aio_set_msg(aio.aio(), request);
+                // Nng takes ownership of the message
+                let msg = msg.take();
+                nng_aio_set_msg(aio.aio(), msg);
                 nng_send_aio(aio.socket(), aio.aio());
             }
         }
@@ -100,8 +98,8 @@ extern fn publish_callback(arg : AioCallbackArg) {
             PublishState::Ready => panic!(),
             PublishState::Sending => {
                 if let Some(ref mut aio) = ctx.aio {
-                    let res = NngReturn::from_i32(nng_aio_result(aio.aio()));
-                    if let NngReturn::Fail(_) = res {
+                    let res = NngFail::from_i32(nng_aio_result(aio.aio()));
+                    if let Err(_) = res {
                         // Nng requires that we retrieve the message and free it
                         let _ = NngMsg::new_msg(nng_aio_get_msg(aio.aio()));
                     }

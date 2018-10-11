@@ -68,7 +68,7 @@ impl Context for AsyncReplyContext {
         };
         Box::new(ctx)
     }
-    fn init(&mut self, aio: Rc<NngAio>) -> NngResult<()> {
+    fn init(&mut self, aio: Rc<NngAio>) -> NngReturn {
         let ctx = NngCtx::new(aio)?;
         self.ctx = Some(ctx);
         self.start_receive();
@@ -93,8 +93,9 @@ impl AsyncReply for AsyncReplyContext {
             let aio = self.ctx.as_ref().unwrap().aio();
             let ctx = self.ctx.as_ref().unwrap().ctx();
 
-            nng_aio_set_msg(aio, msg.take());
             self.state = ReplyState::Sending;
+            // Nng assumes ownership of the message
+            nng_aio_set_msg(aio, msg.take());
             nng_ctx_send(ctx, aio);
         }
         self.reply_recv.take().unwrap()
@@ -129,9 +130,9 @@ extern fn reply_callback(arg : AioCallbackArg) {
         println!("callback Reply:{:?}", ctx.state);
         match ctx.state {
             ReplyState::Receiving => {
-                let res = NngReturn::from_i32(nng_aio_result(aionng));
+                let res = NngFail::from_i32(nng_aio_result(aionng));
                 match res {
-                    NngReturn::Fail(res) => {
+                    Err(res) => {
                         match res {
                             NngFail::Err(NngError::ECLOSED) => {
                                 println!("Closed");
@@ -145,7 +146,7 @@ extern fn reply_callback(arg : AioCallbackArg) {
                         let sender = ctx.request_send.take().unwrap();
                         sender.send(Err(res)).unwrap();
                     },
-                    NngReturn::Ok => {
+                    Ok(()) => {
                         let msg = NngMsg::new_msg(nng_aio_get_msg(aionng));
                         
                         ctx.state = ReplyState::Wait;
@@ -157,9 +158,9 @@ extern fn reply_callback(arg : AioCallbackArg) {
             },
             ReplyState::Wait => panic!(),
             ReplyState::Sending => {
-                let res = NngReturn::from_i32(nng_aio_result(aionng));
-                if let NngReturn::Fail(_) = res {
-                    // Nng requires we retrieve the msg and free it
+                let res = NngFail::from_i32(nng_aio_result(aionng));
+                if let Err(_) = res {
+                    // Nng requires we resume ownership of the message
                     let _ = NngMsg::new_msg(nng_aio_get_msg(aionng));
                 }
                 

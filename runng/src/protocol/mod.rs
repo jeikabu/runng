@@ -27,17 +27,15 @@ fn open<T, O, S>(open_func: O, socket_create_func: S) -> NngResult<T>
 {
     let mut socket = nng_socket { id: 0 };
     let res = open_func(&mut socket);
-    if res == 0 {
+    NngFail::succeed_then(res, || {
         let socket = NngSocket::new(socket);
-        Ok(socket_create_func(socket))
-    } else {
-        Err(NngFail::from_i32(res))
-    }
+        socket_create_func(socket)
+    })
 }
 
 trait Context {
     fn new() -> Box<Self>;
-    fn init(&mut self, Rc<NngAio>) -> NngResult<()>;
+    fn init(&mut self, Rc<NngAio>) -> NngReturn;
 }
 
 fn create_async_context<T: Context>(socket: NngSocket, callback: AioCallback) -> NngResult<Box<T>> {
