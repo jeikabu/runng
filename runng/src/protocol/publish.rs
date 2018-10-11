@@ -30,7 +30,7 @@ pub trait AsyncPublish {
 pub struct AsyncPublishContext {
     aio: Option<Rc<NngAio>>,
     state: PublishState,
-    sender: Option<oneshot::Sender<NngReturn>>
+    sender: Option<NngReturnPromise>
 }
 
 impl Context for AsyncPublishContext {
@@ -100,15 +100,13 @@ extern fn publish_callback(arg : AioCallbackArg) {
             PublishState::Ready => panic!(),
             PublishState::Sending => {
                 if let Some(ref mut aio) = ctx.aio {
-                    let res = nng_aio_result(aio.aio());
-                    if res != 0 {
-                        //TODO: destroy message and set error
-                        ctx.state = PublishState::Ready;
-                        panic!();
-                    } else {
-                        ctx.state = PublishState::Ready;
+                    let res = NngReturn::from_i32(nng_aio_result(aio.aio()));
+                    if let NngReturn::Fail(_) = res {
+                        // Nng requires that we retrieve the message and free it
+                        let _ = NngMsg::new_msg(nng_aio_get_msg(aio.aio()));
                     }
-                    ctx.sender.take().unwrap().send(NngReturn::from_i32(res)).unwrap();
+                    ctx.state = PublishState::Ready;
+                    ctx.sender.take().unwrap().send(res).unwrap();
                 } else {
                     panic!();
                 }

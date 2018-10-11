@@ -14,7 +14,10 @@ use runng_sys::*;
 use std::{rc::Rc};
 use super::*;
 
-type MsgFuture = oneshot::Receiver<NngMsg>;
+type MsgFutureType = NngResult<NngMsg>;
+type MsgPromise = oneshot::Sender<MsgFutureType>;
+type MsgFuture = oneshot::Receiver<MsgFutureType>;
+type NngReturnPromise = oneshot::Sender<NngReturn>;
 type NngReturnFuture = oneshot::Receiver<NngReturn>;
 
 

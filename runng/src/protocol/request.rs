@@ -32,7 +32,7 @@ pub trait AsyncRequest {
 pub struct AsyncRequestContext {
     ctx: Option<NngCtx>,
     state: RequestState,
-    sender: Option<oneshot::Sender<NngMsg>>
+    sender: Option<MsgPromise>
 }
 
 impl Context for AsyncRequestContext {
@@ -56,7 +56,7 @@ impl AsyncRequest for AsyncRequestContext {
         if self.state != RequestState::Ready {
             panic!();
         }
-        let (sender, receiver) = oneshot::channel::<NngMsg>();
+        let (sender, receiver) = oneshot::channel::<MsgFutureType>();
         self.sender = Some(sender);
         unsafe {
             let aio = self.ctx.as_ref().unwrap().aio();
@@ -103,30 +103,37 @@ extern fn request_callback(arg : AioCallbackArg) {
         match ctx.state {
             RequestState::Ready => panic!(),
             RequestState::Sending => {
-                let res = nng_aio_result(aionng);
-                if res != 0 {
-                    //TODO: destroy message and set error
-                    ctx.state = RequestState::Ready;
-                    panic!();
-                    return;
-                }
+                let res = NngReturn::from_i32(nng_aio_result(aionng));
+                match res {
+                    NngReturn::Fail(res) => {
+                        // Nng requries we retrieve the msg and free it
+                        let _ = NngMsg::new_msg(nng_aio_get_msg(aionng));
 
-                ctx.state = RequestState::Receiving;
-                nng_ctx_recv(ctxnng, aionng);
+                        ctx.state = RequestState::Ready;
+                        let sender = ctx.sender.take().unwrap();
+                        sender.send(Err(res)).unwrap();
+                    },
+                    NngReturn::Ok => {
+                        ctx.state = RequestState::Receiving;
+                        nng_ctx_recv(ctxnng, aionng);
+                    },
+                }
             },
             RequestState::Receiving => {
-                let res = nng_aio_result(aionng);
-                if res != 0 {
-                    //TODO: set error
-                    ctx.state = RequestState::Ready;
-                    panic!();
-                    return;
+                let sender = ctx.sender.take().unwrap();
+                let res = NngReturn::from_i32(nng_aio_result(aionng));
+                match res {
+                    NngReturn::Fail(res) => {
+                        ctx.state = RequestState::Ready;
+                        sender.send(Err(res)).unwrap();
+                    },
+                    NngReturn::Ok => {
+                        let msg = NngMsg::new_msg(nng_aio_get_msg(aionng));
+                        
+                        ctx.state = RequestState::Ready;
+                        sender.send(Ok(msg)).unwrap();
+                    },
                 }
-                let msg = nng_aio_get_msg(aionng);
-                let msg = NngMsg::new_msg(msg);
-                let sender = ctx.sender.take();
-                ctx.state = RequestState::Ready;
-                sender.unwrap().send(msg).unwrap();
             },
         }
     }

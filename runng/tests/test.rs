@@ -73,10 +73,12 @@ fn pubsub() {
     let subscriber = factory.subscriber_open().unwrap();
     subscriber.dial(url).unwrap();
     let mut sub_ctx = subscriber.create_async_context().unwrap();
-    sub_ctx.subscribe("sub:subscribe");
+    let topic: Vec<u8> = vec![0, 0, 0, 0];
+    sub_ctx.subscribe(topic.as_slice());
 
     // Beginning of message body contains topic
     let msg = msg::MsgBuilder::new().append_u32(0u32).build().unwrap();
     pub_ctx.send().wait();
+    println!("Wait receive");
     sub_ctx.receive().wait();
 }

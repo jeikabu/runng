@@ -33,9 +33,9 @@ pub trait AsyncReply {
 pub struct AsyncReplyContext {
     ctx: Option<NngCtx>,
     state: ReplyState,
-    request_send: Option<oneshot::Sender<NngMsg>>,
+    request_send: Option<MsgPromise>,
     request_recv: Option<MsgFuture>,
-    reply_send: Option<oneshot::Sender<NngReturn>>,
+    reply_send: Option<NngReturnPromise>,
     reply_recv: Option<NngReturnFuture>,
 }
 
@@ -44,6 +44,12 @@ impl AsyncReplyContext {
         let aionng = self.ctx.as_ref().unwrap().aio();
         let ctxnng = self.ctx.as_ref().unwrap().ctx();
         self.state = ReplyState::Receiving;
+        let (request_send, request_recv) = oneshot::channel::<MsgFutureType>();
+        let (reply_send, reply_recv) = oneshot::channel::<NngReturn>();
+        self.request_send = Some(request_send);
+        self.request_recv = Some(request_recv);
+        self.reply_send = Some(reply_send);
+        self.reply_recv = Some(reply_recv);
         unsafe {
             nng_ctx_recv(ctxnng, aionng);
         }
@@ -52,15 +58,13 @@ impl AsyncReplyContext {
 
 impl Context for AsyncReplyContext {
     fn new() -> Box<AsyncReplyContext> {
-        let (request_send, request_recv) = oneshot::channel::<NngMsg>();
-        let (reply_send, reply_recv) = oneshot::channel::<NngReturn>();
         let ctx = AsyncReplyContext {
             ctx: None,
             state: ReplyState::Receiving,
-            request_send: Some(request_send), 
-            request_recv: Some(request_recv),
-            reply_send: Some(reply_send),
-            reply_recv: Some(reply_recv),
+            request_send: None, 
+            request_recv: None,
+            reply_send: None,
+            reply_recv: None,
         };
         Box::new(ctx)
     }
@@ -125,47 +129,46 @@ extern fn reply_callback(arg : AioCallbackArg) {
         println!("callback Reply:{:?}", ctx.state);
         match ctx.state {
             ReplyState::Receiving => {
-                let res = nng_aio_result(aionng);
-                let res = NngReturn::from_i32(res);
-                //TODO: set error
+                let res = NngReturn::from_i32(nng_aio_result(aionng));
                 match res {
                     NngReturn::Fail(res) => {
                         match res {
                             NngFail::Err(NngError::ECLOSED) => {
                                 println!("Closed");
                             },
-                            NngFail::Err(_) => {
+                            _ => {
                                 println!("Reply.Receive: {:?}", res);
                                 ctx.start_receive();
                             },
-                            NngFail::Unknown(res) => {
-                                panic!(res);
-                            },
                         }
+
+                        let sender = ctx.request_send.take().unwrap();
+                        sender.send(Err(res)).unwrap();
                     },
                     NngReturn::Ok => {
-                        let msg = nng_aio_get_msg(aionng);
-                        let msg = NngMsg::new_msg(msg);
-                        let sender = ctx.request_send.take().unwrap();
-                        sender.send(msg).unwrap();
+                        let msg = NngMsg::new_msg(nng_aio_get_msg(aionng));
+                        
                         ctx.state = ReplyState::Wait;
+
+                        let sender = ctx.request_send.take().unwrap();
+                        sender.send(Ok(msg)).unwrap();
                     }
                 }
             },
             ReplyState::Wait => panic!(),
             ReplyState::Sending => {
-                let res = nng_aio_result(aionng);
-                if res != 0 {
-                    //TODO: destroy message and set error
-                    panic!();
+                let res = NngReturn::from_i32(nng_aio_result(aionng));
+                if let NngReturn::Fail(_) = res {
+                    // Nng requires we retrieve the msg and free it
+                    let _ = NngMsg::new_msg(nng_aio_get_msg(aionng));
                 }
-
+                
                 // No matter if sending reply succeeded/failed, start receiving again before
                 // signaling completion to avoid race condition where we say we're done, but 
                 // not yet ready for receive() to be called.
                 ctx.start_receive();
                 let sender = ctx.reply_send.take().unwrap();
-                sender.send(NngReturn::from_i32(res)).unwrap();
+                sender.send(res).unwrap();
             },
             
         }
