@@ -35,8 +35,8 @@ impl Drop for NngAio {
 }
 
 impl RawSocket for NngAio {
-    fn socket(&self) -> nng_socket {
-        self.socket.socket()
+    fn socket(&self) -> &NngSocket {
+        &self.socket
     }
 }
 

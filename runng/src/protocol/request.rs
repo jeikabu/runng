@@ -14,7 +14,7 @@ impl Req0 {
     pub fn open() -> NngResult<Self> {
         let open_func = |socket: &mut nng_socket| unsafe { nng_req0_open(socket) };
         let socket_create_func = |socket| Req0{ socket };
-        open(open_func, socket_create_func)
+        nng_open(open_func, socket_create_func)
     }
 }
 
@@ -74,20 +74,17 @@ impl AsyncRequest for AsyncRequestContext {
 }
 
 impl Socket for Req0 {
-    fn socket(&self) -> nng_socket {
-        self.socket.socket()
+    fn socket(&self) -> &NngSocket {
+        &self.socket
     }
 }
 
 impl Dial for Req0 {}
 impl SendMsg for Req0 {}
 
-pub trait AsyncRequestSocket: Socket {
-    fn create_async_context(self) -> NngResult<Box<AsyncRequestContext>>;
-}
-
-impl AsyncRequestSocket for Req0 {
-    fn create_async_context(self) -> NngResult<Box<AsyncRequestContext>> {
+impl AsyncSocket for Req0 {
+    type ContextType = AsyncRequestContext;
+    fn create_async_context(self) -> NngResult<Box<Self::ContextType>> {
         create_async_context(self.socket, request_callback)
     }
 }

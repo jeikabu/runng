@@ -12,7 +12,7 @@ pub struct Rep0 {
 
 impl Rep0 {
     pub fn open() -> NngResult<Self> {
-        open(|socket| unsafe { nng_rep0_open(socket) }, 
+        nng_open(|socket| unsafe { nng_rep0_open(socket) }, 
             |socket| Rep0{ socket }
         )
     }
@@ -103,21 +103,17 @@ impl AsyncReply for AsyncReplyContext {
 }
 
 impl Socket for Rep0 {
-    fn socket(&self) -> nng_socket {
-        self.socket.socket()
+    fn socket(&self) -> &NngSocket {
+        &self.socket
     }
 }
 
 impl Listen for Rep0 {}
 impl RecvMsg for Rep0 {}
 
-pub trait AsyncReplySocket: Socket {
-    fn create_async_context(self) -> NngResult<Box<AsyncReplyContext>>;
-}
-
-
-impl AsyncReplySocket for Rep0 {
-    fn create_async_context(self) -> NngResult<Box<AsyncReplyContext>> {
+impl AsyncSocket for Rep0 {
+    type ContextType = AsyncReplyContext;
+    fn create_async_context(self) -> NngResult<Box<Self::ContextType>> {
         create_async_context(self.socket, reply_callback)
     }
 }

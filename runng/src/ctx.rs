@@ -22,7 +22,7 @@ impl NngCtx {
     pub fn new(aio: Rc<NngAio>) -> NngResult<NngCtx> {
         let mut ctx = nng_ctx { id: 0 };
         let res = unsafe {
-            nng_ctx_open(&mut ctx, aio.socket())
+            nng_ctx_open(&mut ctx, aio.nng_socket())
         };
         NngFail::succeed_then(res, || NngCtx { ctx, aio })
     }

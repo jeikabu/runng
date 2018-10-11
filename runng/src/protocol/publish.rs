@@ -13,7 +13,7 @@ impl Pub0 {
     pub fn open() -> NngResult<Self> {
         let open_func = |socket: &mut nng_socket| unsafe { nng_pub0_open(socket) };
         let socket_create_func = |socket| Pub0{ socket };
-        open(open_func, socket_create_func)
+        nng_open(open_func, socket_create_func)
     }
 }
 
@@ -62,7 +62,7 @@ impl AsyncPublish for AsyncPublishContext {
                 // Nng takes ownership of the message
                 let msg = msg.take();
                 nng_aio_set_msg(aio.aio(), msg);
-                nng_send_aio(aio.socket(), aio.aio());
+                nng_send_aio(aio.nng_socket(), aio.aio());
             }
         }
         
@@ -71,20 +71,17 @@ impl AsyncPublish for AsyncPublishContext {
 }
 
 impl Socket for Pub0 {
-    fn socket(&self) -> nng_socket {
-        self.socket.socket()
+    fn socket(&self) -> &NngSocket {
+        &self.socket
     }
 }
 
 impl Listen for Pub0 {}
 impl SendMsg for Pub0 {}
 
-pub trait AsyncPublishSocket: Socket {
-    fn create_async_context(self) -> NngResult<Box<AsyncPublishContext>>;
-}
-
-impl AsyncPublishSocket for Pub0 {
-    fn create_async_context(self) -> NngResult<Box<AsyncPublishContext>> {
+impl AsyncSocket for Pub0 {
+    type ContextType = AsyncPublishContext;
+    fn create_async_context(self) -> NngResult<Box<Self::ContextType>> {
         create_async_context(self.socket, publish_callback)
     }
 }
@@ -110,5 +107,35 @@ extern fn publish_callback(arg : AioCallbackArg) {
                 }
             },
         }
+    }
+}
+
+
+pub struct Push0 {
+    socket: NngSocket
+}
+
+impl Push0 {
+    pub fn open() -> NngResult<Self> {
+        nng_open(
+            |socket| unsafe { nng_push0_open(socket) }, 
+            |socket| Push0{ socket }
+        )
+    }
+}
+
+impl Socket for Push0 {
+    fn socket(&self) -> &NngSocket {
+        &self.socket
+    }
+}
+
+impl Listen for Push0 {}
+impl SendMsg for Push0 {}
+
+impl AsyncSocket for Push0 {
+    type ContextType = AsyncPublishContext;
+    fn create_async_context(self) -> NngResult<Box<Self::ContextType>> {
+        create_async_context(self.socket, publish_callback)
     }
 }

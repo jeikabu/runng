@@ -1,12 +1,12 @@
 pub mod publish;
+pub mod pull;
 pub mod reply;
 pub mod request;
-pub mod subscribe;
 
 pub use self::publish::*;
+pub use self::pull::*;
 pub use self::reply::*;
 pub use self::request::*;
-pub use self::subscribe::*;
 
 use futures::{sync::oneshot};
 use msg::NngMsg;
@@ -21,7 +21,7 @@ type NngReturnPromise = oneshot::Sender<NngReturn>;
 type NngReturnFuture = oneshot::Receiver<NngReturn>;
 
 
-fn open<T, O, S>(open_func: O, socket_create_func: S) -> NngResult<T>
+fn nng_open<T, O, S>(open_func: O, socket_create_func: S) -> NngResult<T>
     where O: Fn(&mut nng_socket) -> i32,
         S: Fn(NngSocket) -> T
 {
@@ -46,4 +46,9 @@ fn create_async_context<T: Context>(socket: NngSocket, callback: AioCallback) ->
     let aio = Rc::new(aio);
     (*ctx).init(aio.clone())?;
     Ok(ctx)
+}
+
+pub trait AsyncSocket: Socket {
+    type ContextType;
+    fn create_async_context(self) -> NngResult<Box<Self::ContextType>>;
 }

@@ -73,7 +73,7 @@ fn pubsub() {
     let subscriber = factory.subscriber_open().unwrap();
     subscriber.dial(url).unwrap();
     let mut sub_ctx = subscriber.create_async_context().unwrap();
-    let topic: Vec<u8> = vec![0, 0, 0, 0];
+    let topic: Vec<u8> = vec![0; 4];
     sub_ctx.subscribe(topic.as_slice());
 
     // Beginning of message body contains topic
@@ -81,4 +81,20 @@ fn pubsub() {
     pub_ctx.send(msg).wait();
     println!("Wait receive");
     sub_ctx.receive().wait();
+}
+
+#[test]
+fn pushpull() {
+    let url = "inproc://test4";
+    let factory = Latest::new();
+
+    let pusher = factory.pusher_open().unwrap();
+    pusher.listen(url).unwrap();
+    let mut push_ctx = pusher.create_async_context().unwrap();
+    let puller = factory.puller_open().unwrap();
+    puller.dial(url).unwrap();
+    let mut pull_ctx = puller.create_async_context().unwrap();
+
+    push_ctx.send(msg::NngMsg::new().unwrap()).wait().unwrap();
+    pull_ctx.receive().wait().unwrap();
 }
