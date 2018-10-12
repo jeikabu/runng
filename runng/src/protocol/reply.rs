@@ -144,9 +144,8 @@ extern fn reply_callback(arg : AioCallbackArg) {
                     },
                     Ok(()) => {
                         let msg = NngMsg::new_msg(nng_aio_get_msg(aionng));
-                        
+                        // Reset state before signaling completion
                         ctx.state = ReplyState::Wait;
-
                         let sender = ctx.request_send.take().unwrap();
                         sender.send(Ok(msg)).unwrap();
                     }
@@ -160,11 +159,11 @@ extern fn reply_callback(arg : AioCallbackArg) {
                     let _ = NngMsg::new_msg(nng_aio_get_msg(aionng));
                 }
                 
-                // No matter if sending reply succeeded/failed, start receiving again before
+                let sender = ctx.reply_send.take().unwrap();
+                // Reset state and start receiving again before
                 // signaling completion to avoid race condition where we say we're done, but 
                 // not yet ready for receive() to be called.
                 ctx.start_receive();
-                let sender = ctx.reply_send.take().unwrap();
                 sender.send(res).unwrap();
             },
             

@@ -76,6 +76,7 @@ impl Socket for Pub0 {
     }
 }
 
+impl Dial for Pub0 {}
 impl Listen for Pub0 {}
 impl SendMsg for Pub0 {}
 
@@ -100,6 +101,7 @@ extern fn publish_callback(arg : AioCallbackArg) {
                         // Nng requires that we retrieve the message and free it
                         let _ = NngMsg::new_msg(nng_aio_get_msg(aio.aio()));
                     }
+                    // Reset state before signaling completion
                     ctx.state = PublishState::Ready;
                     ctx.sender.take().unwrap().send(res).unwrap();
                 } else {
@@ -130,6 +132,7 @@ impl Socket for Push0 {
     }
 }
 
+impl Dial for Push0 {}
 impl Listen for Push0 {}
 impl SendMsg for Push0 {}
 

@@ -79,6 +79,7 @@ impl Socket for Pull0 {
 }
 
 impl Dial for Pull0 {}
+impl Listen for Pull0 {}
 impl RecvMsg for Pull0 {}
 
 impl AsyncSocket for Pull0 {
@@ -116,8 +117,10 @@ extern fn pull_callback(arg : AioCallbackArg) {
                         Ok(()) => {
                             let msg = NngMsg::new_msg(nng_aio_get_msg(aio));
                             let promise = ctx.promise.take().unwrap();
-                            promise.send(Ok(msg)).unwrap();
+                            // Make sure to reset state before signaling completion.  Otherwise
+                            // have race-condition where receiver can receive None promise
                             ctx.start_receive();
+                            promise.send(Ok(msg)).unwrap();
                         }
                     }
                 } else {
