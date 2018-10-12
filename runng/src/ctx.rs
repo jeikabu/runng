@@ -22,13 +22,9 @@ impl NngCtx {
     pub fn new(aio: Rc<NngAio>) -> NngResult<NngCtx> {
         let mut ctx = nng_ctx { id: 0 };
         let res = unsafe {
-            nng_ctx_open(&mut ctx, aio.socket())
+            nng_ctx_open(&mut ctx, aio.nng_socket())
         };
-        if res == 0 {
-            Ok(NngCtx { ctx, aio })
-        } else {
-            Err(NngFail::from_i32(res))
-        }
+        NngFail::succeed_then(res, || NngCtx { ctx, aio })
     }
 }
 

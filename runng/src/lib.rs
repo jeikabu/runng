@@ -39,5 +39,8 @@ use runng_sys::*;
 
 // Trait where type exposes a socket, but this shouldn't be part of public API
 trait RawSocket {
-    fn socket(&self) -> nng_socket;
+    fn socket(&self) -> &NngSocket;
+    unsafe fn nng_socket(&self) -> nng_socket {
+        self.socket().nng_socket()
+    }
 }

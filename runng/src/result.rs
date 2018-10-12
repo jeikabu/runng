@@ -91,35 +91,25 @@ pub enum NngFail {
 }
 
 impl NngFail {
-    pub fn from_i32(value: i32) -> NngFail {
-        if let Some(error) = NngError::from_i32(value) {
-            NngFail::Err(error)
-        } else {
-            NngFail::Unknown(value)
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum NngReturn {
-    Ok,
-    Fail(NngFail),
-}
-
-impl NngReturn {
     pub fn from_i32(value: i32) -> NngReturn {
         if value == 0 {
-            NngReturn::Ok
+            Ok(())
+        } else if let Some(error) = NngError::from_i32(value) {
+            Err(NngFail::Err(error))
         } else {
-            NngReturn::Fail(NngFail::from_i32(value))
+            Err(NngFail::Unknown(value))
         }
     }
-
-    pub fn from<T>(return_value: i32, result: T) -> NngResult<T> {
-        if return_value == 0 {
-            Ok(result)
-        } else {
-            Err(NngFail::from_i32(return_value))
+    pub fn succeed<T>(value: i32, result: T) -> NngResult<T> {
+        match NngFail::from_i32(value) {
+            Ok(()) => Ok(result),
+            Err(error) => Err(error),
+        }
+    }
+    pub fn succeed_then<T, F: FnOnce() -> T>(value: i32, result: F) -> NngResult<T> {
+        match NngFail::from_i32(value) {
+            Ok(()) => Ok(result()),
+            Err(error) => Err(error),
         }
     }
 }
@@ -133,3 +123,4 @@ impl fmt::Display for NngError {
 }
 
 pub type NngResult<T> = Result<T, NngFail>;
+pub type NngReturn = NngResult<()>;
