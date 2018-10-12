@@ -14,7 +14,7 @@ travis-ci = { repository = "jeikabu/runng", branch = "master" }
 codecov = { repository = "jeikabu/runng", branch = "master", service = "github" }
 
 [dependencies]
-runng-sys = { path = "../runng-sys" }
+runng-sys = { version = "0.1.3", path = "../runng-sys" }
 futures = "0.1"
 byteorder = "1.2"
 

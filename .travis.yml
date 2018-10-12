@@ -2,10 +2,13 @@ language: rust
 rust:
   - stable
 
+cache: cargo
+
 os:
   - linux
   - osx
 
+# Need travis full VM otherwise kcov fails
 sudo: required
 addons:
   apt:
