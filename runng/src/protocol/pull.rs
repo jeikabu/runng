@@ -146,26 +146,44 @@ impl Sub0 {
     }
 }
 
+impl Subscribe for Sub0 {
+    fn subscribe(&self, topic: &[u8]) -> NngReturn {
+        unsafe {
+            subscribe(self.socket.nng_socket(), topic)
+        }
+    }
+}
+
+pub trait Subscribe {
+    fn subscribe(&self, topic: &[u8]) -> NngReturn;
+    fn subscribe_str(&self, topic: &str) -> NngReturn {
+        self.subscribe(topic.as_bytes())
+    }
+}
+
+fn subscribe(socket: nng_socket, topic: &[u8]) -> NngReturn {
+    unsafe {
+        let opt = NNG_OPT_SUB_SUBSCRIBE.as_ptr() as *const ::std::os::raw::c_char;
+        let topic_ptr = topic.as_ptr() as *const ::std::os::raw::c_void;
+        let topic_size = std::mem::size_of_val(topic);
+        let res = nng_setopt(socket, opt, topic_ptr, topic_size);
+        NngFail::from_i32(res)
+    }
+}
+
 pub struct AsyncSubscribeContext {
     ctx: AsyncPullContext
 }
 
-impl AsyncSubscribeContext {
-    pub fn subscribe(&self, topic: &[u8]) -> NngReturn {
+impl Subscribe for AsyncSubscribeContext {
+    fn subscribe(&self, topic: &[u8]) -> NngReturn {
         unsafe {
             if let Some(ref aio) = self.ctx.aio {
-                let opt = NNG_OPT_SUB_SUBSCRIBE.as_ptr() as *const ::std::os::raw::c_char;
-                let topic_ptr = topic.as_ptr() as *const ::std::os::raw::c_void;
-                let topic_size = std::mem::size_of_val(topic);
-                let res = nng_setopt(aio.nng_socket(), opt, topic_ptr, topic_size);
-                NngFail::from_i32(res)
+                subscribe(aio.nng_socket(), topic)
             } else {
                 panic!();
             }
         }
-    }
-    pub fn subscribe_str(&self, topic: &str) -> NngReturn {
-        self.subscribe(topic.as_bytes())
     }
 }
 

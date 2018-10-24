@@ -1,0 +1,8 @@
+[package]
+name = "runng-thrift"
+version = "0.1.0"
+authors = ["Jake <jeikabu+github@gmail.com>"]
+
+[dependencies]
+thrift = { path = "../../../thrift/lib/rs" }
+runng = { version = "0.1.1", path = "../runng" }

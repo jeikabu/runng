@@ -1,5 +1,6 @@
 [workspace]
 members = [
     "runng",
-    "runng-sys"
+    "runng-sys",
+    "runng-thrift",
 ]
