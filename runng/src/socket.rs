@@ -20,9 +20,14 @@ impl Drop for NngSocket {
         unsafe {
             println!("Socket close: {:?}", self.socket);
             let res = NngFail::from_i32(nng_close(self.socket));
-            if let Err(res) = res {
-                println!("nng_close {:?}", res);
-                panic!(res);
+            match res {
+                Ok(()) => {},
+                // Can't panic here.  Thrift's TIoChannel::split() clones the socket handle so we may get ECLOSED
+                Err(NngFail::Err(NngError::ECLOSED)) => {},
+                Err(res) => {
+                    println!("nng_close {:?}", res);
+                    panic!(res);
+                },
             }
         }
     }
@@ -32,13 +37,17 @@ impl Socket for NngSocket {
     fn socket(&self) -> &NngSocket {
         self
     }
+    fn take(self) -> NngSocket {
+        self
+    }
 }
 
 impl SendMsg for NngSocket {}
 impl RecvMsg for NngSocket {}
 
-pub trait Socket {
+pub trait Socket: Sized {
     fn socket(&self) -> &NngSocket;
+    fn take(self) -> NngSocket;
     unsafe fn nng_socket(&self) -> nng_socket {
         self.socket().nng_socket()
     }

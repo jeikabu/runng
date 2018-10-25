@@ -76,6 +76,9 @@ impl Socket for Pull0 {
     fn socket(&self) -> &NngSocket {
         &self.socket
     }
+    fn take(self) -> NngSocket {
+        self.socket
+    }
 }
 
 impl Dial for Pull0 {}
@@ -208,6 +211,9 @@ impl AsyncPull for AsyncSubscribeContext {
 impl Socket for Sub0 {
     fn socket(&self) -> &NngSocket {
         &self.socket
+    }
+    fn take(self) -> NngSocket {
+        self.socket
     }
 }
 

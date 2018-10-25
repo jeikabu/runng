@@ -74,6 +74,9 @@ impl Socket for Pub0 {
     fn socket(&self) -> &NngSocket {
         &self.socket
     }
+    fn take(self) -> NngSocket {
+        self.socket
+    }
 }
 
 impl Dial for Pub0 {}
@@ -129,6 +132,9 @@ impl Push0 {
 impl Socket for Push0 {
     fn socket(&self) -> &NngSocket {
         &self.socket
+    }
+    fn take(self) -> NngSocket {
+        self.socket
     }
 }
 

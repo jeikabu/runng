@@ -77,6 +77,9 @@ impl Socket for Req0 {
     fn socket(&self) -> &NngSocket {
         &self.socket
     }
+    fn take(self) -> NngSocket {
+        self.socket
+    }
 }
 
 impl Dial for Req0 {}
