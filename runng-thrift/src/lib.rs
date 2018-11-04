@@ -8,6 +8,7 @@ use std::{
     }
 };
 
+
 mod nng_channel;
 pub use nng_channel::*;
 
@@ -130,60 +131,5 @@ where
 {
     fn deref_mut(&mut self) -> &mut C {
         &mut self.handle
-    }
-}
-
-
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use runng::{
-        Dial,
-        Factory,
-        Listen,
-        RecvMsg,
-        SendMsg,
-        Socket,
-        msg::NngMsg,
-        protocol::Subscribe,
-    };
-    use thrift::{
-        protocol::{
-            TMultiplexedOutputProtocol,
-        }
-    };
-
-    #[test]
-    fn it_works() {
-        let factory = runng::Latest::new();
-        let publisher = factory.publisher_open().unwrap();
-        let subscriber = factory.subscriber_open().unwrap();
-        let url = "inproc://test";
-        publisher.listen(url).unwrap();
-        subscriber.dial(url).unwrap();
-        let topic: Vec<u8> = vec![0];
-        subscriber.subscribe(&topic);
-        let mut msg = NngMsg::new().unwrap();
-        msg.append_u32(0).unwrap();
-        publisher.send(msg).unwrap();
-        subscriber.recv().unwrap();
-    }
-
-    #[test]
-    fn thrift_works() {
-        let url = "inproc://test2";
-        let factory = runng::Latest::new();
-        let replier = factory.replier_open().unwrap();
-        let requester = factory.requester_open().unwrap();
-        replier.listen(url).unwrap();
-        requester.dial(url).unwrap();
-
-        let mut channel = TNngChannel::new(requester.take()).unwrap();
-        let (readable, writable) = channel.split().unwrap();
-        let in_proto = TNngInputProtocol::new(readable);
-        let out_proto = TNngOutputProtocol::new(writable);
-        let out_proto = TMultiplexedOutputProtocol::new("blah", out_proto);
-
     }
 }

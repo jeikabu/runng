@@ -4,5 +4,7 @@ version = "0.1.0"
 authors = ["Jake <jeikabu+github@gmail.com>"]
 
 [dependencies]
-thrift = { version = "0.0.4" }
 runng = { version = "0.1.1", path = "../runng" }
+thrift = "0.0.4"
+try_from = "0.2"
+ordered-float = "1.0"

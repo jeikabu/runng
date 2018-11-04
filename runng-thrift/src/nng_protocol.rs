@@ -32,7 +32,7 @@ where
 {
     pub fn new (transport: T) -> TNngInputProtocol<T> {
         TNngInputProtocol {
-            protocol: thrift::protocol::TBinaryInputProtocol::new(transport, false),
+            protocol: thrift::protocol::TBinaryInputProtocol::new(transport, true),
         }
     }
 }
@@ -139,7 +139,7 @@ where
 {
     pub fn new(transport: T) -> TNngOutputProtocol<T> {
         TNngOutputProtocol {
-            protocol: thrift::protocol::TBinaryOutputProtocol::new(transport, false),
+            protocol: thrift::protocol::TBinaryOutputProtocol::new(transport, true),
         }
     }
 }
