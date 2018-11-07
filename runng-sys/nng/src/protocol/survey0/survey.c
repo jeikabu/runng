@@ -376,7 +376,7 @@ surv0_pipe_getq_cb(void *arg)
 	surv0_pipe *p = arg;
 
 	if (nni_aio_result(p->aio_getq) != 0) {
-		nni_pipe_stop(p->npipe);
+		nni_pipe_close(p->npipe);
 		return;
 	}
 
@@ -394,7 +394,7 @@ surv0_pipe_send_cb(void *arg)
 	if (nni_aio_result(p->aio_send) != 0) {
 		nni_msg_free(nni_aio_get_msg(p->aio_send));
 		nni_aio_set_msg(p->aio_send, NULL);
-		nni_pipe_stop(p->npipe);
+		nni_pipe_close(p->npipe);
 		return;
 	}
 
@@ -411,7 +411,7 @@ surv0_pipe_recv_cb(void *arg)
 	uint32_t    id;
 
 	if (nni_aio_result(p->aio_recv) != 0) {
-		nni_pipe_stop(p->npipe);
+		nni_pipe_close(p->npipe);
 		return;
 	}
 
@@ -423,7 +423,7 @@ surv0_pipe_recv_cb(void *arg)
 	if (nni_msg_len(msg) < 4) {
 		// Peer sent us garbage.  Kick it.
 		nni_msg_free(msg);
-		nni_pipe_stop(p->npipe);
+		nni_pipe_close(p->npipe);
 		return;
 	}
 	id = nni_msg_trim_u32(msg);
@@ -449,49 +449,50 @@ surv0_pipe_recv_cb(void *arg)
 }
 
 static int
-surv0_ctx_setopt_surveytime(void *arg, const void *buf, size_t sz, int typ)
+surv0_ctx_set_surveytime(void *arg, const void *buf, size_t sz, nni_opt_type t)
 {
 	surv0_ctx *ctx = arg;
-	return (nni_copyin_ms(&ctx->survtime, buf, sz, typ));
+	return (nni_copyin_ms(&ctx->survtime, buf, sz, t));
 }
 
 static int
-surv0_ctx_getopt_surveytime(void *arg, void *buf, size_t *szp, int typ)
+surv0_ctx_get_surveytime(void *arg, void *buf, size_t *szp, nni_opt_type t)
 {
 	surv0_ctx *ctx = arg;
-	return (nni_copyout_ms(ctx->survtime, buf, szp, typ));
+	return (nni_copyout_ms(ctx->survtime, buf, szp, t));
 }
 
 static int
-surv0_sock_setopt_maxttl(void *arg, const void *buf, size_t sz, int typ)
+surv0_sock_set_maxttl(void *arg, const void *buf, size_t sz, nni_opt_type t)
 {
 	surv0_sock *s = arg;
-	return (nni_copyin_int(&s->ttl, buf, sz, 1, 255, typ));
+	return (nni_copyin_int(&s->ttl, buf, sz, 1, 255, t));
 }
 
 static int
-surv0_sock_getopt_maxttl(void *arg, void *buf, size_t *szp, int typ)
+surv0_sock_get_maxttl(void *arg, void *buf, size_t *szp, nni_opt_type t)
 {
 	surv0_sock *s = arg;
-	return (nni_copyout_int(s->ttl, buf, szp, typ));
+	return (nni_copyout_int(s->ttl, buf, szp, t));
 }
 
 static int
-surv0_sock_setopt_surveytime(void *arg, const void *buf, size_t sz, int typ)
+surv0_sock_set_surveytime(
+    void *arg, const void *buf, size_t sz, nni_opt_type t)
 {
 	surv0_sock *s = arg;
-	return (surv0_ctx_setopt_surveytime(s->ctx, buf, sz, typ));
+	return (surv0_ctx_set_surveytime(s->ctx, buf, sz, t));
 }
 
 static int
-surv0_sock_getopt_surveytime(void *arg, void *buf, size_t *szp, int typ)
+surv0_sock_get_surveytime(void *arg, void *buf, size_t *szp, nni_opt_type t)
 {
 	surv0_sock *s = arg;
-	return (surv0_ctx_getopt_surveytime(s->ctx, buf, szp, typ));
+	return (surv0_ctx_get_surveytime(s->ctx, buf, szp, t));
 }
 
 static int
-surv0_sock_getopt_sendfd(void *arg, void *buf, size_t *szp, int typ)
+surv0_sock_get_sendfd(void *arg, void *buf, size_t *szp, nni_opt_type t)
 {
 	surv0_sock *sock = arg;
 	int         rv;
@@ -510,11 +511,11 @@ surv0_sock_getopt_sendfd(void *arg, void *buf, size_t *szp, int typ)
 	if ((rv = nni_pollable_getfd(sock->sendable, &fd)) != 0) {
 		return (rv);
 	}
-	return (nni_copyout_int(fd, buf, szp, typ));
+	return (nni_copyout_int(fd, buf, szp, t));
 }
 
 static int
-surv0_sock_getopt_recvfd(void *arg, void *buf, size_t *szp, int typ)
+surv0_sock_get_recvfd(void *arg, void *buf, size_t *szp, nni_opt_type t)
 {
 	surv0_sock *  sock = arg;
 	nni_pollable *recvable;
@@ -525,7 +526,7 @@ surv0_sock_getopt_recvfd(void *arg, void *buf, size_t *szp, int typ)
 	    ((rv = nni_pollable_getfd(recvable, &fd)) != 0)) {
 		return (rv);
 	}
-	return (nni_copyout_int(fd, buf, szp, typ));
+	return (nni_copyout_int(fd, buf, szp, t));
 }
 
 static void
@@ -550,15 +551,15 @@ static nni_proto_pipe_ops surv0_pipe_ops = {
 	.pipe_stop  = surv0_pipe_stop,
 };
 
-static nni_proto_ctx_option surv0_ctx_options[] = {
+static nni_proto_option surv0_ctx_options[] = {
 	{
-	    .co_name   = NNG_OPT_SURVEYOR_SURVEYTIME,
-	    .co_type   = NNI_TYPE_DURATION,
-	    .co_getopt = surv0_ctx_getopt_surveytime,
-	    .co_setopt = surv0_ctx_setopt_surveytime,
+	    .o_name = NNG_OPT_SURVEYOR_SURVEYTIME,
+	    .o_type = NNI_TYPE_DURATION,
+	    .o_get  = surv0_ctx_get_surveytime,
+	    .o_set  = surv0_ctx_set_surveytime,
 	},
 	{
-	    .co_name = NULL,
+	    .o_name = NULL,
 	}
 };
 static nni_proto_ctx_ops surv0_ctx_ops = {
@@ -569,34 +570,32 @@ static nni_proto_ctx_ops surv0_ctx_ops = {
 	.ctx_options = surv0_ctx_options,
 };
 
-static nni_proto_sock_option surv0_sock_options[] = {
+static nni_proto_option surv0_sock_options[] = {
 	{
-	    .pso_name   = NNG_OPT_SURVEYOR_SURVEYTIME,
-	    .pso_type   = NNI_TYPE_DURATION,
-	    .pso_getopt = surv0_sock_getopt_surveytime,
-	    .pso_setopt = surv0_sock_setopt_surveytime,
+	    .o_name = NNG_OPT_SURVEYOR_SURVEYTIME,
+	    .o_type = NNI_TYPE_DURATION,
+	    .o_get  = surv0_sock_get_surveytime,
+	    .o_set  = surv0_sock_set_surveytime,
 	},
 	{
-	    .pso_name   = NNG_OPT_MAXTTL,
-	    .pso_type   = NNI_TYPE_INT32,
-	    .pso_getopt = surv0_sock_getopt_maxttl,
-	    .pso_setopt = surv0_sock_setopt_maxttl,
+	    .o_name = NNG_OPT_MAXTTL,
+	    .o_type = NNI_TYPE_INT32,
+	    .o_get  = surv0_sock_get_maxttl,
+	    .o_set  = surv0_sock_set_maxttl,
 	},
 	{
-	    .pso_name   = NNG_OPT_RECVFD,
-	    .pso_type   = NNI_TYPE_INT32,
-	    .pso_getopt = surv0_sock_getopt_recvfd,
-	    .pso_setopt = NULL,
+	    .o_name = NNG_OPT_RECVFD,
+	    .o_type = NNI_TYPE_INT32,
+	    .o_get  = surv0_sock_get_recvfd,
 	},
 	{
-	    .pso_name   = NNG_OPT_SENDFD,
-	    .pso_type   = NNI_TYPE_INT32,
-	    .pso_getopt = surv0_sock_getopt_sendfd,
-	    .pso_setopt = NULL,
+	    .o_name = NNG_OPT_SENDFD,
+	    .o_type = NNI_TYPE_INT32,
+	    .o_get  = surv0_sock_get_sendfd,
 	},
 	// terminate list
 	{
-	    .pso_name = NULL,
+	    .o_name = NULL,
 	},
 };
 

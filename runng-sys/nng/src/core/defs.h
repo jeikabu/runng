@@ -40,22 +40,23 @@ typedef struct nng_event  nni_event;
 typedef struct nng_notify nni_notify;
 
 // These are our own names.
-typedef struct nni_socket           nni_sock;
-typedef struct nni_ctx              nni_ctx;
-typedef struct nni_ep               nni_ep;
-typedef struct nni_pipe             nni_pipe;
-typedef struct nni_tran             nni_tran;
-typedef struct nni_tran_ep_ops      nni_tran_ep_ops;
-typedef struct nni_tran_ep_option   nni_tran_ep_option;
-typedef struct nni_tran_pipe_ops    nni_tran_pipe_ops;
-typedef struct nni_tran_pipe_option nni_tran_pipe_option;
+typedef struct nni_socket   nni_sock;
+typedef struct nni_ctx      nni_ctx;
+typedef struct nni_dialer   nni_dialer;
+typedef struct nni_listener nni_listener;
+typedef struct nni_pipe     nni_pipe;
 
-typedef struct nni_proto_ctx_option  nni_proto_ctx_option;
-typedef struct nni_proto_ctx_ops     nni_proto_ctx_ops;
-typedef struct nni_proto_sock_ops    nni_proto_sock_ops;
-typedef struct nni_proto_pipe_ops    nni_proto_pipe_ops;
-typedef struct nni_proto_sock_option nni_proto_sock_option;
-typedef struct nni_proto             nni_proto;
+typedef struct nni_tran              nni_tran;
+typedef struct nni_tran_option       nni_tran_option;
+typedef struct nni_tran_dialer_ops   nni_tran_dialer_ops;
+typedef struct nni_tran_listener_ops nni_tran_listener_ops;
+typedef struct nni_tran_pipe_ops     nni_tran_pipe_ops;
+
+typedef struct nni_proto_option   nni_proto_option;
+typedef struct nni_proto_ctx_ops  nni_proto_ctx_ops;
+typedef struct nni_proto_sock_ops nni_proto_sock_ops;
+typedef struct nni_proto_pipe_ops nni_proto_pipe_ops;
+typedef struct nni_proto          nni_proto;
 
 typedef struct nni_plat_mtx nni_mtx;
 typedef struct nni_plat_cv  nni_cv;
@@ -81,9 +82,9 @@ typedef struct {
 #define NNI_SECOND (1000)
 
 // Structure allocation conveniences.
-#define NNI_ALLOC_STRUCT(s) nni_alloc(sizeof(*s))
+#define NNI_ALLOC_STRUCT(s) nni_zalloc(sizeof(*s))
 #define NNI_FREE_STRUCT(s) nni_free((s), sizeof(*s))
-#define NNI_ALLOC_STRUCTS(s, n) nni_alloc(sizeof(*s) * n)
+#define NNI_ALLOC_STRUCTS(s, n) nni_zalloc(sizeof(*s) * n)
 #define NNI_FREE_STRUCTS(s, n) nni_free(s, sizeof(*s) * n)
 
 #define NNI_PUT16(ptr, u)                                   \
@@ -140,7 +141,7 @@ typedef struct {
 
 // Types.  These are used to provide more structured access to options
 // (and maybe later statistics).  For now these are internal only.
-enum nni_type {
+typedef enum nni_opt_type {
 	NNI_TYPE_OPAQUE,
 	NNI_TYPE_BOOL,
 	NNI_TYPE_INT32,
@@ -152,6 +153,6 @@ enum nni_type {
 	NNI_TYPE_STRING,
 	NNI_TYPE_SOCKADDR,
 	NNI_TYPE_POINTER,
-};
+} nni_opt_type;
 
 #endif // CORE_DEFS_H

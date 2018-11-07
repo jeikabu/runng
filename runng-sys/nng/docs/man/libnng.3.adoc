@@ -152,9 +152,11 @@ The following functions are used in the asynchronous model:
 |===
 |<<nng_aio_abort.3#,nng_aio_abort()>>|abort asynchronous I/O operation
 |<<nng_aio_alloc.3#,nng_aio_alloc()>>|allocate asynchronous I/O handle
+|<<nng_aio_begin.3#,nng_aio_begin()>>|begin asynchronous I/O operation
 |<<nng_aio_cancel.3#,nng_aio_cancel()>>|cancel asynchronous I/O operation
 |<<nng_aio_count.3#,nng_aio_count()>>|return number of bytes transferred
-|<<nng_aio_finish.3#,nng_aio_finish()>>|finish an asynchronous I/O operation
+|<<nng_aio_defer.3#,nng_aio_defer()>>|defer asynchronous I/O operation
+|<<nng_aio_finish.3#,nng_aio_finish()>>|finish asynchronous I/O operation
 |<<nng_aio_free.3#,nng_aio_free()>>|free asynchronous I/O handle
 |<<nng_aio_get_input.3#,nng_aio_get_input()>>|return input parameter
 |<<nng_aio_get_msg.3#,nng_aio_get_msg()>>|get message from an asynchronous receive
@@ -220,6 +222,25 @@ concurrent applications.
 |<<nng_ctx_setopt.3#,nng_ctx_setopt()>>|set context option
 |===
 
+=== Statistics
+
+The following functions provide access to statistics which can be used
+to observe program behaviors and as an aid in troubleshooting.
+
+|===
+|<<nng_stat_child.3#,nng_stat_child()>>|get child statistic
+|<<nng_stat_desc.3#,nng_stat_name()>>|get statistic description
+|<<nng_stat_name.3#,nng_stat_name()>>|get statistic name
+|<<nng_stat_next.3#,nng_stat_next()>>|get next statistic
+|<<nng_stat_string.3#,nng_stat_string()>>|get statistic string value
+|<<nng_stat_timestamp.3#,nng_stat_timestamp()>>|get statistic timestamp
+|<<nng_stat_type.3#,nng_stat_type()>>|get statistic type
+|<<nng_stat_unit.3#,nng_stat_unit()>>|get statistic unit
+|<<nng_stat_value.3#,nng_stat_valueg()>>|get statistic value
+|<<nng_stats_free.3#,nng_stats_free()>>|free statistics
+|<<nng_stats_get.3#,nng_stats_get()>>|get statistics
+|===
+
 === URL Object
 
 Common functionality is supplied for parsing and handling
@@ -245,7 +266,7 @@ as a convenience to aid in creating portable applications.
 |<<nng_cv_until.3supp#,nng_cv_until()>>|wait for condition or timeout
 |<<nng_cv_wait.3supp#,nng_cv_wait()>>|wait for condition
 |<<nng_cv_wake.3supp#,nng_cv_wake()>>|wake all waiters
-|<<nng_cv_wake1.3supp#,nng_cv_wake()>>|wake one waiter
+|<<nng_cv_wake1.3supp#,nng_cv_wake1()>>|wake one waiter
 |<<nng_msleep.3supp#,nng_msleep()>>|sleep for milliseconds
 |<<nng_mtx_alloc.3supp#,nng_mtx_alloc()>>|allocate mutex
 |<<nng_mtx_free.3supp#,nng_mtx_free()>>|free mutex
@@ -275,20 +296,22 @@ and connections.
 |<<nng_http_conn_read.3http#,nng_http_conn_read()>>|read from HTTP connection
 |<<nng_http_conn_read_all.3http#,nng_http_conn_read_all()>>|read all from HTTP connection
 |<<nng_http_conn_read_req.3http#,nng_http_conn_read_req()>>|read HTTP request
-|<<nng_http_conn_read_res.3http#,nng_http_conn_read_req()>>|read HTTP response
+|<<nng_http_conn_read_res.3http#,nng_http_conn_read_res()>>|read HTTP response
 |<<nng_http_conn_write.3http#,nng_http_conn_write()>>|write to HTTP connection
 |<<nng_http_conn_write_all.3http#,nng_http_conn_write_all()>>|write all to HTTP connection
-|<<nng_http_conn_write_req.3http#,nng_http_conn_write()>>|write HTTP request
-|<<nng_http_conn_write_res.3http#,nng_http_conn_write()>>|write HTTP response
+|<<nng_http_conn_write_req.3http#,nng_http_conn_write_req()>>|write HTTP request
+|<<nng_http_conn_write_res.3http#,nng_http_conn_write_res()>>|write HTTP response
 |<<nng_http_req_add_header.3http#,nng_http_req_add_header()>>|add HTTP request header
 |<<nng_http_req_alloc.3http#,nng_http_req_alloc()>>|allocate HTTP request structure
 |<<nng_http_req_copy_data.3http#,nng_http_req_copy_data()>>|copy HTTP request body
 |<<nng_http_req_del_header.3http#,nng_http_req_del_header()>>|delete HTTP request header
 |<<nng_http_req_free.3http#,nng_http_req_free()>>|free HTTP request structure
+|<<nng_http_req_get_data.3http#,nng_http_req_get_data()>>|get HTTP request body
 |<<nng_http_req_get_header.3http#,nng_http_req_get_header()>>|return HTTP request header
 |<<nng_http_req_get_method.3http#,nng_http_req_get_method()>>|return HTTP request method
 |<<nng_http_req_get_uri.3http#,nng_http_req_get_uri()>>|return HTTP request URI
 |<<nng_http_req_get_version.3http#,nng_http_req_get_version()>>|return HTTP request protocol version
+|<<nng_http_req_reset.3http#,nng_http_req_reset()>>|reset HTTP request structure
 |<<nng_http_req_set_data.3http#,nng_http_req_set_data()>>|set HTTP request body
 |<<nng_http_req_set_header.3http#,nng_http_req_set_header()>>|set HTTP request header
 |<<nng_http_req_set_method.3http#,nng_http_req_set_method()>>|set HTTP request method
@@ -300,11 +323,13 @@ and connections.
 |<<nng_http_res_copy_data.3http#,nng_http_res_copy_data()>>|copy HTTP response body
 |<<nng_http_res_del_header.3http#,nng_http_res_del_header()>>|delete HTTP response header
 |<<nng_http_res_free.3http#,nng_http_res_free()>>|free HTTP response structure
-|<<nng_http_res_set_data.3http#,nng_http_res_set_data()>>|set HTTP response body
+|<<nng_http_res_get_data.3http#,nng_http_res_get_data()>>|get HTTP response body
 |<<nng_http_res_get_header.3http#,nng_http_res_get_header()>>|return HTTP response header
 |<<nng_http_res_get_reason.3http#,nng_http_res_get_reason()>>|return HTTP response reason
 |<<nng_http_res_get_status.3http#,nng_http_res_get_status()>>|return HTTP response status
 |<<nng_http_res_get_version.3http#,nng_http_res_get_version()>>|return HTTP response protocol version
+|<<nng_http_res_reset.3http#,nng_http_res_reset()>>|reset HTTP response structure
+|<<nng_http_res_set_data.3http#,nng_http_res_set_data()>>|set HTTP response body
 |<<nng_http_res_set_header.3http#,nng_http_res_set_header()>>|set HTTP response header
 |<<nng_http_res_set_reason.3http#,nng_http_res_set_reason()>>|set HTTP response reason
 |<<nng_http_res_set_status.3http#,nng_http_res_set_status()>>|set HTTP response status
@@ -316,11 +341,13 @@ and connections.
 These functions are intended for use with HTTP client applications.
 
 |===
-| <<nng_http_client_alloc.3http#,nng_http_client_alloc()>>|allocate HTTP client
-| <<nng_http_client_connect.3http#,nng_http_client_connect()>>|establish HTTP client connection
-| <<nng_http_client_free.3http#,nng_http_client_free()>>|free HTTP client
-| <<nng_http_client_get_tls.3http#,nng_http_client_get_tls()>>|get HTTP client TLS configuration
-| <<nng_http_client_set_tls.3http#,nng_http_client_set_tls()>>|set HTTP client TLS configuration
+|<<nng_http_client_alloc.3http#,nng_http_client_alloc()>>|allocate HTTP client
+|<<nng_http_client_connect.3http#,nng_http_client_connect()>>|establish HTTP client connection
+|<<nng_http_client_free.3http#,nng_http_client_free()>>|free HTTP client
+|<<nng_http_client_get_tls.3http#,nng_http_client_get_tls()>>|get HTTP client TLS configuration
+|<<nng_http_client_set_tls.3http#,nng_http_client_set_tls()>>|set HTTP client TLS configuration
+|<<nng_http_client_transact.3http#,nng_http_client_transact()>>|perform one HTTP transaction
+|<<nng_http_conn_transact.3http#,nng_http_conn_transact()>>|perform one HTTP transaction on connection
 |===
 
 ==== HTTP Server Functions
@@ -329,6 +356,7 @@ These functions are intended for use with HTTP server applications.
 
 |===
 |<<nng_http_handler_alloc.3http#,nng_http_handler_alloc()>>|allocate HTTP server handler
+|<<nng_http_handler_collect_body.3http#,nng_http_handler_collect_body()>>|set HTTP handler to collect request body
 |<<nng_http_handler_free.3http#,nng_http_handler_free()>>|free HTTP server handler
 |<<nng_http_handler_get_data.3http#,nng_http_handler_get_data()>>|return extra data for HTTP handler
 |<<nng_http_handler_set_data.3http#,nng_http_handler_set_data()>>|set extra data for HTTP handler
@@ -339,9 +367,12 @@ These functions are intended for use with HTTP server applications.
 |<<nng_http_server_add_handler.3http#,nng_http_server_add_handler()>>|add HTTP server handler
 |<<nng_http_server_del_handler.3http#,nng_http_server_del_handler()>>|delete HTTP server handler
 |<<nng_http_server_get_tls.3http#,nng_http_server_get_tls()>>|get HTTP server TLS configuration
-|<<nng_http_server_hold.3http#,nng_http_server_get_tls()>>|get and hold HTTP server instance
-|<<nng_http_server_release.3http#,nng_http_server_get_tls()>>|release HTTP server instance
+|<<nng_http_server_hold.3http#,nng_http_server_hold()>>|get and hold HTTP server instance
+|<<nng_http_server_release.3http#,nng_http_server_release()>>|release HTTP server instance
+|<<nng_http_server_set_error_file.3http#,nng_http_server_set_error_file()>>|set custom HTTP error file
+|<<nng_http_server_set_error_page.3http#,nng_http_server_set_error_page()>>|set custom HTTP error page
 |<<nng_http_server_set_tls.3http#,nng_http_server_set_tls()>>|set HTTP server TLS configuration
+|<<nng_http_server_res_error.3http#,nng_http_server_res_error()>>|use HTTP server error page
 |<<nng_http_server_start.3http#,nng_http_server_start()>>|start HTTP server
 |<<nng_http_server_stop.3http#,nng_http_server_stop()>>|stop HTTP server
 |===
@@ -359,7 +390,7 @@ with TLS support.
 |<<nng_tls_config_auth_mode.3tls#,nng_tls_config_auth_mode()>>|set authentication mode
 |<<nng_tls_config_ca_chain.3tls#,nng_tls_config_ca_chain()>>|set certificate authority chain
 |<<nng_tls_config_ca_file.3tls#,nng_tls_config_ca_file()>>|load certificate authority from file
-|<<nng_tls_config_cert_key_file.3tls#,nng_tls_config_cert_key_file_cert()>>|load own certificate and key from file
+|<<nng_tls_config_cert_key_file.3tls#,nng_tls_config_cert_key_file()>>|load own certificate and key from file
 |<<nng_tls_config_own_cert.3tls#,nng_tls_config_own_cert()>>|set own certificate and key
 |<<nng_tls_config_free.3tls#,nng_tls_config_free()>>|free TLS configuration
 |<<nng_tls_config_server_name.3tls#,nng_tls_config_server_name()>>|set remote server name

@@ -122,6 +122,27 @@ TestMain("Socket Operations", {
 				nng_strfree(allocd);
 			});
 
+			Convey("Oversize sockname handled right", {
+				char   name[256]; // 64 is max
+				size_t sz = sizeof(name);
+				memset(name, 'A', sz);
+				So(nng_setopt(s1, NNG_OPT_SOCKNAME, name,
+				       sz) == NNG_EINVAL);
+				name[sz - 1] = '\0';
+				So(nng_setopt(s1, NNG_OPT_SOCKNAME, name,
+				       sz) == NNG_EINVAL);
+
+				strcpy(name, "hello");
+				So(nng_setopt(
+				       s1, NNG_OPT_SOCKNAME, name, sz) == 0);
+				sz = sizeof(name);
+				memset(name, 'B', sz);
+				So(nng_getopt(
+				       s1, NNG_OPT_SOCKNAME, name, &sz) == 0);
+				So(sz == 6);
+				So(strcmp(name, "hello") == 0);
+			});
+
 			Convey("RAW option works", {
 				bool raw;
 				So(nng_getopt_bool(s1, NNG_OPT_RAW, &raw) ==
@@ -315,6 +336,8 @@ TestMain("Socket Operations", {
 			size_t     sz;
 			nng_socket s2;
 			char *     a = "inproc://asy";
+			So(nng_setopt_ms(s1, NNG_OPT_RECONNMINT, 10) == 0);
+			So(nng_setopt_ms(s1, NNG_OPT_RECONNMAXT, 10) == 0);
 			So(nng_dial(s1, a, NULL, NNG_FLAG_NONBLOCK) == 0);
 			Convey("And connects late", {
 				So(nng_pair_open(&s2) == 0);
@@ -387,7 +410,7 @@ TestMain("Socket Operations", {
 				// Not appropriate for dialer.
 				So(nng_dialer_setopt_bool(
 				       ep, NNG_OPT_RAW, true) == NNG_ENOTSUP);
-				So(nng_dialer_setopt_ms(ep, NNG_OPT_RECONNMINT,
+				So(nng_dialer_setopt_ms(ep, NNG_OPT_SENDTIMEO,
 				       1) == NNG_ENOTSUP);
 				So(nng_dialer_setopt_string(ep,
 				       NNG_OPT_SOCKNAME,
@@ -402,11 +425,6 @@ TestMain("Socket Operations", {
 			Convey("Bad size checks", {
 				So(nng_dialer_setopt(ep, NNG_OPT_RECVMAXSZ,
 				       "a", 1) == NNG_EINVAL);
-			});
-			Convey("Cannot listen", {
-				nng_listener l;
-				l.id = ep.id;
-				So(nng_listener_start(l, 0) == NNG_ENOTSUP);
 			});
 		});
 
@@ -451,11 +469,6 @@ TestMain("Socket Operations", {
 			Convey("Bad size checks", {
 				So(nng_listener_setopt(ep, NNG_OPT_RECVMAXSZ,
 				       "a", 1) == NNG_EINVAL);
-			});
-			Convey("Cannot dial", {
-				nng_dialer d;
-				d.id = ep.id;
-				So(nng_dialer_start(d, 0) == NNG_ENOTSUP);
 			});
 		});
 

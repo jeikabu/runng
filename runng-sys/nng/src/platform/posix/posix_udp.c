@@ -11,7 +11,6 @@
 #include "core/nng_impl.h"
 
 #ifdef NNG_PLATFORM_POSIX
-#include "platform/posix/posix_aio.h"
 #include "platform/posix/posix_pollq.h"
 
 #include <errno.h>
@@ -177,7 +176,7 @@ static void
 nni_posix_udp_cb(nni_posix_pfd *pfd, int events, void *arg)
 {
 	nni_plat_udp *udp = arg;
-	NNI_ASSERT(pfd == udp->udp_pfd);
+	NNI_ARG_UNUSED(pfd);
 
 	nni_mtx_lock(&udp->udp_mtx);
 	if (events & POLLIN) {
@@ -270,9 +269,9 @@ nni_plat_udp_close(nni_plat_udp *udp)
 }
 
 void
-nni_plat_udp_cancel(nni_aio *aio, int rv)
+nni_plat_udp_cancel(nni_aio *aio, void *arg, int rv)
 {
-	nni_plat_udp *udp = nni_aio_get_prov_data(aio);
+	nni_plat_udp *udp = arg;
 
 	nni_mtx_lock(&udp->udp_mtx);
 	if (nni_aio_list_active(aio)) {

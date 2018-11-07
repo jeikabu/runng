@@ -24,7 +24,7 @@ int nng_dial(nng_socket s, const char *url, nng_dialer *dp, int flags);
 
 == DESCRIPTION
 
-The `nng_dialer()` function creates a newly initialized
+The `nng_dial()` function creates a newly initialized
 `<<nng_dialer.5#,nng_dialer>>` object,
 associated with socket _s_, and configured to listen at the
 address specified by _url_, and starts it.
@@ -76,7 +76,7 @@ This function returns 0 on success, and non-zero otherwise.
 `NNG_ECLOSED`:: The socket _s_ is not open.
 `NNG_ECONNREFUSED`:: The remote peer refused the connection.
 `NNG_ECONNRESET`:: The remote peer reset the connection.
-`NNG_EINVAL`:: An invalid set of _flags_ was specified.
+`NNG_EINVAL`:: An invalid set of _flags_ or an invalid _url_ was specified.
 `NNG_ENOMEM`:: Insufficient memory is available.
 `NNG_EPEERAUTH`:: Authentication or authorization failure.
 `NNG_EPROTO`:: A protocol error occurred.

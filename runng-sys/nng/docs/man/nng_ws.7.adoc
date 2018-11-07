@@ -65,11 +65,6 @@ separating the port.
 For example, the same path and port on the IPv6 loopback address (`::1`)
 would be specified as `ws://[::1]/app/pubsub`.
 
-NOTE: When using symbolic names, the name is resolved when the
-name is first used. _nng_ won't become aware of changes in the
-name resolution until restart,
-usually. (This is a bug and will likely be fixed in the future.)
-
 NOTE: The value specified as the host, if any, will also be used
 in the `Host:` ((HTTP header)) during HTTP negotiation.
 
@@ -134,8 +129,14 @@ This option can be set on listeners, and retrieved from pipes.
 ((`NNG_OPT_TLS_CONFIG`))::
 
 (opaque) This option is used on an endpoint to access the underlying TLS
-configuration object.
+configuration object for `wss://` endpoints.
 The value is of type `nng_tls_config *`.
+A hold is placed on the underlying
+configuration object before returning it (see
+`<<nng_tls_config_hold.3tls#,nng_tls_config_hold()>>`).
+The caller should release the object with
+`<<nng_tls_config_free.3tls#,nng_tls_config_free()>>` when it no
+longer needs the TLS configuration.
 
 TIP: Use this option when advanced TLS configuration is required.
 

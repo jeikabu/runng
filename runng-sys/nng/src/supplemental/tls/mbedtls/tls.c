@@ -59,7 +59,7 @@ typedef struct nni_tls_certkey {
 } nni_tls_certkey;
 
 struct nni_tls {
-	nni_plat_tcp_pipe * tcp;
+	nni_tcp_conn *      tcp;
 	mbedtls_ssl_context ctx;
 	nng_tls_config *    cfg; // kept so we can release it
 	nni_mtx             lk;
@@ -254,14 +254,14 @@ nni_tls_fini(nni_tls *tp)
 {
 	// Shut it all down first.
 	if (tp->tcp) {
-		nni_plat_tcp_pipe_close(tp->tcp);
+		nni_tcp_conn_close(tp->tcp);
 	}
 	nni_aio_stop(tp->tcp_send);
 	nni_aio_stop(tp->tcp_recv);
 
 	// And finalize / free everything.
 	if (tp->tcp) {
-		nni_plat_tcp_pipe_fini(tp->tcp);
+		nni_tcp_conn_fini(tp->tcp);
 	}
 	nni_aio_fini(tp->tcp_send);
 	nni_aio_fini(tp->tcp_recv);
@@ -306,7 +306,7 @@ nni_tls_mkerr(int err)
 }
 
 int
-nni_tls_init(nni_tls **tpp, nng_tls_config *cfg, nni_plat_tcp_pipe *tcp)
+nni_tls_init(nni_tls **tpp, nng_tls_config *cfg, nni_tcp_conn *tcp)
 {
 	nni_tls *tp;
 	int      rv;
@@ -314,16 +314,16 @@ nni_tls_init(nni_tls **tpp, nng_tls_config *cfg, nni_plat_tcp_pipe *tcp)
 	// During the handshake, disable Nagle to shorten the
 	// negotiation.  Once things are set up the caller can
 	// re-enable Nagle if so desired.
-	(void) nni_plat_tcp_pipe_set_nodelay(tcp, true);
+	(void) nni_tcp_conn_set_nodelay(tcp, true);
 
 	if ((tp = NNI_ALLOC_STRUCT(tp)) == NULL) {
 		return (NNG_ENOMEM);
 	}
-	if ((tp->recvbuf = nni_alloc(NNG_TLS_MAX_RECV_SIZE)) == NULL) {
+	if ((tp->recvbuf = nni_zalloc(NNG_TLS_MAX_RECV_SIZE)) == NULL) {
 		NNI_FREE_STRUCT(tp);
 		return (NNG_ENOMEM);
 	}
-	if ((tp->sendbuf = nni_alloc(NNG_TLS_MAX_SEND_SIZE)) == NULL) {
+	if ((tp->sendbuf = nni_zalloc(NNG_TLS_MAX_SEND_SIZE)) == NULL) {
 		nni_free(tp->sendbuf, NNG_TLS_MAX_RECV_SIZE);
 		NNI_FREE_STRUCT(tp);
 		return (NNG_ENOMEM);
@@ -371,9 +371,9 @@ nni_tls_init(nni_tls **tpp, nng_tls_config *cfg, nni_plat_tcp_pipe *tcp)
 }
 
 static void
-nni_tls_cancel(nni_aio *aio, int rv)
+nni_tls_cancel(nni_aio *aio, void *arg, int rv)
 {
-	nni_tls *tp = nni_aio_get_prov_data(aio);
+	nni_tls *tp = arg;
 	nni_mtx_lock(&tp->lk);
 	if (nni_aio_list_active(aio)) {
 		nni_aio_list_remove(aio);
@@ -387,7 +387,7 @@ nni_tls_fail(nni_tls *tp, int rv)
 {
 	nni_aio *aio;
 	tp->tls_closed = true;
-	nni_plat_tcp_pipe_close(tp->tcp);
+	nni_tcp_conn_close(tp->tcp);
 	tp->tcp_closed = true;
 	while ((aio = nni_list_first(&tp->recvs)) != NULL) {
 		nni_list_remove(&tp->recvs, aio);
@@ -408,11 +408,11 @@ nni_tls_send_cb(void *ctx)
 
 	nni_mtx_lock(&tp->lk);
 	if (nni_aio_result(aio) != 0) {
-		nni_plat_tcp_pipe_close(tp->tcp);
+		nni_tcp_conn_close(tp->tcp);
 		tp->tcp_closed = true;
 	} else {
 		size_t n = nni_aio_count(aio);
-		NNI_ASSERT(tp->sendlen <= n);
+		NNI_ASSERT(tp->sendlen >= n);
 		tp->sendlen -= n;
 		if (tp->sendlen) {
 			nni_iov iov;
@@ -421,7 +421,7 @@ nni_tls_send_cb(void *ctx)
 			iov.iov_len = tp->sendlen;
 			nni_aio_set_iov(aio, 1, &iov);
 			nni_aio_set_timeout(aio, NNG_DURATION_INFINITE);
-			nni_plat_tcp_pipe_send(tp->tcp, aio);
+			nni_tcp_conn_send(tp->tcp, aio);
 			nni_mtx_unlock(&tp->lk);
 			return;
 		}
@@ -460,7 +460,7 @@ nni_tls_recv_start(nni_tls *tp)
 	iov.iov_len = NNG_TLS_MAX_RECV_SIZE;
 	nni_aio_set_iov(aio, 1, &iov);
 	nni_aio_set_timeout(tp->tcp_recv, NNG_DURATION_INFINITE);
-	nni_plat_tcp_pipe_recv(tp->tcp, aio);
+	nni_tcp_conn_recv(tp->tcp, aio);
 }
 
 static void
@@ -474,7 +474,7 @@ nni_tls_recv_cb(void *ctx)
 	if (nni_aio_result(aio) != 0) {
 		// Close the underlying TCP channel, but permit data we
 		// already received to continue to be received.
-		nni_plat_tcp_pipe_close(tp->tcp);
+		nni_tcp_conn_close(tp->tcp);
 		tp->tcp_closed = true;
 	} else {
 		NNI_ASSERT(tp->recvlen == 0);
@@ -531,7 +531,7 @@ nni_tls_net_send(void *ctx, const unsigned char *buf, size_t len)
 	iov.iov_len = len;
 	nni_aio_set_iov(tp->tcp_send, 1, &iov);
 	nni_aio_set_timeout(tp->tcp_send, NNG_DURATION_INFINITE);
-	nni_plat_tcp_pipe_send(tp->tcp, tp->tcp_send);
+	nni_tcp_conn_send(tp->tcp, tp->tcp_send);
 	return (len);
 }
 
@@ -615,25 +615,25 @@ nni_tls_recv(nni_tls *tp, nni_aio *aio)
 int
 nni_tls_peername(nni_tls *tp, nni_sockaddr *sa)
 {
-	return (nni_plat_tcp_pipe_peername(tp->tcp, sa));
+	return (nni_tcp_conn_peername(tp->tcp, sa));
 }
 
 int
 nni_tls_sockname(nni_tls *tp, nni_sockaddr *sa)
 {
-	return (nni_plat_tcp_pipe_sockname(tp->tcp, sa));
+	return (nni_tcp_conn_sockname(tp->tcp, sa));
 }
 
 int
 nni_tls_set_nodelay(nni_tls *tp, bool val)
 {
-	return (nni_plat_tcp_pipe_set_nodelay(tp->tcp, val));
+	return (nni_tcp_conn_set_nodelay(tp->tcp, val));
 }
 
 int
 nni_tls_set_keepalive(nni_tls *tp, bool val)
 {
-	return (nni_plat_tcp_pipe_set_keepalive(tp->tcp, val));
+	return (nni_tcp_conn_set_keepalive(tp->tcp, val));
 }
 
 static void
@@ -785,7 +785,7 @@ nni_tls_close(nni_tls *tp)
 		// connection at this point.
 		(void) mbedtls_ssl_close_notify(&tp->ctx);
 	} else {
-		nni_plat_tcp_pipe_close(tp->tcp);
+		nni_tcp_conn_close(tp->tcp);
 	}
 	nni_mtx_unlock(&tp->lk);
 }
@@ -957,12 +957,11 @@ nng_tls_config_ca_file(nng_tls_config *cfg, const char *path)
 	if ((rv = nni_file_get(path, &fdata, &fsize)) != 0) {
 		return (rv);
 	}
-	if ((pem = nni_alloc(fsize + 1)) == NULL) {
+	if ((pem = nni_zalloc(fsize + 1)) == NULL) {
 		nni_free(fdata, fsize);
 		return (NNG_ENOMEM);
 	}
 	memcpy(pem, fdata, fsize);
-	pem[fsize] = '\0';
 	nni_free(fdata, fsize);
 	if (strstr(pem, "-----BEGIN X509 CRL-----") != NULL) {
 		rv = nng_tls_config_ca_chain(cfg, pem, pem);
@@ -992,12 +991,11 @@ nng_tls_config_cert_key_file(
 	if ((rv = nni_file_get(path, &fdata, &fsize)) != 0) {
 		return (rv);
 	}
-	if ((pem = nni_alloc(fsize + 1)) == NULL) {
+	if ((pem = nni_zalloc(fsize + 1)) == NULL) {
 		nni_free(fdata, fsize);
 		return (NNG_ENOMEM);
 	}
 	memcpy(pem, fdata, fsize);
-	pem[fsize] = '\0';
 	nni_free(fdata, fsize);
 	rv = nng_tls_config_own_cert(cfg, pem, pem, pass);
 	nni_free(pem, fsize + 1);
@@ -1014,4 +1012,10 @@ void
 nng_tls_config_free(nng_tls_config *cfg)
 {
 	nni_tls_config_fini(cfg);
+}
+
+void
+nng_tls_config_hold(nng_tls_config *cfg)
+{
+	nni_tls_config_hold(cfg);
 }

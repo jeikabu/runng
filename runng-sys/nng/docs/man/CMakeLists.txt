@@ -62,8 +62,10 @@ if (NNG_ENABLE_DOC)
 	libnng
 	nng_aio_abort
 	nng_aio_alloc
+	nng_aio_begin
 	nng_aio_cancel
 	nng_aio_count
+	nng_aio_defer
 	nng_aio_finish
 	nng_aio_free
 	nng_aio_get_input
@@ -149,6 +151,17 @@ if (NNG_ENABLE_DOC)
 	nng_setopt
 	nng_sleep_aio
 	nng_socket_id
+	nng_stats_free
+	nng_stats_get
+	nng_stat_child
+	nng_stat_desc
+	nng_stat_name
+	nng_stat_next
+	nng_stat_string
+	nng_stat_timestamp
+	nng_stat_type
+	nng_stat_unit
+	nng_stat_value
 	nng_strdup
 	nng_strerror
 	nng_strfree
@@ -196,11 +209,13 @@ if (NNG_ENABLE_DOC)
 	nng_http_client_free
 	nng_http_client_get_tls
 	nng_http_client_set_tls
+	nng_http_client_transact
 	nng_http_conn_close
 	nng_http_conn_read
 	nng_http_conn_read_all
 	nng_http_conn_read_req
 	nng_http_conn_read_res
+	nng_http_conn_transact
 	nng_http_conn_write
 	nng_http_conn_write_all
 	nng_http_conn_write_req
@@ -218,10 +233,12 @@ if (NNG_ENABLE_DOC)
 	nng_http_req_copy_data
 	nng_http_req_del_header
 	nng_http_req_free
+	nng_http_req_get_data
 	nng_http_req_get_header
 	nng_http_req_get_method
 	nng_http_req_get_uri
 	nng_http_req_get_version
+	nng_http_req_reset
 	nng_http_req_set_data
 	nng_http_req_set_header
 	nng_http_req_set_method
@@ -233,10 +250,12 @@ if (NNG_ENABLE_DOC)
 	nng_http_res_copy_data
 	nng_http_res_del_header
 	nng_http_res_free
+	nng_http_res_get_data
 	nng_http_res_get_header
 	nng_http_res_get_reason
 	nng_http_res_get_status
 	nng_http_res_get_version
+	nng_http_res_reset
 	nng_http_res_set_data
 	nng_http_res_set_header
 	nng_http_res_set_reason
@@ -278,6 +297,7 @@ if (NNG_ENABLE_DOC)
 	nng_tls_config_ca_file
 	nng_tls_config_cert_key_file
 	nng_tls_config_free
+	nng_tls_config_hold
 	nng_tls_config_own_cert
 	nng_tls_config_server_name
     )
@@ -299,6 +319,7 @@ if (NNG_ENABLE_DOC)
 	nng_sockaddr_ipc
 	nng_sockaddr_zt
 	nng_socket
+	nng_stat
     )
 
     set(NNG_MAN7

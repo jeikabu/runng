@@ -32,7 +32,7 @@ typedef struct ws_header {
 struct nni_ws {
 	nni_list_node    node;
 	nni_reap_item    reap;
-	int              mode; // NNI_EP_MODE_DIAL or NNI_EP_MODE_LISTEN
+	bool             server;
 	bool             closed;
 	bool             ready;
 	bool             wclose;
@@ -89,6 +89,7 @@ struct nni_ws_dialer {
 	nni_http_res *   res;
 	nni_http_client *client;
 	nni_mtx          mtx;
+	nni_cv           cv;
 	char *           proto;
 	nni_url *        url;
 	nni_list         wspend; // ws structures still negotiating
@@ -295,10 +296,10 @@ ws_msg_init_control(
 	frame->buf     = frame->sdata;
 	frame->bufsz   = 0;
 
-	if (ws->mode == NNI_EP_MODE_DIAL) {
-		ws_mask_frame(frame);
-	} else {
+	if (ws->server) {
 		frame->masked = false;
+	} else {
+		ws_mask_frame(frame);
 	}
 
 	wm->aio = NULL;
@@ -374,10 +375,10 @@ ws_msg_init_tx(ws_msg **wmp, nni_ws *ws, nni_msg *msg, nni_aio *aio)
 			frame->hlen += 8;
 		}
 
-		if (ws->mode == NNI_EP_MODE_DIAL) {
-			ws_mask_frame(frame);
-		} else {
+		if (ws->server) {
 			frame->masked = false;
+		} else {
+			ws_mask_frame(frame);
 		}
 
 	} while (len);
@@ -406,8 +407,9 @@ ws_msg_init_rx(ws_msg **wmp, nni_ws *ws, nni_aio *aio)
 static void
 ws_close_cb(void *arg)
 {
-	nni_ws *ws = arg;
-	ws_msg *wm;
+	nni_ws * ws = arg;
+	ws_msg * wm;
+	nni_aio *aio;
 
 	nni_aio_close(ws->txaio);
 	nni_aio_close(ws->rxaio);
@@ -422,20 +424,24 @@ ws_close_cb(void *arg)
 	// This list (receive) should be empty.
 	while ((wm = nni_list_first(&ws->rxmsgs)) != NULL) {
 		nni_list_remove(&ws->rxmsgs, wm);
-		if (wm->aio) {
-			nni_aio_finish_error(wm->aio, NNG_ECLOSED);
+		if ((aio = wm->aio) != NULL) {
+			wm->aio = NULL;
+			nni_aio_list_remove(aio);
+			nni_aio_finish_error(aio, NNG_ECLOSED);
 		}
 		ws_msg_fini(wm);
 	}
 
 	while ((wm = nni_list_first(&ws->txmsgs)) != NULL) {
 		nni_list_remove(&ws->txmsgs, wm);
-		if (wm->aio) {
-			nni_aio_list_remove(wm->aio);
-			nni_aio_finish_error(wm->aio, NNG_ECLOSED);
+		if ((aio = wm->aio) != NULL) {
+			wm->aio = NULL;
+			nni_aio_list_remove(aio);
+			nni_aio_finish_error(aio, NNG_ECLOSED);
 		}
 		ws_msg_fini(wm);
 	}
+	ws->txframe = NULL;
 
 	if (ws->rxframe != NULL) {
 		ws_frame_fini(ws->rxframe);
@@ -454,9 +460,12 @@ ws_close(nni_ws *ws, uint16_t code)
 	// Receive stuff gets aborted always.  No further receives
 	// once we get a close.
 	while ((wm = nni_list_first(&ws->rxmsgs)) != NULL) {
+		nni_aio *aio;
 		nni_list_remove(&ws->rxmsgs, wm);
-		if (wm->aio) {
-			nni_aio_finish_error(wm->aio, NNG_ECLOSED);
+		if ((aio = wm->aio) != NULL) {
+			wm->aio = NULL;
+			nni_aio_list_remove(aio);
+			nni_aio_finish_error(aio, NNG_ECLOSED);
 		}
 		ws_msg_fini(wm);
 	}
@@ -470,16 +479,6 @@ ws_close(nni_ws *ws, uint16_t code)
 		nni_aio_close(ws->connaio);
 		nni_aio_close(ws->httpaio);
 		ws_send_close(ws, code);
-	}
-
-	if (nni_list_node_active(&ws->node)) {
-		nni_ws_dialer *d;
-
-		if ((d = ws->dialer) != NULL) {
-			nni_mtx_lock(&d->mtx);
-			nni_list_node_remove(&ws->node);
-			nni_mtx_unlock(&d->mtx);
-		}
 	}
 }
 
@@ -518,9 +517,9 @@ ws_start_write(nni_ws *ws)
 }
 
 static void
-ws_cancel_close(nni_aio *aio, int rv)
+ws_cancel_close(nni_aio *aio, void *arg, int rv)
 {
-	nni_ws *ws = nni_aio_get_prov_data(aio);
+	nni_ws *ws = arg;
 	nni_mtx_lock(&ws->mtx);
 	if (ws->wclose) {
 		ws->wclose = false;
@@ -551,6 +550,7 @@ ws_write_cb(void *arg)
 		while ((wm = nni_list_first(&ws->txmsgs)) != NULL) {
 			nni_list_remove(&ws->txmsgs, wm);
 			if ((aio = wm->aio) != NULL) {
+				wm->aio = NULL;
 				nni_aio_list_remove(aio);
 				nni_aio_finish_error(aio, NNG_ECLOSED);
 			}
@@ -572,6 +572,7 @@ ws_write_cb(void *arg)
 		nni_list_remove(&ws->txmsgs, wm);
 		ws_msg_fini(wm);
 		if (aio != NULL) {
+			wm->aio = NULL;
 			nni_aio_list_remove(aio);
 			nni_aio_finish_error(aio, rv);
 		}
@@ -594,6 +595,7 @@ ws_write_cb(void *arg)
 	}
 
 	if (aio != NULL) {
+		wm->aio = NULL;
 		nni_aio_list_remove(aio);
 	}
 	nni_list_remove(&ws->txmsgs, wm);
@@ -614,22 +616,20 @@ ws_write_cb(void *arg)
 }
 
 static void
-ws_write_cancel(nni_aio *aio, int rv)
+ws_write_cancel(nni_aio *aio, void *arg, int rv)
 {
-	nni_ws *  ws;
+	nni_ws *  ws = arg;
 	ws_msg *  wm;
 	ws_frame *frame;
 
-	// Is this aio active?  We can tell by looking at the
-	// active tx frame.
-	ws = nni_aio_get_prov_data(aio);
+	// Is this aio active?  We can tell by looking at the active tx frame.
 
 	nni_mtx_lock(&ws->mtx);
-	wm = nni_aio_get_prov_extra(aio, 0);
 	if (!nni_aio_list_active(aio)) {
 		nni_mtx_unlock(&ws->mtx);
 		return;
 	}
+	wm = nni_aio_get_prov_extra(aio, 0);
 	if (((frame = ws->txframe) != NULL) && (frame->wmsg == wm)) {
 		nni_aio_abort(ws->txaio, rv);
 		// We will wait for callback on the txaio to finish aio.
@@ -637,6 +637,7 @@ ws_write_cancel(nni_aio *aio, int rv)
 		// If scheduled, just need to remove node and complete it.
 		nni_list_remove(&ws->txmsgs, wm);
 		wm->aio = NULL;
+		nni_aio_list_remove(aio);
 		nni_aio_finish_error(aio, rv);
 		ws_msg_fini(wm);
 	}
@@ -775,8 +776,10 @@ ws_start_read(nni_ws *ws)
 
 	if ((frame = NNI_ALLOC_STRUCT(frame)) == NULL) {
 		nni_list_remove(&ws->rxmsgs, wm);
-		if (wm->aio != NULL) {
-			nni_aio_finish_error(wm->aio, NNG_ENOMEM);
+		if ((aio = wm->aio) != NULL) {
+			wm->aio = NULL;
+			nni_aio_list_remove(aio);
+			nni_aio_finish_error(aio, NNG_ENOMEM);
 		}
 		ws_msg_fini(wm);
 		return;
@@ -796,7 +799,7 @@ ws_start_read(nni_ws *ws)
 }
 
 static void
-ws_read_frame_cb(nni_ws *ws, ws_frame *frame, ws_msg **wmp)
+ws_read_frame_cb(nni_ws *ws, ws_frame *frame, ws_msg **wmp, nni_aio **aiop)
 {
 	ws_msg *wm = nni_list_first(&ws->rxmsgs);
 
@@ -861,10 +864,10 @@ ws_read_frame_cb(nni_ws *ws, ws_frame *frame, ws_msg **wmp)
 	// control frame.
 	if (((frame = nni_list_last(&wm->frames)) != NULL) && frame->final) {
 		nni_list_remove(&ws->rxmsgs, wm);
+		*wmp  = wm;
+		*aiop = wm->aio;
 		nni_aio_list_remove(wm->aio);
-		*wmp = wm;
-	} else {
-		*wmp = NULL;
+		wm->aio = NULL;
 	}
 }
 
@@ -957,12 +960,12 @@ ws_read_cb(void *arg)
 		// here, because we don't have data yet.)
 		if (frame->masked) {
 			memcpy(frame->mask, frame->head + frame->hlen - 4, 4);
-			if (ws->mode == NNI_EP_MODE_DIAL) {
+			if (!ws->server) {
 				ws_close(ws, WS_CLOSE_PROTOCOL_ERR);
 				nni_mtx_unlock(&ws->mtx);
 				return;
 			}
-		} else if (ws->mode == NNI_EP_MODE_LISTEN) {
+		} else if (ws->server) {
 			ws_close(ws, WS_CLOSE_PROTOCOL_ERR);
 			nni_mtx_unlock(&ws->mtx);
 			return;
@@ -999,8 +1002,9 @@ ws_read_cb(void *arg)
 	// At this point, we have a complete frame.
 	ws_unmask_frame(frame); // idempotent
 
-	wm = NULL;
-	ws_read_frame_cb(ws, frame, &wm);
+	wm  = NULL;
+	aio = NULL;
+	ws_read_frame_cb(ws, frame, &wm, &aio);
 	ws_start_read(ws);
 	nni_mtx_unlock(&ws->mtx);
 
@@ -1008,11 +1012,8 @@ ws_read_cb(void *arg)
 	if (wm != NULL) {
 		size_t   len = 0;
 		nni_msg *msg;
-		nni_aio *aio;
 		uint8_t *body;
 		int      rv;
-
-		aio = wm->aio;
 
 		NNI_LIST_FOREACH (&wm->frames, frame) {
 			len += frame->len;
@@ -1028,16 +1029,16 @@ ws_read_cb(void *arg)
 			memcpy(body, frame->buf, frame->len);
 			body += frame->len;
 		}
-		nni_aio_set_msg(wm->aio, msg);
-		nni_aio_finish_synch(wm->aio, 0, nni_msg_len(msg));
+		nni_aio_set_msg(aio, msg);
+		nni_aio_finish_synch(aio, 0, nni_msg_len(msg));
 		ws_msg_fini(wm);
 	}
 }
 
 static void
-ws_read_cancel(nni_aio *aio, int rv)
+ws_read_cancel(nni_aio *aio, void *arg, int rv)
 {
-	nni_ws *ws = nni_aio_get_prov_data(aio);
+	nni_ws *ws = arg;
 	ws_msg *wm;
 
 	nni_mtx_lock(&ws->mtx);
@@ -1164,6 +1165,17 @@ ws_fini(void *arg)
 	nni_aio_stop(ws->httpaio);
 	nni_aio_stop(ws->connaio);
 
+	if (nni_list_node_active(&ws->node)) {
+		nni_ws_dialer *d;
+
+		if ((d = ws->dialer) != NULL) {
+			nni_mtx_lock(&d->mtx);
+			nni_list_node_remove(&ws->node);
+			ws->dialer = NULL;
+			nni_mtx_unlock(&d->mtx);
+		}
+	}
+
 	nni_mtx_lock(&ws->mtx);
 	while ((wm = nni_list_first(&ws->rxmsgs)) != NULL) {
 		nni_list_remove(&ws->rxmsgs, wm);
@@ -1250,15 +1262,17 @@ ws_http_cb_dialer(nni_ws *ws, nni_aio *aio)
 	char           wskey[29];
 	const char *   ptr;
 
-	d    = ws->dialer;
+	d = ws->dialer;
+	nni_mtx_lock(&d->mtx);
 	uaio = ws->useraio;
 
-	nni_mtx_lock(&d->mtx);
-	NNI_ASSERT(uaio != NULL);
 	// We have two steps.  In step 1, we just sent the request,
 	// and need to retrieve the reply.  In step two we have
 	// received the reply, and need to validate it.
-	if ((rv = nni_aio_result(aio)) != 0) {
+	// Note that its possible that the user canceled the request,
+	// in which case we no longer care, and just go to the error
+	// case to discard the ws.
+	if (((rv = nni_aio_result(aio)) != 0) || (uaio == NULL)) {
 		goto err;
 	}
 
@@ -1326,15 +1340,26 @@ ws_http_cb_dialer(nni_ws *ws, nni_aio *aio)
 	nni_list_remove(&d->wspend, ws);
 	ws->ready   = true;
 	ws->useraio = NULL;
+	ws->dialer  = NULL;
 	nni_aio_set_output(uaio, 0, ws);
 	nni_aio_finish(uaio, 0, 0);
+	if (nni_list_empty(&d->wspend)) {
+		nni_cv_wake(&d->cv);
+	}
 	nni_mtx_unlock(&d->mtx);
 	return;
 err:
 	nni_list_remove(&d->wspend, ws);
 	ws->useraio = NULL;
-	nni_aio_finish_error(uaio, rv);
+	ws->dialer  = NULL;
+	if (nni_list_empty(&d->wspend)) {
+		nni_cv_wake(&d->cv);
+	}
+	if (uaio != NULL) {
+		nni_aio_finish_error(uaio, rv);
+	}
 	nni_mtx_unlock(&d->mtx);
+
 	nni_ws_fini(ws);
 }
 
@@ -1344,13 +1369,10 @@ ws_http_cb(void *arg)
 	nni_ws * ws  = arg;
 	nni_aio *aio = ws->httpaio;
 
-	switch (ws->mode) {
-	case NNI_EP_MODE_LISTEN:
+	if (ws->server) {
 		ws_http_cb_listener(ws, aio);
-		break;
-	case NNI_EP_MODE_DIAL:
+	} else {
 		ws_http_cb_dialer(ws, aio);
-		break;
 	}
 }
 
@@ -1561,7 +1583,7 @@ ws_handler(nni_aio *aio)
 	ws->http     = conn;
 	ws->req      = req;
 	ws->res      = res;
-	ws->mode     = NNI_EP_MODE_LISTEN;
+	ws->server   = true;
 	ws->maxframe = l->maxframe;
 
 	// XXX: Inherit fragmentation? (Frag is limited for now).
@@ -1649,9 +1671,9 @@ nni_ws_listener_proto(nni_ws_listener *l, const char *proto)
 }
 
 static void
-ws_accept_cancel(nni_aio *aio, int rv)
+ws_accept_cancel(nni_aio *aio, void *arg, int rv)
 {
-	nni_ws_listener *l = nni_aio_get_prov_data(aio);
+	nni_ws_listener *l = arg;
 
 	nni_mtx_lock(&l->mtx);
 	if (nni_aio_list_active(aio)) {
@@ -1821,6 +1843,10 @@ ws_conn_cb(void *arg)
 		nni_mtx_lock(&d->mtx);
 		if (nni_list_node_active(&ws->node)) {
 			nni_list_remove(&d->wspend, ws);
+			ws->dialer = NULL;
+			if (nni_list_empty(&d->wspend)) {
+				nni_cv_wake(&d->cv);
+			}
 			nni_mtx_unlock(&d->mtx);
 			nni_ws_fini(ws);
 		} else {
@@ -1892,6 +1918,12 @@ nni_ws_dialer_fini(nni_ws_dialer *d)
 {
 	ws_header *hdr;
 
+	nni_mtx_lock(&d->mtx);
+	while (!nni_list_empty(&d->wspend)) {
+		nni_cv_wait(&d->cv);
+	}
+	nni_mtx_unlock(&d->mtx);
+
 	nni_strfree(d->proto);
 	while ((hdr = nni_list_first(&d->headers)) != NULL) {
 		nni_list_remove(&d->headers, hdr);
@@ -1905,6 +1937,7 @@ nni_ws_dialer_fini(nni_ws_dialer *d)
 	if (d->url) {
 		nni_url_free(d->url);
 	}
+	nni_cv_fini(&d->cv);
 	nni_mtx_fini(&d->mtx);
 	NNI_FREE_STRUCT(d);
 }
@@ -1921,6 +1954,7 @@ nni_ws_dialer_init(nni_ws_dialer **dp, nni_url *url)
 	NNI_LIST_INIT(&d->headers, ws_header, node);
 	NNI_LIST_INIT(&d->wspend, nni_ws, node);
 	nni_mtx_init(&d->mtx);
+	nni_cv_init(&d->cv, &d->mtx);
 
 	if ((rv = nni_url_clone(&d->url, url)) != 0) {
 		nni_ws_dialer_fini(d);
@@ -1966,11 +2000,9 @@ nni_ws_dialer_close(nni_ws_dialer *d)
 		return;
 	}
 	d->closed = true;
-	while ((ws = nni_list_first(&d->wspend)) != 0) {
-		nni_list_remove(&d->wspend, ws);
-		nni_mtx_unlock(&d->mtx);
-		nni_ws_fini(ws);
-		nni_mtx_lock(&d->mtx);
+	NNI_LIST_FOREACH (&d->wspend, ws) {
+		nni_aio_close(ws->connaio);
+		nni_aio_close(ws->httpaio);
 	}
 	nni_mtx_unlock(&d->mtx);
 }
@@ -1994,9 +2026,9 @@ nni_ws_dialer_proto(nni_ws_dialer *d, const char *proto)
 }
 
 static void
-ws_dial_cancel(nni_aio *aio, int rv)
+ws_dial_cancel(nni_aio *aio, void *arg, int rv)
 {
-	nni_ws *ws = nni_aio_get_prov_data(aio);
+	nni_ws *ws = arg;
 
 	nni_mtx_lock(&ws->mtx);
 	if (aio == ws->useraio) {
@@ -2036,7 +2068,7 @@ nni_ws_dialer_dial(nni_ws_dialer *d, nni_aio *aio)
 	}
 	ws->dialer   = d;
 	ws->useraio  = aio;
-	ws->mode     = NNI_EP_MODE_DIAL;
+	ws->server   = false;
 	ws->maxframe = d->maxframe;
 	nni_list_append(&d->wspend, ws);
 	nni_http_client_connect(d->client, ws->connaio);
