@@ -41,8 +41,7 @@ extern void nni_msgq_aio_put(nni_msgq *, nni_aio *);
 extern void nni_msgq_aio_get(nni_msgq *, nni_aio *);
 
 // nni_msgq_tryput performs a non-blocking attempt to put a message on
-// the message queue.  It is the same as calling nng_msgq_put_until with
-// a zero time.
+// the message queue.
 extern int nni_msgq_tryput(nni_msgq *, nni_msg *);
 
 // nni_msgq_set_error sets an error condition on the message queue,
@@ -98,5 +97,14 @@ extern int nni_msgq_len(nni_msgq *mq);
 
 extern int nni_msgq_get_recvable(nni_msgq *mq, nni_pollable **);
 extern int nni_msgq_get_sendable(nni_msgq *mq, nni_pollable **);
+
+// message queues keep statistics
+extern uint64_t nni_msgq_stat_get_bytes(nni_msgq *);
+extern uint64_t nni_msgq_stat_put_bytes(nni_msgq *);
+extern uint64_t nni_msgq_stat_get_msgs(nni_msgq *);
+extern uint64_t nni_msgq_stat_put_msgs(nni_msgq *);
+extern uint64_t nni_msgq_stat_get_errs(nni_msgq *);
+extern uint64_t nni_msgq_stat_put_errs(nni_msgq *);
+extern uint64_t nni_msgq_stat_discards(nni_msgq *);
 
 #endif // CORE_MSQUEUE_H

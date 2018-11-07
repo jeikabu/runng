@@ -262,7 +262,7 @@ xrep0_pipe_getq_cb(void *arg)
 	xrep0_pipe *p = arg;
 
 	if (nni_aio_result(p->aio_getq) != 0) {
-		nni_pipe_stop(p->pipe);
+		nni_pipe_close(p->pipe);
 		return;
 	}
 
@@ -280,7 +280,7 @@ xrep0_pipe_send_cb(void *arg)
 	if (nni_aio_result(p->aio_send) != 0) {
 		nni_msg_free(nni_aio_get_msg(p->aio_send));
 		nni_aio_set_msg(p->aio_send, NULL);
-		nni_pipe_stop(p->pipe);
+		nni_pipe_close(p->pipe);
 		return;
 	}
 
@@ -296,7 +296,7 @@ xrep0_pipe_recv_cb(void *arg)
 	int         hops;
 
 	if (nni_aio_result(p->aio_recv) != 0) {
-		nni_pipe_stop(p->pipe);
+		nni_pipe_close(p->pipe);
 		return;
 	}
 
@@ -327,7 +327,7 @@ xrep0_pipe_recv_cb(void *arg)
 		if (nni_msg_len(msg) < 4) {
 			// Peer is speaking garbage. Kick it.
 			nni_msg_free(msg);
-			nni_pipe_stop(p->pipe);
+			nni_pipe_close(p->pipe);
 			return;
 		}
 		body = nni_msg_body(msg);
@@ -361,7 +361,7 @@ xrep0_pipe_putq_cb(void *arg)
 	if (nni_aio_result(p->aio_putq) != 0) {
 		nni_msg_free(nni_aio_get_msg(p->aio_putq));
 		nni_aio_set_msg(p->aio_putq, NULL);
-		nni_pipe_stop(p->pipe);
+		nni_pipe_close(p->pipe);
 		return;
 	}
 
@@ -369,17 +369,17 @@ xrep0_pipe_putq_cb(void *arg)
 }
 
 static int
-xrep0_sock_setopt_maxttl(void *arg, const void *buf, size_t sz, int typ)
+xrep0_sock_set_maxttl(void *arg, const void *buf, size_t sz, nni_opt_type t)
 {
 	xrep0_sock *s = arg;
-	return (nni_copyin_int(&s->ttl, buf, sz, 1, 255, typ));
+	return (nni_copyin_int(&s->ttl, buf, sz, 1, 255, t));
 }
 
 static int
-xrep0_sock_getopt_maxttl(void *arg, void *buf, size_t *szp, int typ)
+xrep0_sock_get_maxttl(void *arg, void *buf, size_t *szp, nni_opt_type t)
 {
 	xrep0_sock *s = arg;
-	return (nni_copyout_int(s->ttl, buf, szp, typ));
+	return (nni_copyout_int(s->ttl, buf, szp, t));
 }
 
 static void
@@ -408,16 +408,16 @@ static nni_proto_pipe_ops xrep0_pipe_ops = {
 	.pipe_stop  = xrep0_pipe_stop,
 };
 
-static nni_proto_sock_option xrep0_sock_options[] = {
+static nni_proto_option xrep0_sock_options[] = {
 	{
-	    .pso_name   = NNG_OPT_MAXTTL,
-	    .pso_type   = NNI_TYPE_INT32,
-	    .pso_getopt = xrep0_sock_getopt_maxttl,
-	    .pso_setopt = xrep0_sock_setopt_maxttl,
+	    .o_name = NNG_OPT_MAXTTL,
+	    .o_type = NNI_TYPE_INT32,
+	    .o_get  = xrep0_sock_get_maxttl,
+	    .o_set  = xrep0_sock_set_maxttl,
 	},
 	// terminate list
 	{
-	    .pso_name = NULL,
+	    .o_name = NULL,
 	},
 };
 

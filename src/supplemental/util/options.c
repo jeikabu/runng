@@ -16,19 +16,20 @@
 
 // Call with optidx set to 1 to start parsing.
 int
-nng_opts_parse(int argc, const char **argv, const nng_optspec *opts, int *val,
-    const char **optarg, int *optidx)
+nng_opts_parse(int argc, char *const *argv, const nng_optspec *opts, int *val,
+    char **optarg, int *optidx)
 {
 	const nng_optspec *opt;
 	int                matches;
 	bool               shortopt;
 	size_t             l;
-	const char *       arg = argv[*optidx];
+	char *             arg;
 	int                i;
 
 	if ((i = *optidx) >= argc) {
 		return (-1);
 	}
+	arg = argv[*optidx];
 
 	if (arg[0] != '-') {
 		return (-1);

@@ -131,9 +131,9 @@ rep0_ctx_init(void **ctxp, void *sarg)
 }
 
 static void
-rep0_ctx_cancel_send(nni_aio *aio, int rv)
+rep0_ctx_cancel_send(nni_aio *aio, void *arg, int rv)
 {
-	rep0_ctx * ctx = nni_aio_get_prov_data(aio);
+	rep0_ctx * ctx = arg;
 	rep0_sock *s   = ctx->sock;
 
 	nni_mtx_lock(&s->lk);
@@ -413,15 +413,14 @@ rep0_pipe_send_cb(void *arg)
 	nni_msg *  msg;
 	size_t     len;
 
-	nni_mtx_lock(&s->lk);
-	p->busy = false;
 	if (nni_aio_result(p->aio_send) != 0) {
 		nni_msg_free(nni_aio_get_msg(p->aio_send));
 		nni_aio_set_msg(p->aio_send, NULL);
-		nni_pipe_stop(p->pipe);
-		nni_mtx_unlock(&s->lk);
+		nni_pipe_close(p->pipe);
 		return;
 	}
+	nni_mtx_lock(&s->lk);
+	p->busy = false;
 	if ((ctx = nni_list_first(&p->sendq)) == NULL) {
 		// Nothing else to send.
 		if (p->id == s->ctx->pipe_id) {
@@ -449,9 +448,9 @@ rep0_pipe_send_cb(void *arg)
 }
 
 static void
-rep0_cancel_recv(nni_aio *aio, int rv)
+rep0_cancel_recv(nni_aio *aio, void *arg, int rv)
 {
-	rep0_ctx * ctx = nni_aio_get_prov_data(aio);
+	rep0_ctx * ctx = arg;
 	rep0_sock *s   = ctx->sock;
 
 	nni_mtx_lock(&s->lk);
@@ -520,7 +519,7 @@ rep0_pipe_recv_cb(void *arg)
 	int        hops;
 
 	if (nni_aio_result(p->aio_recv) != 0) {
-		nni_pipe_stop(p->pipe);
+		nni_pipe_close(p->pipe);
 		return;
 	}
 
@@ -545,7 +544,7 @@ rep0_pipe_recv_cb(void *arg)
 			// Peer is speaking garbage. Kick it.
 			nni_msg_free(msg);
 			nni_aio_set_msg(p->aio_recv, NULL);
-			nni_pipe_stop(p->pipe);
+			nni_pipe_close(p->pipe);
 			return;
 		}
 		body = nni_msg_body(msg);
@@ -605,23 +604,23 @@ drop:
 }
 
 static int
-rep0_sock_setopt_maxttl(void *arg, const void *buf, size_t sz, int typ)
+rep0_sock_set_maxttl(void *arg, const void *buf, size_t sz, nni_opt_type t)
 {
 	rep0_sock *s = arg;
 
-	return (nni_copyin_int(&s->ttl, buf, sz, 1, 255, typ));
+	return (nni_copyin_int(&s->ttl, buf, sz, 1, 255, t));
 }
 
 static int
-rep0_sock_getopt_maxttl(void *arg, void *buf, size_t *szp, int typ)
+rep0_sock_get_maxttl(void *arg, void *buf, size_t *szp, nni_opt_type t)
 {
 	rep0_sock *s = arg;
 
-	return (nni_copyout_int(s->ttl, buf, szp, typ));
+	return (nni_copyout_int(s->ttl, buf, szp, t));
 }
 
 static int
-rep0_sock_getopt_sendfd(void *arg, void *buf, size_t *szp, int typ)
+rep0_sock_get_sendfd(void *arg, void *buf, size_t *szp, nni_opt_type t)
 {
 	rep0_sock *s = arg;
 	int        rv;
@@ -630,11 +629,11 @@ rep0_sock_getopt_sendfd(void *arg, void *buf, size_t *szp, int typ)
 	if ((rv = nni_pollable_getfd(s->sendable, &fd)) != 0) {
 		return (rv);
 	}
-	return (nni_copyout_int(fd, buf, szp, typ));
+	return (nni_copyout_int(fd, buf, szp, t));
 }
 
 static int
-rep0_sock_getopt_recvfd(void *arg, void *buf, size_t *szp, int typ)
+rep0_sock_get_recvfd(void *arg, void *buf, size_t *szp, nni_opt_type t)
 {
 	rep0_sock *s = arg;
 	int        rv;
@@ -644,7 +643,7 @@ rep0_sock_getopt_recvfd(void *arg, void *buf, size_t *szp, int typ)
 		return (rv);
 	}
 
-	return (nni_copyout_int(fd, buf, szp, typ));
+	return (nni_copyout_int(fd, buf, szp, t));
 }
 
 static void
@@ -680,28 +679,26 @@ static nni_proto_ctx_ops rep0_ctx_ops = {
 	.ctx_recv = rep0_ctx_recv,
 };
 
-static nni_proto_sock_option rep0_sock_options[] = {
+static nni_proto_option rep0_sock_options[] = {
 	{
-	    .pso_name   = NNG_OPT_MAXTTL,
-	    .pso_type   = NNI_TYPE_INT32,
-	    .pso_getopt = rep0_sock_getopt_maxttl,
-	    .pso_setopt = rep0_sock_setopt_maxttl,
+	    .o_name = NNG_OPT_MAXTTL,
+	    .o_type = NNI_TYPE_INT32,
+	    .o_get  = rep0_sock_get_maxttl,
+	    .o_set  = rep0_sock_set_maxttl,
 	},
 	{
-	    .pso_name   = NNG_OPT_RECVFD,
-	    .pso_type   = NNI_TYPE_INT32,
-	    .pso_getopt = rep0_sock_getopt_recvfd,
-	    .pso_setopt = NULL,
+	    .o_name = NNG_OPT_RECVFD,
+	    .o_type = NNI_TYPE_INT32,
+	    .o_get  = rep0_sock_get_recvfd,
 	},
 	{
-	    .pso_name   = NNG_OPT_SENDFD,
-	    .pso_type   = NNI_TYPE_INT32,
-	    .pso_getopt = rep0_sock_getopt_sendfd,
-	    .pso_setopt = NULL,
+	    .o_name = NNG_OPT_SENDFD,
+	    .o_type = NNI_TYPE_INT32,
+	    .o_get  = rep0_sock_get_sendfd,
 	},
 	// terminate list
 	{
-	    .pso_name = NULL,
+	    .o_name = NULL,
 	},
 };
 

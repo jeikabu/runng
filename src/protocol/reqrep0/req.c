@@ -66,6 +66,7 @@ struct req0_sock {
 
 	nni_list readypipes;
 	nni_list busypipes;
+	nni_list stoppipes;
 	nni_list ctxs;
 
 	nni_list      sendq;  // contexts waiting to send.
@@ -74,7 +75,6 @@ struct req0_sock {
 	nni_pollable *sendable;
 
 	nni_mtx mtx;
-	nni_cv  cv;
 };
 
 // A req0_pipe is our per-pipe protocol private structure.
@@ -83,6 +83,7 @@ struct req0_pipe {
 	req0_sock *   req;
 	nni_list_node node;
 	nni_list      ctxs; // ctxs with pending traffic
+	bool          closed;
 	nni_aio *     aio_send;
 	nni_aio *     aio_recv;
 };
@@ -112,10 +113,10 @@ req0_sock_init(void **sp, nni_sock *sock)
 	    s->reqids, 0x80000000u, 0xffffffffu, nni_random() | 0x80000000u);
 
 	nni_mtx_init(&s->mtx);
-	nni_cv_init(&s->cv, &s->mtx);
 
 	NNI_LIST_INIT(&s->readypipes, req0_pipe, node);
 	NNI_LIST_INIT(&s->busypipes, req0_pipe, node);
+	NNI_LIST_INIT(&s->stoppipes, req0_pipe, node);
 	NNI_LIST_INIT(&s->sendq, req0_ctx, sqnode);
 	NNI_LIST_INIT(&s->ctxs, req0_ctx, snode);
 
@@ -169,10 +170,9 @@ req0_sock_fini(void *arg)
 	req0_sock *s = arg;
 
 	nni_mtx_lock(&s->mtx);
-	while ((!nni_list_empty(&s->readypipes)) ||
-	    (!nni_list_empty(&s->busypipes))) {
-		nni_cv_wait(&s->cv);
-	}
+	NNI_ASSERT(nni_list_empty(&s->busypipes));
+	NNI_ASSERT(nni_list_empty(&s->stoppipes));
+	NNI_ASSERT(nni_list_empty(&s->readypipes));
 	nni_mtx_unlock(&s->mtx);
 	if (s->ctx) {
 		req0_ctx_fini(s->ctx);
@@ -180,7 +180,6 @@ req0_sock_fini(void *arg)
 	nni_pollable_free(s->recvable);
 	nni_pollable_free(s->sendable);
 	nni_idhash_fini(s->reqids);
-	nni_cv_fini(&s->cv);
 	nni_mtx_fini(&s->mtx);
 	NNI_FREE_STRUCT(s);
 }
@@ -189,9 +188,13 @@ static void
 req0_pipe_stop(void *arg)
 {
 	req0_pipe *p = arg;
+	req0_sock *s = p->req;
 
 	nni_aio_stop(p->aio_recv);
 	nni_aio_stop(p->aio_send);
+	nni_mtx_lock(&s->mtx);
+	nni_list_node_remove(&p->node);
+	nni_mtx_unlock(&s->mtx);
 }
 
 static void
@@ -238,7 +241,7 @@ req0_pipe_start(void *arg)
 	}
 
 	nni_mtx_lock(&s->mtx);
-	if (s->closed) {
+	if (s->closed || p->closed) {
 		nni_mtx_unlock(&s->mtx);
 		return (NNG_ECLOSED);
 	}
@@ -263,13 +266,11 @@ req0_pipe_close(void *arg)
 
 	nni_mtx_lock(&s->mtx);
 	// This removes the node from either busypipes or readypipes.
-	// It doesn't much matter which.
-	if (nni_list_node_active(&p->node)) {
-		nni_list_node_remove(&p->node);
-		if (s->closed) {
-			nni_cv_wake(&s->cv);
-		}
-	}
+	// It doesn't much matter which.  We stick the pipe on the stop
+	// list, so that we can wait for that to close down safely.
+	p->closed = true;
+	nni_list_node_remove(&p->node);
+	nni_list_append(&s->stoppipes, p);
 	if (nni_list_empty(&s->readypipes)) {
 		nni_pollable_clear(s->sendable);
 	}
@@ -303,7 +304,7 @@ req0_send_cb(void *arg)
 		// We failed to send... clean up and deal with it.
 		nni_msg_free(nni_aio_get_msg(p->aio_send));
 		nni_aio_set_msg(p->aio_send, NULL);
-		nni_pipe_stop(p->pipe);
+		nni_pipe_close(p->pipe);
 		return;
 	}
 
@@ -311,20 +312,18 @@ req0_send_cb(void *arg)
 	// in the ready list, and re-run the sendq.
 
 	nni_mtx_lock(&s->mtx);
-	if (nni_list_active(&s->busypipes, p)) {
-		nni_list_remove(&s->busypipes, p);
-		nni_list_append(&s->readypipes, p);
-		if (nni_list_empty(&s->sendq)) {
-			nni_pollable_raise(s->sendable);
-		}
-		req0_run_sendq(s, &aios);
-	} else {
-		// We wind up here if stop was called from the reader
-		// side while we were waiting to be scheduled to run for the
-		// writer side.  In this case we can't complete the operation,
-		// and we have to abort.
-		nni_pipe_stop(p->pipe);
+	if (p->closed || s->closed) {
+		// This occurs if the req0_pipe_close has been called.
+		// In that case we don't want any more processing.
+		nni_mtx_unlock(&s->mtx);
+		return;
 	}
+	nni_list_remove(&s->busypipes, p);
+	nni_list_append(&s->readypipes, p);
+	if (nni_list_empty(&s->sendq)) {
+		nni_pollable_raise(s->sendable);
+	}
+	req0_run_sendq(s, &aios);
 	nni_mtx_unlock(&s->mtx);
 
 	while ((aio = nni_list_first(&aios)) != NULL) {
@@ -344,7 +343,7 @@ req0_recv_cb(void *arg)
 	uint32_t   id;
 
 	if (nni_aio_result(p->aio_recv) != 0) {
-		nni_pipe_stop(p->pipe);
+		nni_pipe_close(p->pipe);
 		return;
 	}
 
@@ -408,7 +407,7 @@ req0_recv_cb(void *arg)
 
 malformed:
 	nni_msg_free(msg);
-	nni_pipe_stop(p->pipe);
+	nni_pipe_close(p->pipe);
 }
 
 static void
@@ -479,17 +478,17 @@ req0_ctx_fini(void *arg)
 }
 
 static int
-req0_ctx_setopt_resendtime(void *arg, const void *buf, size_t sz, int typ)
+req0_ctx_set_resendtime(void *arg, const void *buf, size_t sz, nni_opt_type t)
 {
 	req0_ctx *ctx = arg;
-	return (nni_copyin_ms(&ctx->retry, buf, sz, typ));
+	return (nni_copyin_ms(&ctx->retry, buf, sz, t));
 }
 
 static int
-req0_ctx_getopt_resendtime(void *arg, void *buf, size_t *szp, int typ)
+req0_ctx_get_resendtime(void *arg, void *buf, size_t *szp, nni_opt_type t)
 {
 	req0_ctx *ctx = arg;
-	return (nni_copyout_ms(ctx->retry, buf, szp, typ));
+	return (nni_copyout_ms(ctx->retry, buf, szp, t));
 }
 
 static void
@@ -591,9 +590,9 @@ req0_ctx_reset(req0_ctx *ctx)
 }
 
 static void
-req0_ctx_cancel_recv(nni_aio *aio, int rv)
+req0_ctx_cancel_recv(nni_aio *aio, void *arg, int rv)
 {
-	req0_ctx * ctx = nni_aio_get_prov_data(aio);
+	req0_ctx * ctx = arg;
 	req0_sock *s   = ctx->sock;
 
 	nni_mtx_lock(&s->mtx);
@@ -667,9 +666,9 @@ req0_ctx_recv(void *arg, nni_aio *aio)
 }
 
 static void
-req0_ctx_cancel_send(nni_aio *aio, int rv)
+req0_ctx_cancel_send(nni_aio *aio, void *arg, int rv)
 {
-	req0_ctx * ctx = nni_aio_get_prov_data(aio);
+	req0_ctx * ctx = arg;
 	req0_sock *s   = ctx->sock;
 
 	nni_mtx_lock(&s->mtx);
@@ -713,6 +712,11 @@ req0_ctx_send(void *arg, nni_aio *aio)
 		return;
 	}
 	nni_mtx_lock(&s->mtx);
+	if (s->closed) {
+		nni_mtx_unlock(&s->mtx);
+		nni_aio_finish_error(aio, NNG_ECLOSED);
+		return;
+	}
 	// Sending a new request cancels the old one, including any
 	// outstanding reply.
 	if (ctx->raio != NULL) {
@@ -782,38 +786,38 @@ req0_sock_recv(void *arg, nni_aio *aio)
 }
 
 static int
-req0_sock_setopt_maxttl(void *arg, const void *buf, size_t sz, int typ)
+req0_sock_set_maxttl(void *arg, const void *buf, size_t sz, nni_opt_type t)
 {
 	req0_sock *s = arg;
-	return (nni_copyin_int(&s->ttl, buf, sz, 1, 255, typ));
+	return (nni_copyin_int(&s->ttl, buf, sz, 1, 255, t));
 }
 
 static int
-req0_sock_getopt_maxttl(void *arg, void *buf, size_t *szp, int typ)
+req0_sock_get_maxttl(void *arg, void *buf, size_t *szp, nni_opt_type t)
 {
 	req0_sock *s = arg;
-	return (nni_copyout_int(s->ttl, buf, szp, typ));
+	return (nni_copyout_int(s->ttl, buf, szp, t));
 }
 
 static int
-req0_sock_setopt_resendtime(void *arg, const void *buf, size_t sz, int typ)
+req0_sock_set_resendtime(void *arg, const void *buf, size_t sz, nni_opt_type t)
 {
 	req0_sock *s = arg;
 	int        rv;
-	rv       = req0_ctx_setopt_resendtime(s->ctx, buf, sz, typ);
+	rv       = req0_ctx_set_resendtime(s->ctx, buf, sz, t);
 	s->retry = s->ctx->retry;
 	return (rv);
 }
 
 static int
-req0_sock_getopt_resendtime(void *arg, void *buf, size_t *szp, int typ)
+req0_sock_get_resendtime(void *arg, void *buf, size_t *szp, nni_opt_type t)
 {
 	req0_sock *s = arg;
-	return (req0_ctx_getopt_resendtime(s->ctx, buf, szp, typ));
+	return (req0_ctx_get_resendtime(s->ctx, buf, szp, t));
 }
 
 static int
-req0_sock_getopt_sendfd(void *arg, void *buf, size_t *szp, int typ)
+req0_sock_get_sendfd(void *arg, void *buf, size_t *szp, nni_opt_type t)
 {
 	req0_sock *s = arg;
 	int        rv;
@@ -822,11 +826,11 @@ req0_sock_getopt_sendfd(void *arg, void *buf, size_t *szp, int typ)
 	if ((rv = nni_pollable_getfd(s->sendable, &fd)) != 0) {
 		return (rv);
 	}
-	return (nni_copyout_int(fd, buf, szp, typ));
+	return (nni_copyout_int(fd, buf, szp, t));
 }
 
 static int
-req0_sock_getopt_recvfd(void *arg, void *buf, size_t *szp, int typ)
+req0_sock_get_recvfd(void *arg, void *buf, size_t *szp, nni_opt_type t)
 {
 	req0_sock *s = arg;
 	int        rv;
@@ -836,7 +840,7 @@ req0_sock_getopt_recvfd(void *arg, void *buf, size_t *szp, int typ)
 		return (rv);
 	}
 
-	return (nni_copyout_int(fd, buf, szp, typ));
+	return (nni_copyout_int(fd, buf, szp, t));
 }
 
 static nni_proto_pipe_ops req0_pipe_ops = {
@@ -847,15 +851,15 @@ static nni_proto_pipe_ops req0_pipe_ops = {
 	.pipe_stop  = req0_pipe_stop,
 };
 
-static nni_proto_ctx_option req0_ctx_options[] = {
+static nni_proto_option req0_ctx_options[] = {
 	{
-	    .co_name   = NNG_OPT_REQ_RESENDTIME,
-	    .co_type   = NNI_TYPE_DURATION,
-	    .co_getopt = req0_ctx_getopt_resendtime,
-	    .co_setopt = req0_ctx_setopt_resendtime,
+	    .o_name = NNG_OPT_REQ_RESENDTIME,
+	    .o_type = NNI_TYPE_DURATION,
+	    .o_get  = req0_ctx_get_resendtime,
+	    .o_set  = req0_ctx_set_resendtime,
 	},
 	{
-	    .co_name = NULL,
+	    .o_name = NULL,
 	},
 };
 
@@ -867,34 +871,32 @@ static nni_proto_ctx_ops req0_ctx_ops = {
 	.ctx_options = req0_ctx_options,
 };
 
-static nni_proto_sock_option req0_sock_options[] = {
+static nni_proto_option req0_sock_options[] = {
 	{
-	    .pso_name   = NNG_OPT_MAXTTL,
-	    .pso_type   = NNI_TYPE_INT32,
-	    .pso_getopt = req0_sock_getopt_maxttl,
-	    .pso_setopt = req0_sock_setopt_maxttl,
+	    .o_name = NNG_OPT_MAXTTL,
+	    .o_type = NNI_TYPE_INT32,
+	    .o_get  = req0_sock_get_maxttl,
+	    .o_set  = req0_sock_set_maxttl,
 	},
 	{
-	    .pso_name   = NNG_OPT_REQ_RESENDTIME,
-	    .pso_type   = NNI_TYPE_DURATION,
-	    .pso_getopt = req0_sock_getopt_resendtime,
-	    .pso_setopt = req0_sock_setopt_resendtime,
+	    .o_name = NNG_OPT_REQ_RESENDTIME,
+	    .o_type = NNI_TYPE_DURATION,
+	    .o_get  = req0_sock_get_resendtime,
+	    .o_set  = req0_sock_set_resendtime,
 	},
 	{
-	    .pso_name   = NNG_OPT_RECVFD,
-	    .pso_type   = NNI_TYPE_INT32,
-	    .pso_getopt = req0_sock_getopt_recvfd,
-	    .pso_setopt = NULL,
+	    .o_name = NNG_OPT_RECVFD,
+	    .o_type = NNI_TYPE_INT32,
+	    .o_get  = req0_sock_get_recvfd,
 	},
 	{
-	    .pso_name   = NNG_OPT_SENDFD,
-	    .pso_type   = NNI_TYPE_INT32,
-	    .pso_getopt = req0_sock_getopt_sendfd,
-	    .pso_setopt = NULL,
+	    .o_name = NNG_OPT_SENDFD,
+	    .o_type = NNI_TYPE_INT32,
+	    .o_get  = req0_sock_get_sendfd,
 	},
 	// terminate list
 	{
-	    .pso_name = NULL,
+	    .o_name = NULL,
 	},
 };
 

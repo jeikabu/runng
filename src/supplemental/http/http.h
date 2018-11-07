@@ -154,6 +154,9 @@ NNG_DECL int nng_http_req_set_data(nng_http_req *, const void *, size_t);
 // probably set the content-type header.
 NNG_DECL int nng_http_req_copy_data(nng_http_req *, const void *, size_t);
 
+// nng_http_req_get_data gets the data for the response.
+NNG_DECL void nng_http_req_get_data(nng_http_req *, void **, size_t *);
+
 // nng_http_res represents an HTTP response.
 typedef struct nng_http_res nng_http_res;
 
@@ -207,6 +210,9 @@ NNG_DECL int nng_http_res_set_version(nng_http_res *, const char *);
 
 // nng_http_res_get_version returns the version, usually HTTP/1.1.
 NNG_DECL const char *nng_http_res_get_version(nng_http_res *);
+
+// nng_http_res_get_data gets the data for the response.
+NNG_DECL void nng_http_res_get_data(nng_http_res *, void **, size_t *);
 
 // nng_http_res_set_data adds entity data to the response.  The
 // data object must persist (so only really useful for static data).
@@ -269,6 +275,12 @@ NNG_DECL void nng_http_conn_read_req(
 NNG_DECL void nng_http_conn_read_res(
     nng_http_conn *, nng_http_res *, nng_aio *);
 
+// nng_http_req_reset resets the request to an initially allocated state.
+NNG_DECL void nng_http_req_reset(nng_http_req *);
+
+// nng_http_res_reset resets the response to an initially allocated state.
+NNG_DECL void nng_http_res_reset(nng_http_res *);
+
 // nng_http_handler is a handler used on the server side to handle HTTP
 // requests coming into a specific URL.
 typedef struct nng_http_handler nng_http_handler;
@@ -316,6 +328,12 @@ NNG_DECL int nng_http_handler_alloc_file(
 NNG_DECL int nng_http_handler_alloc_static(
     nng_http_handler **, const char *, const void *, size_t, const char *);
 
+// nng_http_handler_alloc_redirect creates an HTTP redirect handler.
+// The status is given, along with the new URL.  If the status is 0,
+// then 301 will be used instead.
+NNG_DECL int nng_http_handler_alloc_redirect(
+    nng_http_handler **, const char *, uint16_t, const char *);
+
 // nng_http_handler_alloc_file creates a "directory" based handler, that
 // serves up static content from the given directory tree.  Directories
 // that contain an index.html or index.htm file use that file for the
@@ -337,6 +355,16 @@ NNG_DECL int nng_http_handler_set_method(nng_http_handler *, const char *);
 // handler.)  Note that the Host: header must match *exactly* (except
 // that case is not considered.)
 NNG_DECL int nng_http_handler_set_host(nng_http_handler *, const char *);
+
+// nng_http_handler_collect_body is used to indicate the server should
+// check for, and process, data sent by the client, which will be attached
+// to the request.  If this is false, then the handler will need to check
+// for and process any content data.  By default the server will accept
+// up to 1MB.  If the client attempts to send more data than requested,
+// then a 400 Bad Request will be sent back to the client.  To set an
+// unlimited value, use (size_t)-1.  To preclude the client from sending
+// *any* data, use 0.  (The static and file handlers use 0 by default.)
+NNG_DECL int nng_http_handler_collect_body(nng_http_handler *, bool, size_t);
 
 // nng_http_handler_set_tree indicates that the handler is being registered
 // for a heirarchical tree, rather than just a single path, so it will be
@@ -375,7 +403,9 @@ NNG_DECL void nng_http_server_release(nng_http_server *);
 NNG_DECL int nng_http_server_start(nng_http_server *);
 
 // nng_http_server_stop stops the server.  No new client connections are
-// accepted after this returns.
+// accepted after this returns.  Once a server is stopped fully, the
+// instance will no longer be returned by nng_http_server_hold, as the
+// server may not be reused.
 NNG_DECL void nng_http_server_stop(nng_http_server *);
 
 // nng_http_server_add_handler registers a handler on the server.
@@ -406,6 +436,29 @@ NNG_DECL int nng_http_server_set_tls(
 // nng_http_server_set_tls function is called, so be careful.
 NNG_DECL int nng_http_server_get_tls(
     nng_http_server *, struct nng_tls_config **);
+
+// nng_http_server_set_error_page sets a custom error page (HTML) content
+// to be sent for the given error code.  This is used when the error is
+// generated internally by the framework, or when the application returns
+// the response back to the server via the handler's aio, and the response
+// was allocated with nng_http_res_alloc_error.  If the response was not
+// allocated this way, or the application writes the response itself instead
+// of letting the server do so, then this setting will be ignored.
+NNG_DECL int nng_http_server_set_error_page(
+    nng_http_server *, uint16_t, const char *);
+
+// nng_http_server_set_error_file works like nng_http_server_error_page,
+// except that the content is loaded from the named file path.  The contents
+// are loaded at the time this function is called, so this function should be
+// called anytime the contents of the named file have changed.
+NNG_DECL int nng_http_server_set_error_file(
+    nng_http_server *, uint16_t, const char *);
+
+// nng_http_server_res_error takes replaces the body of the response with
+// a custom error page previously set for the server, using the status
+// of the response.  The response must have the status set first using
+// nng_http_res_set_status or implicitly via nng_http_res_alloc_error.
+NNG_DECL int nng_http_server_res_error(nng_http_server *, nng_http_res *);
 
 // nng_http_hijack is intended to be called by a handler that wishes to
 // take over the processing of the HTTP session -- usually to change protocols
@@ -451,6 +504,22 @@ NNG_DECL int nng_http_client_get_tls(
 // is established, the associated nng_http_conn object pointer is returned
 // in the first (index 0) output for the aio.
 NNG_DECL void nng_http_client_connect(nng_http_client *, nng_aio *);
+
+// nng_http_conn_transact is used to perform a round-trip exchange (i.e. a
+// single HTTP transaction).  It will not automatically close the connection,
+// unless some kind of significant error occurs.  The caller should close
+// the connection if the aio does not complete successfully.
+// Note that this will fail with NNG_ENOTSUP if the server attempts to reply
+// with a chunked transfer encoding.
+NNG_DECL void nng_http_conn_transact(
+    nng_http_conn *, nng_http_req *, nng_http_res *, nng_aio *);
+
+// nng_http_client_transact is used to execute a single transaction to a
+// server. The connection is opened, and will be closed when the transaction is
+// complete.  Note that this will fail with NNG_ENOTSUP if the server attempts
+// to reply with a chunked transfer encoding.
+NNG_DECL void nng_http_client_transact(
+    nng_http_client *, nng_http_req *, nng_http_res *, nng_aio *);
 
 #ifdef __cplusplus
 }

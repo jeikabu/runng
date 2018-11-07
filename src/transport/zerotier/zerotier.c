@@ -16,7 +16,7 @@
 #include "core/nng_impl.h"
 #include "zerotier.h"
 
-#include <ZeroTierOne.h>
+#include <zerotiercore/ZeroTierOne.h>
 
 // ZeroTier Transport.  This sits on the ZeroTier L2 network, which itself
 // is implemented on top of UDP.  This requires the 3rd party
@@ -83,7 +83,7 @@ static const nng_duration zt_ping_time  = 60000; // keepalive time (msec)
 // These are compile time tunables for now.
 enum zt_tunables {
 	zt_listenq       = 128,   // backlog queue length
-	zt_listen_expire = 60000, // maximum time in backlog (msec)
+	zt_listen_expire = 10000, // maximum time in backlog (msec)
 	zt_rcv_bufsize   = 4096,  // max UDP recv
 	zt_udp_sendq     = 16,    // outgoing UDP queue length
 	zt_recvq         = 2,     // max pending recv (per pipe)
@@ -147,7 +147,7 @@ struct zt_node {
 	ZT_Node *       zn_znode;
 	uint64_t        zn_self;
 	nni_list_node   zn_link;
-	int             zn_closed;
+	bool            zn_closed;
 	nni_plat_udp *  zn_udp4;
 	nni_plat_udp *  zn_udp6;
 	nni_list        zn_eplist;
@@ -156,7 +156,6 @@ struct zt_node {
 	nni_idhash *    zn_eps;
 	nni_idhash *    zn_lpipes;
 	nni_idhash *    zn_rpipes;
-	nni_idhash *    zn_peers; // indexed by remote address
 	nni_aio *       zn_rcv4_aio;
 	uint8_t *       zn_rcv4_buf;
 	nng_sockaddr    zn_rcv4_addr;
@@ -175,7 +174,7 @@ struct zt_fraglist {
 	nni_time     fl_time;  // time first frag was received
 	uint32_t     fl_msgid; // message id
 	int          fl_ready; // we have all messages
-	unsigned int fl_fragsz;
+	size_t       fl_fragsz;
 	unsigned int fl_nfrags;
 	uint8_t *    fl_missing;
 	size_t       fl_missingsz;
@@ -183,27 +182,28 @@ struct zt_fraglist {
 };
 
 struct zt_pipe {
-	nni_list_node zp_link;
-	const char *  zp_addr;
-	zt_node *     zp_ztn;
-	uint64_t      zp_nwid;
-	uint64_t      zp_laddr;
-	uint64_t      zp_raddr;
-	uint16_t      zp_peer;
-	uint16_t      zp_proto;
-	uint16_t      zp_next_msgid;
-	size_t        zp_rcvmax;
-	size_t        zp_mtu;
-	int           zp_closed;
-	nni_aio *     zp_user_rxaio;
-	nni_time      zp_last_recv;
-	zt_fraglist   zp_recvq[zt_recvq];
-	int           zp_ping_try;
-	int           zp_ping_tries;
-	int           zp_ping_active;
-	nni_duration  zp_ping_time;
-	nni_aio *     zp_ping_aio;
-	uint8_t *     zp_send_buf;
+	nni_list_node   zp_link;
+	zt_node *       zp_ztn;
+	nni_pipe *      zp_npipe;
+	uint64_t        zp_nwid;
+	uint64_t        zp_laddr;
+	uint64_t        zp_raddr;
+	uint16_t        zp_peer;
+	uint16_t        zp_proto;
+	uint16_t        zp_next_msgid;
+	size_t          zp_rcvmax;
+	size_t          zp_mtu;
+	nni_aio *       zp_user_rxaio;
+	nni_time        zp_last_recv;
+	zt_fraglist     zp_recvq[zt_recvq];
+	int             zp_ping_try;
+	int             zp_ping_tries;
+	bool            zp_closed;
+	nni_duration    zp_ping_time;
+	nni_aio *       zp_ping_aio;
+	uint8_t *       zp_send_buf;
+	nni_atomic_flag zp_reaped;
+	nni_reap_item   zp_reap;
 };
 
 typedef struct zt_creq zt_creq;
@@ -218,15 +218,14 @@ struct zt_ep {
 	char          ze_home[NNG_MAXADDRLEN]; // should be enough
 	zt_node *     ze_ztn;
 	uint64_t      ze_nwid;
-	int           ze_mode;
-	int           ze_running;
+	bool          ze_running;
 	uint64_t      ze_raddr; // remote node address
 	uint64_t      ze_laddr; // local node address
 	uint16_t      ze_proto;
 	size_t        ze_rcvmax;
 	nni_aio *     ze_aio;
 	nni_aio *     ze_creq_aio;
-	int           ze_creq_active;
+	bool          ze_creq_active;
 	int           ze_creq_try;
 	nni_list      ze_aios;
 	int           ze_mtu;
@@ -240,9 +239,11 @@ struct zt_ep {
 	// established connection/pipe unless the application calls
 	// accept.  Since the "application" is our library, that should
 	// be pretty much as fast we can run.
-	zt_creq ze_creqs[zt_listenq];
-	int     ze_creq_head;
-	int     ze_creq_tail;
+	zt_creq       ze_creqs[zt_listenq];
+	int           ze_creq_head;
+	int           ze_creq_tail;
+	nni_dialer *  ze_ndialer;
+	nni_listener *ze_nlistener;
 };
 
 // Locking strategy.  At present the ZeroTier core is not reentrant or fully
@@ -273,13 +274,14 @@ static void zt_ep_send_conn_req(zt_ep *);
 static void zt_ep_conn_req_cb(void *);
 static void zt_ep_doaccept(zt_ep *);
 static void zt_pipe_dorecv(zt_pipe *);
-static int  zt_pipe_init(zt_pipe **, zt_ep *, uint64_t, uint64_t);
+static int  zt_pipe_alloc(zt_pipe **, zt_ep *, uint64_t, uint64_t, bool);
 static void zt_pipe_ping_cb(void *);
 static void zt_fraglist_clear(zt_fraglist *);
 static void zt_fraglist_free(zt_fraglist *);
 static void zt_virtual_recv(ZT_Node *, void *, void *, uint64_t, void **,
     uint64_t, uint64_t, unsigned int, unsigned int, const void *,
     unsigned int);
+static void zt_pipe_start_ping(zt_pipe *);
 
 static int64_t
 zt_now(void)
@@ -521,11 +523,6 @@ zt_virtual_config(ZT_Node *node, void *userptr, void *thr, uint64_t nwid,
 				continue;
 			}
 			ep->ze_mtu = config->mtu;
-
-			if ((ep->ze_mode == NNI_EP_MODE_DIAL) &&
-			    (nni_list_first(&ep->ze_aios) != NULL)) {
-				zt_ep_send_conn_req(ep);
-			}
 		}
 		break;
 	case ZT_VIRTUAL_NETWORK_CONFIG_OPERATION_DESTROY:
@@ -640,7 +637,7 @@ zt_ep_recv_conn_ack(zt_ep *ep, uint64_t raddr, const uint8_t *data, size_t len)
 	zt_pipe *p;
 	int      rv;
 
-	if (ep->ze_mode != NNI_EP_MODE_DIAL) {
+	if (ep->ze_ndialer == NULL) {
 		zt_send_err(ztn, ep->ze_nwid, raddr, ep->ze_laddr,
 		    zt_err_proto, "Inappropriate operation");
 		return;
@@ -659,11 +656,12 @@ zt_ep_recv_conn_ack(zt_ep *ep, uint64_t raddr, const uint8_t *data, size_t len)
 	// Do we already have a matching pipe?  If so, we can discard
 	// the operation.  This should not happen, since we normally,
 	// deregister the endpoint when we create the pipe.
-	if ((nni_idhash_find(ztn->zn_peers, raddr, (void **) &p)) == 0) {
+	if ((nni_idhash_find(ztn->zn_lpipes, ep->ze_laddr, (void **) &p)) ==
+	    0) {
 		return;
 	}
 
-	if ((rv = zt_pipe_init(&p, ep, raddr, ep->ze_laddr)) != 0) {
+	if ((rv = zt_pipe_alloc(&p, ep, raddr, ep->ze_laddr, false)) != 0) {
 		// We couldn't create the pipe, just drop it.
 		nni_aio_finish_error(aio, rv);
 		return;
@@ -687,7 +685,7 @@ zt_ep_recv_conn_req(zt_ep *ep, uint64_t raddr, const uint8_t *data, size_t len)
 	zt_pipe *p;
 	int      i;
 
-	if (ep->ze_mode != NNI_EP_MODE_LISTEN) {
+	if (ep->ze_nlistener == NULL) {
 		zt_send_err(ztn, ep->ze_nwid, raddr, ep->ze_laddr,
 		    zt_err_proto, "Inappropriate operation");
 		return;
@@ -700,7 +698,7 @@ zt_ep_recv_conn_req(zt_ep *ep, uint64_t raddr, const uint8_t *data, size_t len)
 
 	// If we already have created a pipe for this connection
 	// then just reply the conn ack.
-	if ((nni_idhash_find(ztn->zn_peers, raddr, (void **) &p)) == 0) {
+	if ((nni_idhash_find(ztn->zn_rpipes, raddr, (void **) &p)) == 0) {
 		zt_pipe_send_conn_ack(p);
 		return;
 	}
@@ -740,8 +738,8 @@ zt_ep_recv_error(zt_ep *ep, const uint8_t *data, size_t len)
 	// is that when we have an outstanding CON_REQ, we would like to
 	// process that appropriately.
 
-	if (ep->ze_mode != NNI_EP_MODE_DIAL) {
-		// Drop it.
+	if (ep->ze_ndialer == NULL) {
+		// Not a dialer. Drop it.
 		return;
 	}
 
@@ -805,10 +803,8 @@ zt_pipe_close_err(zt_pipe *p, int err, uint8_t code, const char *msg)
 		p->zp_user_rxaio = NULL;
 		nni_aio_finish_error(aio, err);
 	}
-	if ((aio = p->zp_ping_aio) != NULL) {
-		nni_aio_finish_error(aio, NNG_ECLOSED);
-	}
-	p->zp_closed = 1;
+	nni_aio_close(p->zp_ping_aio);
+	p->zp_closed = true;
 	if (msg != NULL) {
 		zt_pipe_send_err(p, code, msg);
 	}
@@ -820,7 +816,7 @@ zt_pipe_recv_data(zt_pipe *p, const uint8_t *data, size_t len)
 	uint16_t     msgid;
 	uint16_t     fragno;
 	uint16_t     nfrags;
-	uint16_t     fragsz;
+	size_t       fragsz;
 	zt_fraglist *fl;
 	int          i;
 	int          slot;
@@ -974,7 +970,7 @@ zt_pipe_recv_disc_req(zt_pipe *p, const uint8_t *data, size_t len)
 	// Don't bother to check the length, going to disconnect anyway.
 	if ((aio = p->zp_user_rxaio) != NULL) {
 		p->zp_user_rxaio = NULL;
-		p->zp_closed     = 1;
+		p->zp_closed     = true;
 		nni_aio_finish_error(aio, NNG_ECLOSED);
 	}
 }
@@ -990,7 +986,7 @@ zt_pipe_recv_error(zt_pipe *p, const uint8_t *data, size_t len)
 	// the day, the details are just not that interesting.
 	if ((aio = p->zp_user_rxaio) != NULL) {
 		p->zp_user_rxaio = NULL;
-		p->zp_closed     = 1;
+		p->zp_closed     = true;
 		nni_aio_finish_error(aio, NNG_ETRANERR);
 	}
 }
@@ -1299,7 +1295,6 @@ zt_wire_packet_send(ZT_Node *node, void *userptr, void *thr, int64_t socket,
 	struct sockaddr_in6 *sin6 = (void *) remaddr;
 	zt_node *            ztn  = userptr;
 	nni_plat_udp *       udp;
-	uint16_t             port;
 	uint8_t *            buf;
 	zt_send_hdr *        hdr;
 	nni_iov              iov;
@@ -1318,13 +1313,11 @@ zt_wire_packet_send(ZT_Node *node, void *userptr, void *thr, int64_t socket,
 		addr.s_in.sa_port   = sin->sin_port;
 		addr.s_in.sa_addr   = sin->sin_addr.s_addr;
 		udp                 = ztn->zn_udp4;
-		port                = htons(sin->sin_port);
 		break;
 	case AF_INET6:
 		addr.s_in6.sa_family = NNG_AF_INET6;
 		addr.s_in6.sa_port   = sin6->sin6_port;
 		udp                  = ztn->zn_udp6;
-		port                 = htons(sin6->sin6_port);
 		memcpy(addr.s_in6.sa_addr, sin6->sin6_addr.s6_addr, 16);
 		break;
 	default:
@@ -1416,7 +1409,6 @@ zt_node_destroy(zt_node *ztn)
 	nni_idhash_fini(ztn->zn_eps);
 	nni_idhash_fini(ztn->zn_lpipes);
 	nni_idhash_fini(ztn->zn_rpipes);
-	nni_idhash_fini(ztn->zn_peers);
 	nni_cv_fini(&ztn->zn_bgcv);
 	NNI_FREE_STRUCT(ztn);
 }
@@ -1458,7 +1450,6 @@ zt_node_create(zt_node **ztnp, const char *path)
 	    ((rv = nni_idhash_init(&ztn->zn_eps)) != 0) ||
 	    ((rv = nni_idhash_init(&ztn->zn_lpipes)) != 0) ||
 	    ((rv = nni_idhash_init(&ztn->zn_rpipes)) != 0) ||
-	    ((rv = nni_idhash_init(&ztn->zn_peers)) != 0) ||
 	    ((rv = nni_thr_init(&ztn->zn_bgthr, zt_bgthr, ztn)) != 0) ||
 	    ((rv = nni_plat_udp_open(&ztn->zn_udp4, &sa4)) != 0) ||
 	    ((rv = nni_plat_udp_open(&ztn->zn_udp6, &sa6)) != 0)) {
@@ -1527,14 +1518,12 @@ zt_walk_moons(const char *path, void *arg)
 {
 	zt_node *   ztn = arg;
 	const char *bn  = nni_file_basename(path);
-	char *      ep;
 	uint64_t    moonid;
 
 	if (strncmp(bn, "moon.", 5) != 0) {
 		return (NNI_FILE_WALK_CONTINUE);
 	}
-	moonid = strtoull(bn + 5, &ep, 16);
-	if (*ep == '\0') {
+	if (nni_strtox64(bn + 5, &moonid) == 0) {
 		ZT_Node_orbit(ztn->zn_znode, NULL, moonid, 0);
 	}
 	return (NNI_FILE_WALK_CONTINUE);
@@ -1600,7 +1589,7 @@ zt_tran_fini(void)
 	nni_mtx_lock(&zt_lk);
 	while ((ztn = nni_list_first(&zt_nodes)) != 0) {
 		nni_list_remove(&zt_nodes, ztn);
-		ztn->zn_closed = 1;
+		ztn->zn_closed = true;
 		nni_cv_wake(&ztn->zn_bgcv);
 		nni_mtx_unlock(&zt_lk);
 
@@ -1627,13 +1616,22 @@ zt_pipe_close(void *arg)
 	nni_aio *aio;
 
 	nni_mtx_lock(&zt_lk);
-	p->zp_closed = 1;
+	p->zp_closed = true;
+	nni_aio_close(p->zp_ping_aio);
 	if ((aio = p->zp_user_rxaio) != NULL) {
 		p->zp_user_rxaio = NULL;
 		nni_aio_finish_error(aio, NNG_ECLOSED);
 	}
 	zt_pipe_send_disc_req(p);
 	nni_mtx_unlock(&zt_lk);
+}
+
+static int
+zt_pipe_init(void *arg, nni_pipe *npipe)
+{
+	zt_pipe *p  = arg;
+	p->zp_npipe = npipe;
+	return (0);
 }
 
 static void
@@ -1649,7 +1647,6 @@ zt_pipe_fini(void *arg)
 	nni_idhash_remove(ztn->zn_ports, p->zp_laddr & zt_port_mask);
 	nni_idhash_remove(ztn->zn_lpipes, p->zp_laddr);
 	nni_idhash_remove(ztn->zn_rpipes, p->zp_raddr);
-	nni_idhash_remove(ztn->zn_peers, p->zp_raddr);
 	nni_mtx_unlock(&zt_lk);
 
 	for (int i = 0; i < zt_recvq; i++) {
@@ -1659,8 +1656,17 @@ zt_pipe_fini(void *arg)
 	NNI_FREE_STRUCT(p);
 }
 
+static void
+zt_pipe_reap(zt_pipe *p)
+{
+	if (!nni_atomic_flag_test_and_set(&p->zp_reaped)) {
+		nni_reap(&p->zp_reap, zt_pipe_fini, p);
+	}
+}
+
 static int
-zt_pipe_init(zt_pipe **pipep, zt_ep *ep, uint64_t raddr, uint64_t laddr)
+zt_pipe_alloc(
+    zt_pipe **pipep, zt_ep *ep, uint64_t raddr, uint64_t laddr, bool listener)
 {
 	zt_pipe *p;
 	int      rv;
@@ -1687,16 +1693,19 @@ zt_pipe_init(zt_pipe **pipep, zt_ep *ep, uint64_t raddr, uint64_t laddr)
 	p->zp_ping_time  = ep->ze_ping_time;
 	p->zp_next_msgid = (uint16_t) nni_random();
 	p->zp_ping_try   = 0;
+	nni_atomic_flag_reset(&p->zp_reaped);
 
-	if (ep->ze_mode == NNI_EP_MODE_DIAL) {
-		rv = nni_idhash_insert(ztn->zn_lpipes, laddr, p);
-	} else {
+	if (listener) {
+		// listener
 		rv = nni_idhash_insert(ztn->zn_rpipes, raddr, p);
+	} else {
+		// dialer
+		rv = nni_idhash_insert(ztn->zn_lpipes, laddr, p);
 	}
 	if ((rv != 0) ||
-	    ((rv = nni_idhash_insert(ztn->zn_peers, p->zp_raddr, p)) != 0) ||
 	    ((rv = nni_aio_init(&p->zp_ping_aio, zt_pipe_ping_cb, p)) != 0)) {
-		zt_pipe_fini(p);
+		zt_pipe_reap(p);
+		return (rv);
 	}
 
 	// The largest fragment we can accept on this pipe. The MTU is
@@ -1717,7 +1726,7 @@ zt_pipe_init(zt_pipe **pipep, zt_ep *ep, uint64_t raddr, uint64_t laddr)
 		fl->fl_missingsz = (maxfrags + 7) / 8;
 		fl->fl_missing   = nni_alloc(fl->fl_missingsz);
 		if (fl->fl_missing == NULL) {
-			zt_pipe_fini(p);
+			zt_pipe_reap(p);
 			return (NNG_ENOMEM);
 		}
 	}
@@ -1738,7 +1747,7 @@ zt_pipe_send(void *arg, nni_aio *aio)
 	uint16_t id;
 	uint16_t nfrags;
 	uint16_t fragno;
-	uint16_t fragsz;
+	size_t   fragsz;
 	size_t   bytes;
 	nni_msg *m;
 
@@ -1758,7 +1767,8 @@ zt_pipe_send(void *arg, nni_aio *aio)
 		return;
 	}
 
-	fragsz = (uint16_t)(p->zp_mtu - zt_offset_data_data);
+	fragsz = p->zp_mtu - zt_offset_data_data;
+	NNI_ASSERT(fragsz < 0x10000); // Because zp_mtu is 16 bits
 
 	bytes = nni_msg_header_len(m) + nni_msg_len(m);
 	if (bytes >= (0xfffe * fragsz)) {
@@ -1807,7 +1817,7 @@ zt_pipe_send(void *arg, nni_aio *aio)
 
 		nng_msg_trim(m, len);
 		NNI_PUT16(data + zt_offset_data_id, id);
-		NNI_PUT16(data + zt_offset_data_fragsz, fragsz);
+		NNI_PUT16(data + zt_offset_data_fragsz, (uint16_t) fragsz);
 		NNI_PUT16(data + zt_offset_data_frag, fragno);
 		NNI_PUT16(data + zt_offset_data_nfrag, nfrags);
 		offset += len;
@@ -1829,9 +1839,9 @@ zt_pipe_send(void *arg, nni_aio *aio)
 }
 
 static void
-zt_pipe_cancel_recv(nni_aio *aio, int rv)
+zt_pipe_cancel_recv(nni_aio *aio, void *arg, int rv)
 {
-	zt_pipe *p = nni_aio_get_prov_data(aio);
+	zt_pipe *p = arg;
 	nni_mtx_lock(&zt_lk);
 	if (p->zp_user_rxaio == aio) {
 		p->zp_user_rxaio = NULL;
@@ -1932,16 +1942,13 @@ zt_pipe_peer(void *arg)
 }
 
 static int
-zt_getopt_nw_status(
-    zt_node *ztn, uint64_t nwid, void *buf, size_t *szp, int typ)
+zt_get_nw_status(zt_node *ztn, uint64_t nwid, int *statusp)
 {
 	ZT_VirtualNetworkConfig *vcfg;
 	int                      status;
 
-	nni_mtx_lock(&zt_lk);
 	vcfg = ZT_Node_networkConfig(ztn->zn_znode, nwid);
 	if (vcfg == NULL) {
-		nni_mtx_unlock(&zt_lk);
 		return (NNG_ECLOSED);
 	}
 	switch (vcfg->status) {
@@ -1968,63 +1975,48 @@ zt_getopt_nw_status(
 		break;
 	}
 	ZT_Node_freeQueryResult(ztn->zn_znode, vcfg);
-	nni_mtx_unlock(&zt_lk);
 
-	return (nni_copyout_int(status, buf, szp, typ));
+	*statusp = status;
+	return (0);
 }
 
 static int
-zt_getopt_nw_name(zt_node *ztn, uint64_t nwid, void *buf, size_t *szp, int typ)
+zt_get_nw_name(
+    zt_node *ztn, uint64_t nwid, void *buf, size_t *szp, nni_opt_type t)
 {
 	ZT_VirtualNetworkConfig *vcfg;
 	int                      rv;
 
-	nni_mtx_lock(&zt_lk);
 	vcfg = ZT_Node_networkConfig(ztn->zn_znode, nwid);
 	if (vcfg == NULL) {
-		nni_mtx_unlock(&zt_lk);
 		return (NNG_ECLOSED);
 	}
 
-	rv = nni_copyout_str(vcfg->name, buf, szp, typ);
+	rv = nni_copyout_str(vcfg->name, buf, szp, t);
 	ZT_Node_freeQueryResult(ztn->zn_znode, vcfg);
-	nni_mtx_unlock(&zt_lk);
 
 	return (rv);
 }
 
 static int
-zt_pipe_get_recvmaxsz(void *arg, void *buf, size_t *szp, int typ)
+zt_pipe_get_recvmaxsz(void *arg, void *buf, size_t *szp, nni_opt_type t)
 {
 	zt_pipe *p = arg;
-	return (nni_copyout_size(p->zp_rcvmax, buf, szp, typ));
+	return (nni_copyout_size(p->zp_rcvmax, buf, szp, t));
 }
 
 static int
-zt_pipe_get_nwid(void *arg, void *buf, size_t *szp, int typ)
+zt_pipe_get_nwid(void *arg, void *buf, size_t *szp, nni_opt_type t)
 {
 	zt_pipe *p = arg;
-	return (nni_copyout_u64(p->zp_nwid, buf, szp, typ));
+	return (nni_copyout_u64(p->zp_nwid, buf, szp, t));
 }
 
 static int
-zt_pipe_get_node(void *arg, void *buf, size_t *szp, int typ)
+zt_pipe_get_node(void *arg, void *buf, size_t *szp, nni_opt_type t)
 {
 	zt_pipe *p = arg;
-	return (nni_copyout_u64(p->zp_laddr >> 24, buf, szp, typ));
-}
-
-static void
-zt_pipe_cancel_ping(nni_aio *aio, int rv)
-{
-	zt_pipe *p = nni_aio_get_prov_data(aio);
-
-	nni_mtx_lock(&zt_lk);
-	if (p->zp_ping_active) {
-		p->zp_ping_active = 0;
-		nni_aio_finish_error(aio, rv);
-	}
-	nni_mtx_unlock(&zt_lk);
+	return (nni_copyout_u64(p->zp_laddr >> 24, buf, szp, t));
 }
 
 static void
@@ -2032,79 +2024,46 @@ zt_pipe_ping_cb(void *arg)
 {
 	zt_pipe *p   = arg;
 	nni_aio *aio = p->zp_ping_aio;
+	int      rv;
 
+	if ((rv = nni_aio_result(aio)) != 0) {
+		// We were canceled.  That means we're done.
+		return;
+	}
 	nni_mtx_lock(&zt_lk);
-
-	p->zp_ping_active = 0;
 	if (p->zp_closed || aio == NULL || (p->zp_ping_tries == 0) ||
 	    (p->zp_ping_time == NNG_DURATION_INFINITE) ||
 	    (p->zp_ping_time == NNG_DURATION_ZERO)) {
 		nni_mtx_unlock(&zt_lk);
 		return;
 	}
-	if (nni_aio_result(aio) != NNG_ETIMEDOUT) {
-		nni_mtx_unlock(&zt_lk);
-		return;
-	}
-	if (p->zp_ping_try < p->zp_ping_tries) {
-		nni_time now = nni_clock();
-		nni_aio_set_timeout(aio, p->zp_ping_time);
-		// We want pings.  We only send one if needed, but we
-		// use the the timer to wake us up even if we aren't
-		// going to send a ping.  (We don't increment the try count
-		// unless we actually do send one though.)
-		if (nni_aio_begin(aio) == 0) {
-			int rv;
-			rv = nni_aio_schedule(aio, zt_pipe_cancel_ping, p);
-			if (rv != 0) {
-				nni_mtx_unlock(&zt_lk);
-				nni_aio_finish_error(aio, rv);
-				return;
-			}
-			p->zp_ping_active = 1;
-			if (now > (p->zp_last_recv + p->zp_ping_time)) {
-				p->zp_ping_try++;
-				zt_pipe_send_ping(p);
-			}
-		}
-	} else {
+	if (p->zp_ping_try >= p->zp_ping_tries) {
 		// Ping count exceeded; the other side is AFK.
 		// Close the pipe, but no need to send a reason to the peer.
 		zt_pipe_close_err(p, NNG_ECLOSED, 0, NULL);
+		nni_mtx_unlock(&zt_lk);
+		return;
 	}
+
+	if (nni_clock() > (p->zp_last_recv + p->zp_ping_time)) {
+		p->zp_ping_try++;
+		zt_pipe_send_ping(p);
+	}
+
+	nni_sleep_aio(p->zp_ping_time, aio); // Schedule a recheck.
 	nni_mtx_unlock(&zt_lk);
 }
 
 static void
-zt_pipe_start(void *arg, nni_aio *aio)
+zt_pipe_start_ping(zt_pipe *p)
 {
-	zt_pipe *p = arg;
-
-	if (nni_aio_begin(aio) != 0) {
-		return;
-	}
-	nni_mtx_lock(&zt_lk);
-	p->zp_ping_active = 0;
 	// send a gratuitous ping, and start the ping interval timer.
 	if ((p->zp_ping_tries > 0) && (p->zp_ping_time != NNG_DURATION_ZERO) &&
-	    (p->zp_ping_time != NNG_DURATION_INFINITE) &&
-	    (p->zp_ping_aio != NULL)) {
+	    (p->zp_ping_time != NNG_DURATION_INFINITE)) {
 		p->zp_ping_try = 0;
-		nni_aio_set_timeout(aio, p->zp_ping_time);
-		if (nni_aio_begin(p->zp_ping_aio) == 0) {
-			int rv;
-			rv = nni_aio_schedule(
-			    p->zp_ping_aio, zt_pipe_cancel_ping, p);
-			if (rv != 0) {
-				nni_aio_finish_error(p->zp_ping_aio, rv);
-			} else {
-				p->zp_ping_active = 1;
-				zt_pipe_send_ping(p);
-			}
-		}
+		zt_pipe_send_ping(p);
+		nni_sleep_aio(p->zp_ping_time, p->zp_ping_aio);
 	}
-	nni_aio_finish(aio, 0, 0);
-	nni_mtx_unlock(&zt_lk);
 }
 
 static void
@@ -2163,7 +2122,8 @@ zt_parsedec(const char **sp, uint64_t *valp)
 }
 
 static int
-zt_ep_init(void **epp, nni_url *url, nni_sock *sock, int mode)
+zt_ep_init(void **epp, nni_url *url, nni_sock *sock, nni_dialer *ndialer,
+    nni_listener *nlistener)
 {
 	zt_ep *     ep;
 	uint64_t    node;
@@ -2175,7 +2135,6 @@ zt_ep_init(void **epp, nni_url *url, nni_sock *sock, int mode)
 		return (NNG_ENOMEM);
 	}
 
-	ep->ze_mode       = mode;
 	ep->ze_mtu        = ZT_MIN_MTU;
 	ep->ze_aio        = NULL;
 	ep->ze_ping_tries = zt_ping_tries;
@@ -2183,6 +2142,8 @@ zt_ep_init(void **epp, nni_url *url, nni_sock *sock, int mode)
 	ep->ze_conn_time  = zt_conn_time;
 	ep->ze_conn_tries = zt_conn_tries;
 	ep->ze_proto      = nni_sock_proto_id(sock);
+	ep->ze_ndialer    = ndialer;
+	ep->ze_nlistener  = nlistener;
 
 	nni_aio_list_init(&ep->ze_aios);
 
@@ -2215,39 +2176,39 @@ zt_ep_init(void **epp, nni_url *url, nni_sock *sock, int mode)
 	}
 
 	// Parse the URL.
-	switch (mode) {
-	case NNI_EP_MODE_DIAL:
-		/// We have to have a non-zero port number to connect to.
+	if (nlistener != NULL) {
+		// listener
+		ep->ze_laddr = node;
+		ep->ze_laddr <<= 24;
+		ep->ze_laddr |= port;
+		ep->ze_raddr     = 0;
+		ep->ze_nlistener = nlistener;
+	} else {
+		// dialer
 		if (port == 0) {
 			return (NNG_EADDRINVAL);
 		}
 		ep->ze_raddr = node;
 		ep->ze_raddr <<= 24;
 		ep->ze_raddr |= port;
-		ep->ze_laddr = 0;
-		break;
-	case NNI_EP_MODE_LISTEN:
-		ep->ze_laddr = node;
-		ep->ze_laddr <<= 24;
-		ep->ze_laddr |= port;
-		ep->ze_raddr = 0;
-		break;
-	default:
-		NNI_ASSERT(0);
-		break;
-	}
-
-	nni_mtx_lock(&zt_lk);
-	rv = zt_node_find(ep);
-	nni_mtx_unlock(&zt_lk);
-
-	if (rv != 0) {
-		zt_ep_fini(ep);
-		return (rv);
+		ep->ze_laddr   = 0;
+		ep->ze_ndialer = ndialer;
 	}
 
 	*epp = ep;
 	return (0);
+}
+
+static int
+zt_dialer_init(void **epp, nni_url *url, nni_dialer *d)
+{
+	return (zt_ep_init(epp, url, nni_dialer_sock(d), d, NULL));
+}
+
+static int
+zt_listener_init(void **epp, nni_url *url, nni_listener *l)
+{
+	return (zt_ep_init(epp, url, nni_listener_sock(l), NULL, l));
 }
 
 static void
@@ -2329,7 +2290,7 @@ zt_ep_bind_locked(zt_ep *ep)
 	ep->ze_laddr = ztn->zn_self;
 	ep->ze_laddr <<= 24;
 	ep->ze_laddr |= port;
-	ep->ze_running = 1;
+	ep->ze_running = true;
 
 	if ((rv = nni_idhash_insert(ztn->zn_eps, ep->ze_laddr, ep)) != 0) {
 		nni_idhash_remove(ztn->zn_ports, port);
@@ -2353,9 +2314,9 @@ zt_ep_bind(void *arg)
 }
 
 static void
-zt_ep_cancel(nni_aio *aio, int rv)
+zt_ep_cancel(nni_aio *aio, void *arg, int rv)
 {
-	zt_ep *ep = nni_aio_get_prov_data(aio);
+	zt_ep *ep = arg;
 
 	nni_mtx_lock(&zt_lk);
 	if (nni_aio_list_active(aio)) {
@@ -2402,7 +2363,7 @@ zt_ep_doaccept(zt_ep *ep)
 		// We remove this AIO.  This keeps it from being canceled.
 		nni_aio_list_remove(aio);
 
-		rv = zt_pipe_init(&p, ep, creq.cr_raddr, ep->ze_laddr);
+		rv = zt_pipe_alloc(&p, ep, creq.cr_raddr, ep->ze_laddr, true);
 		if (rv != 0) {
 			zt_send_err(ep->ze_ztn, ep->ze_nwid, creq.cr_raddr,
 			    ep->ze_laddr, zt_err_unknown,
@@ -2412,6 +2373,7 @@ zt_ep_doaccept(zt_ep *ep)
 		}
 		p->zp_peer = creq.cr_proto;
 		zt_pipe_send_conn_ack(p);
+		zt_pipe_start_ping(p);
 		nni_aio_set_output(aio, 0, p);
 		nni_aio_finish(aio, 0, 0);
 	}
@@ -2438,14 +2400,14 @@ zt_ep_accept(void *arg, nni_aio *aio)
 }
 
 static void
-zt_ep_conn_req_cancel(nni_aio *aio, int rv)
+zt_ep_conn_req_cancel(nni_aio *aio, void *arg, int rv)
 {
-	zt_ep *ep = nni_aio_get_prov_data(aio);
+	zt_ep *ep = arg;
 	// We don't have much to do here.  The AIO will have been
 	// canceled as a result of the "parent" AIO canceling.
 	nni_mtx_lock(&zt_lk);
 	if (ep->ze_creq_active) {
-		ep->ze_creq_active = 0;
+		ep->ze_creq_active = false;
 		nni_aio_finish_error(aio, rv);
 	}
 	nni_mtx_unlock(&zt_lk);
@@ -2460,17 +2422,16 @@ zt_ep_conn_req_cb(void *arg)
 	nni_aio *uaio;
 	int      rv;
 
-	NNI_ASSERT(ep->ze_mode == NNI_EP_MODE_DIAL);
-
 	nni_mtx_lock(&zt_lk);
 
-	ep->ze_creq_active = 0;
+	ep->ze_creq_active = false;
 	switch ((rv = nni_aio_result(aio))) {
 	case 0:
 		p = nni_aio_get_output(aio, 0);
 		// Already canceled, or already handled?
 		if ((uaio = nni_list_first(&ep->ze_aios)) != NULL) {
 			nni_aio_list_remove(uaio);
+			zt_pipe_start_ping(p);
 			nni_aio_set_output(uaio, 0, p);
 			nni_aio_finish(uaio, 0, 0);
 		} else {
@@ -2511,7 +2472,7 @@ zt_ep_conn_req_cb(void *arg)
 			if (rv != 0) {
 				nni_aio_finish_error(aio, rv);
 			} else {
-				ep->ze_creq_active = 1;
+				ep->ze_creq_active = true;
 				ep->ze_creq_try++;
 				zt_ep_send_conn_req(ep);
 			}
@@ -2554,7 +2515,7 @@ zt_ep_connect(void *arg, nni_aio *aio)
 		return;
 	}
 	nni_aio_list_append(&ep->ze_aios, aio);
-	ep->ze_running = 1;
+	ep->ze_running = true;
 
 	nni_aio_set_timeout(ep->ze_creq_aio, ep->ze_conn_time);
 	if (nni_aio_begin(ep->ze_creq_aio) == 0) {
@@ -2566,7 +2527,7 @@ zt_ep_connect(void *arg, nni_aio *aio)
 			// Send out the first connect message; if not
 			// yet attached to network message will be dropped.
 			ep->ze_creq_try    = 1;
-			ep->ze_creq_active = 1;
+			ep->ze_creq_active = true;
 			zt_ep_send_conn_req(ep);
 		}
 	}
@@ -2574,88 +2535,108 @@ zt_ep_connect(void *arg, nni_aio *aio)
 }
 
 static int
-zt_ep_setopt_recvmaxsz(void *arg, const void *data, size_t sz, int typ)
+zt_ep_chk_recvmaxsz(const void *v, size_t sz, nni_opt_type t)
+{
+	return (nni_copyin_size(NULL, v, sz, 0, NNI_MAXSZ, t));
+}
+
+static int
+zt_ep_set_recvmaxsz(void *arg, const void *data, size_t sz, nni_opt_type t)
 {
 	zt_ep *ep = arg;
 	size_t val;
 	int    rv;
 
-	rv = nni_copyin_size(&val, data, sz, 0, 0xffffffffu, typ);
-	if ((rv == 0) && (ep != NULL)) {
+	if ((rv = nni_copyin_size(&val, data, sz, 0, NNI_MAXSZ, t)) == 0) {
+		nni_mtx_lock(&zt_lk);
 		ep->ze_rcvmax = val;
+		nni_mtx_unlock(&zt_lk);
 	}
 	return (rv);
 }
 
 static int
-zt_ep_getopt_recvmaxsz(void *arg, void *data, size_t *szp, int typ)
+zt_ep_get_recvmaxsz(void *arg, void *data, size_t *szp, nni_opt_type t)
 {
 	zt_ep *ep = arg;
-	return (nni_copyout_size(ep->ze_rcvmax, data, szp, typ));
+	int    rv;
+	nni_mtx_lock(&zt_lk);
+	rv = nni_copyout_size(ep->ze_rcvmax, data, szp, t);
+	nni_mtx_unlock(&zt_lk);
+	return (rv);
 }
 
 static int
-zt_ep_setopt_home(void *arg, const void *data, size_t sz, int typ)
+zt_ep_chk_string(const void *data, size_t sz, nni_opt_type t)
 {
 	size_t len;
-	int    rv;
-	zt_ep *ep = arg;
 
-	if ((typ != NNI_TYPE_OPAQUE) && (typ != NNI_TYPE_STRING)) {
+	if ((t != NNI_TYPE_OPAQUE) && (t != NNI_TYPE_STRING)) {
 		return (NNG_EBADTYPE);
 	}
-
 	len = nni_strnlen(data, sz);
 	if ((len >= sz) || (len >= NNG_MAXADDRLEN)) {
 		return (NNG_EINVAL);
 	}
-	if (ep != NULL) {
-		if (ep->ze_running) {
-			return (NNG_ESTATE);
-		}
+	return (0);
+}
+
+static int
+zt_ep_set_home(void *arg, const void *data, size_t sz, nni_opt_type t)
+{
+	int    rv;
+	zt_ep *ep = arg;
+
+	if ((rv = zt_ep_chk_string(data, sz, t)) == 0) {
 		nni_mtx_lock(&zt_lk);
-		nni_strlcpy(ep->ze_home, data, sizeof(ep->ze_home));
-		if ((rv = zt_node_find(ep)) != 0) {
-			ep->ze_ztn = NULL;
+		if (ep->ze_running) {
+			rv = NNG_ESTATE;
+		} else {
+			nni_strlcpy(ep->ze_home, data, sizeof(ep->ze_home));
+			if ((rv = zt_node_find(ep)) != 0) {
+				ep->ze_ztn = NULL;
+			}
 		}
 		nni_mtx_unlock(&zt_lk);
-	} else {
-		rv = 0;
 	}
+
 	return (rv);
 }
 
 static int
-zt_ep_getopt_home(void *arg, void *data, size_t *szp, int typ)
+zt_ep_get_home(void *arg, void *data, size_t *szp, nni_opt_type t)
 {
 	zt_ep *ep = arg;
-	return (nni_copyout_str(ep->ze_home, data, szp, typ));
+	int    rv;
+
+	nni_mtx_lock(&zt_lk);
+	rv = nni_copyout_str(ep->ze_home, data, szp, t);
+	nni_mtx_unlock(&zt_lk);
+	return (rv);
 }
 
 static int
-zt_ep_getopt_url(void *arg, void *data, size_t *szp, int typ)
+zt_ep_get_url(void *arg, void *data, size_t *szp, nni_opt_type t)
 {
 	char     ustr[64]; // more than plenty
 	zt_ep *  ep = arg;
 	uint64_t addr;
 
-	addr = ep->ze_mode == NNI_EP_MODE_DIAL ? ep->ze_raddr : ep->ze_laddr;
+	nni_mtx_lock(&zt_lk);
+	addr = ep->ze_nlistener != NULL ? ep->ze_laddr : ep->ze_raddr;
 	snprintf(ustr, sizeof(ustr), "zt://%llx.%llx:%u",
 	    (unsigned long long) addr >> zt_port_shift,
 	    (unsigned long long) ep->ze_nwid,
 	    (unsigned) (addr & zt_port_mask));
-	return (nni_copyout_str(ustr, data, szp, typ));
+	nni_mtx_unlock(&zt_lk);
+	return (nni_copyout_str(ustr, data, szp, t));
 }
 
 static int
-zt_ep_setopt_orbit(void *arg, const void *data, size_t sz, int typ)
+zt_ep_chk_orbit(const void *data, size_t sz, nni_opt_type t)
 {
-	uint64_t           moonid;
-	uint64_t           peerid;
-	zt_ep *            ep = arg;
-	enum ZT_ResultCode zrv;
-
-	switch (typ) {
+	NNI_ARG_UNUSED(data);
+	switch (t) {
 	case NNI_TYPE_UINT64:
 		NNI_ASSERT(sz == sizeof(uint64_t));
 		break;
@@ -2667,6 +2648,21 @@ zt_ep_setopt_orbit(void *arg, const void *data, size_t sz, int typ)
 		break;
 	default:
 		return (NNG_EBADTYPE);
+	}
+	return (0);
+}
+
+static int
+zt_ep_set_orbit(void *arg, const void *data, size_t sz, nni_opt_type t)
+{
+	uint64_t           moonid;
+	uint64_t           peerid;
+	zt_ep *            ep = arg;
+	int                rv;
+	enum ZT_ResultCode zrv;
+
+	if ((rv = zt_ep_chk_orbit(data, sz, t)) != 0) {
+		return (rv);
 	}
 
 	if (sz == sizeof(uint64_t)) {
@@ -2680,6 +2676,10 @@ zt_ep_setopt_orbit(void *arg, const void *data, size_t sz, int typ)
 	}
 
 	nni_mtx_lock(&zt_lk);
+	if ((ep->ze_ztn == NULL) && ((rv = zt_node_find(ep)) != 0)) {
+		nni_mtx_unlock(&zt_lk);
+		return (rv);
+	}
 	zrv = ZT_Node_orbit(ep->ze_ztn->zn_znode, NULL, moonid, peerid);
 	nni_mtx_unlock(&zt_lk);
 
@@ -2687,137 +2687,336 @@ zt_ep_setopt_orbit(void *arg, const void *data, size_t sz, int typ)
 }
 
 static int
-zt_ep_setopt_deorbit(void *arg, const void *data, size_t sz, int typ)
+zt_ep_chk_deorbit(const void *data, size_t sz, nni_opt_type t)
+{
+	return (nni_copyin_u64(NULL, data, sz, t));
+}
+
+static int
+zt_ep_set_deorbit(void *arg, const void *data, size_t sz, nni_opt_type t)
 {
 	uint64_t           moonid;
 	zt_ep *            ep = arg;
 	enum ZT_ResultCode zrv;
 	int                rv;
 
-	rv = nni_copyin_u64(&moonid, data, sz, typ);
-	if ((rv == 0) && (ep != NULL)) {
+	if ((rv = nni_copyin_u64(&moonid, data, sz, t)) == 0) {
 
 		nni_mtx_lock(&zt_lk);
+		if ((ep->ze_ztn == NULL) && ((rv = zt_node_find(ep)) != 0)) {
+			nni_mtx_unlock(&zt_lk);
+			return (rv);
+		}
 		zrv = ZT_Node_deorbit(ep->ze_ztn->zn_znode, NULL, moonid);
 		nni_mtx_unlock(&zt_lk);
-
 		rv = zt_result(zrv);
 	}
 	return (rv);
 }
 
 static int
-zt_ep_getopt_node(void *arg, void *data, size_t *szp, int typ)
+zt_ep_chk_add_local_addr(const void *data, size_t sz, nni_opt_type t)
 {
-	zt_ep *ep = arg;
-	return (nni_copyout_u64(ep->ze_ztn->zn_self, data, szp, typ));
+	int          rv;
+	nng_sockaddr sa;
+	rv = nni_copyin_sockaddr(&sa, data, sz, t);
+	if (rv == 0) {
+		switch (sa.s_family) {
+		case NNG_AF_INET:
+		case NNG_AF_INET6:
+			break;
+		default:
+			return (NNG_EINVAL);
+		}
+	}
+	return (0);
 }
 
 static int
-zt_ep_getopt_nwid(void *arg, void *data, size_t *szp, int typ)
+zt_ep_set_add_local_addr(
+    void *arg, const void *data, size_t sz, nni_opt_type t)
 {
-	zt_ep *ep = arg;
-	return (nni_copyout_u64(ep->ze_nwid, data, szp, typ));
+	nng_sockaddr       sa;
+	zt_ep *            ep = arg;
+	enum ZT_ResultCode zrv;
+	int                rv;
+	ZT_Node *          zn;
+
+	if ((rv = nni_copyin_sockaddr(&sa, data, sz, t)) == 0) {
+		struct sockaddr_storage ss;
+		struct sockaddr_in *    sin;
+		struct sockaddr_in6 *   sin6;
+
+		memset(&ss, 0, sizeof(ss));
+		switch (sa.s_family) {
+		case NNG_AF_INET:
+			sin                  = (void *) &ss;
+			sin->sin_family      = AF_INET;
+			sin->sin_addr.s_addr = sa.s_in.sa_addr;
+			sin->sin_port        = 0;
+			break;
+		case NNG_AF_INET6:
+			sin6              = (void *) &ss;
+			sin6->sin6_family = AF_INET6;
+			sin6->sin6_port   = 0;
+			memcpy(&sin6->sin6_addr, sa.s_in6.sa_addr, 16);
+			break;
+		default:
+			return (NNG_EINVAL);
+		}
+
+		nni_mtx_lock(&zt_lk);
+		if ((ep->ze_ztn == NULL) && ((rv = zt_node_find(ep)) != 0)) {
+			nni_mtx_unlock(&zt_lk);
+			return (rv);
+		}
+		zn  = ep->ze_ztn;
+		zrv = ZT_Node_addLocalInterfaceAddress(zn, &ss);
+		nni_mtx_unlock(&zt_lk);
+		rv = zt_result(zrv);
+	}
+	return (rv);
 }
 
 static int
-zt_ep_getopt_nw_name(void *arg, void *buf, size_t *szp, int typ)
+zt_ep_chk_clear_local_addrs(const void *data, size_t sz, nni_opt_type t)
 {
-	zt_ep *ep = arg;
-	return (zt_getopt_nw_name(ep->ze_ztn, ep->ze_nwid, buf, szp, typ));
+	NNI_ARG_UNUSED(data);
+	NNI_ARG_UNUSED(sz);
+	NNI_ARG_UNUSED(t);
+	return (0);
 }
 
 static int
-zt_ep_getopt_nw_status(void *arg, void *buf, size_t *szp, int typ)
+zt_ep_set_clear_local_addrs(
+    void *arg, const void *data, size_t sz, nni_opt_type t)
 {
-	zt_ep *ep = arg;
-	return (zt_getopt_nw_status(ep->ze_ztn, ep->ze_nwid, buf, szp, typ));
+	zt_ep *  ep = arg;
+	int      rv;
+	ZT_Node *zn;
+	NNI_ARG_UNUSED(data);
+	NNI_ARG_UNUSED(sz);
+	NNI_ARG_UNUSED(t);
+
+	nni_mtx_lock(&zt_lk);
+	if ((ep->ze_ztn == NULL) && ((rv = zt_node_find(ep)) != 0)) {
+		nni_mtx_unlock(&zt_lk);
+		return (rv);
+	}
+	zn = ep->ze_ztn;
+	ZT_Node_clearLocalInterfaceAddresses(zn);
+	nni_mtx_unlock(&zt_lk);
+	return (0);
 }
 
 static int
-zt_ep_setopt_ping_time(void *arg, const void *data, size_t sz, int typ)
+zt_ep_get_node(void *arg, void *data, size_t *szp, nni_opt_type t)
+{
+	zt_ep *ep = arg;
+	int    rv;
+
+	nni_mtx_lock(&zt_lk);
+	if ((ep->ze_ztn == NULL) && ((rv = zt_node_find(ep)) != 0)) {
+		nni_mtx_unlock(&zt_lk);
+		return (rv);
+	}
+
+	rv = nni_copyout_u64(ep->ze_ztn->zn_self, data, szp, t);
+
+	nni_mtx_unlock(&zt_lk);
+	return (rv);
+}
+
+static int
+zt_ep_get_nwid(void *arg, void *data, size_t *szp, nni_opt_type t)
+{
+	zt_ep *ep = arg;
+	int    rv;
+
+	nni_mtx_lock(&zt_lk);
+	if ((ep->ze_ztn == NULL) && ((rv = zt_node_find(ep)) != 0)) {
+		nni_mtx_unlock(&zt_lk);
+		return (rv);
+	}
+	rv = nni_copyout_u64(ep->ze_nwid, data, szp, t);
+	nni_mtx_unlock(&zt_lk);
+	return (rv);
+}
+
+static int
+zt_ep_get_nw_name(void *arg, void *buf, size_t *szp, nni_opt_type t)
+{
+	zt_ep *ep = arg;
+	int    rv;
+
+	nni_mtx_lock(&zt_lk);
+	if ((ep->ze_ztn == NULL) && ((rv = zt_node_find(ep)) != 0)) {
+		nni_mtx_unlock(&zt_lk);
+		return (rv);
+	}
+	rv = zt_get_nw_name(ep->ze_ztn, ep->ze_nwid, buf, szp, t);
+	nni_mtx_unlock(&zt_lk);
+	return (rv);
+}
+
+static int
+zt_ep_get_nw_status(void *arg, void *buf, size_t *szp, nni_opt_type t)
+{
+	zt_ep *ep = arg;
+	int    rv;
+	int    status;
+
+	nni_mtx_lock(&zt_lk);
+	if ((ep->ze_ztn == NULL) && ((rv = zt_node_find(ep)) != 0)) {
+		nni_mtx_unlock(&zt_lk);
+		return (rv);
+	}
+	if ((rv = zt_get_nw_status(ep->ze_ztn, ep->ze_nwid, &status)) != 0) {
+		nni_mtx_unlock(&zt_lk);
+		return (rv);
+	}
+	nni_mtx_unlock(&zt_lk);
+	return (nni_copyout_int(status, buf, szp, t));
+}
+
+static int
+zt_ep_chk_time(const void *data, size_t sz, nni_opt_type t)
+{
+	return (nni_copyin_ms(NULL, data, sz, t));
+}
+
+static int
+zt_ep_set_ping_time(void *arg, const void *data, size_t sz, nni_opt_type t)
 {
 	zt_ep *      ep = arg;
 	nng_duration val;
 	int          rv;
 
-	if (((rv = nni_copyin_ms(&val, data, sz, typ)) == 0) && (ep != NULL)) {
+	if ((rv = nni_copyin_ms(&val, data, sz, t)) == 0) {
+		nni_mtx_lock(&zt_lk);
 		ep->ze_ping_time = val;
+		nni_mtx_unlock(&zt_lk);
 	}
 	return (rv);
 }
 
 static int
-zt_ep_getopt_ping_time(void *arg, void *data, size_t *szp, int typ)
+zt_ep_get_ping_time(void *arg, void *data, size_t *szp, nni_opt_type t)
 {
 	zt_ep *ep = arg;
-	return (nni_copyout_ms(ep->ze_ping_time, data, szp, typ));
+	int    rv;
+
+	nni_mtx_lock(&zt_lk);
+	rv = nni_copyout_ms(ep->ze_ping_time, data, szp, t);
+	nni_mtx_unlock(&zt_lk);
+	return (rv);
 }
 
 static int
-zt_ep_setopt_ping_tries(void *arg, const void *data, size_t sz, int typ)
+zt_ep_chk_tries(const void *data, size_t sz, nni_opt_type t)
+{
+	return (nni_copyin_int(NULL, data, sz, 0, 1000000, t));
+}
+
+static int
+zt_ep_set_ping_tries(void *arg, const void *data, size_t sz, nni_opt_type t)
 {
 	zt_ep *ep = arg;
 	int    val;
 	int    rv;
 
-	if (((rv = nni_copyin_int(&val, data, sz, 0, 1000000, typ)) == 0) &&
-	    (ep != NULL)) {
+	if ((rv = nni_copyin_int(&val, data, sz, 0, 1000000, t)) == 0) {
+		nni_mtx_lock(&zt_lk);
 		ep->ze_ping_tries = val;
+		nni_mtx_unlock(&zt_lk);
 	}
 	return (rv);
 }
 
 static int
-zt_ep_getopt_ping_tries(void *arg, void *data, size_t *szp, int typ)
+zt_ep_get_ping_tries(void *arg, void *data, size_t *szp, nni_opt_type t)
 {
 	zt_ep *ep = arg;
-	return (nni_copyout_int(ep->ze_ping_tries, data, szp, typ));
+	int    rv;
+
+	nni_mtx_lock(&zt_lk);
+	rv = nni_copyout_int(ep->ze_ping_tries, data, szp, t);
+	nni_mtx_unlock(&zt_lk);
+	return (rv);
 }
 
 static int
-zt_ep_setopt_conn_time(void *arg, const void *data, size_t sz, int typ)
+zt_ep_set_conn_time(void *arg, const void *data, size_t sz, nni_opt_type t)
 {
 	zt_ep *      ep = arg;
 	nng_duration val;
 	int          rv;
 
-	if (((rv = nni_copyin_ms(&val, data, sz, typ)) == 0) && (ep != NULL)) {
+	if ((rv = nni_copyin_ms(&val, data, sz, t)) == 0) {
+		nni_mtx_lock(&zt_lk);
 		ep->ze_conn_time = val;
+		nni_mtx_unlock(&zt_lk);
 	}
 	return (rv);
 }
 
 static int
-zt_ep_getopt_conn_time(void *arg, void *data, size_t *szp, int typ)
+zt_ep_get_conn_time(void *arg, void *data, size_t *szp, nni_opt_type t)
 {
 	zt_ep *ep = arg;
-	return (nni_copyout_ms(ep->ze_conn_time, data, szp, typ));
+	int    rv;
+
+	nni_mtx_lock(&zt_lk);
+	rv = nni_copyout_ms(ep->ze_conn_time, data, szp, t);
+	nni_mtx_unlock(&zt_lk);
+	return (rv);
 }
 
 static int
-zt_ep_setopt_conn_tries(void *arg, const void *data, size_t sz, int typ)
+zt_ep_set_conn_tries(void *arg, const void *data, size_t sz, nni_opt_type t)
 {
 	zt_ep *ep = arg;
 	int    val;
 	int    rv;
 
-	if (((rv = nni_copyin_int(&val, data, sz, 0, 1000000, typ)) == 0) &&
-	    (ep != NULL)) {
+	if ((rv = nni_copyin_int(&val, data, sz, 0, 1000000, t)) == 0) {
+		nni_mtx_lock(&zt_lk);
 		ep->ze_conn_tries = val;
+		nni_mtx_unlock(&zt_lk);
 	}
 	return (rv);
 }
 
 static int
-zt_ep_getopt_conn_tries(void *arg, void *data, size_t *szp, int typ)
+zt_ep_get_conn_tries(void *arg, void *data, size_t *szp, nni_opt_type t)
 {
 	zt_ep *ep = arg;
-	return (nni_copyout_int(ep->ze_conn_tries, data, szp, typ));
+	int    rv;
+
+	nni_mtx_lock(&zt_lk);
+	rv = nni_copyout_int(ep->ze_conn_tries, data, szp, t);
+	nni_mtx_unlock(&zt_lk);
+	return (rv);
 }
 
 static int
-zt_pipe_getopt_locaddr(void *arg, void *data, size_t *szp, int typ)
+zt_ep_get_locaddr(void *arg, void *data, size_t *szp, nni_opt_type t)
+{
+	zt_ep *      ep = arg;
+	nng_sockaddr sa;
+
+	memset(&sa, 0, sizeof(sa));
+	sa.s_zt.sa_family = NNG_AF_ZT;
+	nni_mtx_lock(&zt_lk);
+	sa.s_zt.sa_nwid   = ep->ze_nwid;
+	sa.s_zt.sa_nodeid = ep->ze_laddr >> zt_port_shift;
+	sa.s_zt.sa_port   = ep->ze_laddr & zt_port_mask;
+	nni_mtx_unlock(&zt_lk);
+	return (nni_copyout_sockaddr(&sa, data, szp, t));
+}
+
+static int
+zt_pipe_get_locaddr(void *arg, void *data, size_t *szp, nni_opt_type t)
 {
 	zt_pipe *    p = arg;
 	nng_sockaddr sa;
@@ -2827,11 +3026,11 @@ zt_pipe_getopt_locaddr(void *arg, void *data, size_t *szp, int typ)
 	sa.s_zt.sa_nwid   = p->zp_nwid;
 	sa.s_zt.sa_nodeid = p->zp_laddr >> zt_port_shift;
 	sa.s_zt.sa_port   = p->zp_laddr & zt_port_mask;
-	return (nni_copyout_sockaddr(&sa, data, szp, typ));
+	return (nni_copyout_sockaddr(&sa, data, szp, t));
 }
 
 static int
-zt_pipe_getopt_remaddr(void *arg, void *data, size_t *szp, int typ)
+zt_pipe_get_remaddr(void *arg, void *data, size_t *szp, nni_opt_type t)
 {
 	zt_pipe *    p = arg;
 	nng_sockaddr sa;
@@ -2841,56 +3040,56 @@ zt_pipe_getopt_remaddr(void *arg, void *data, size_t *szp, int typ)
 	sa.s_zt.sa_nwid   = p->zp_nwid;
 	sa.s_zt.sa_nodeid = p->zp_raddr >> zt_port_shift;
 	sa.s_zt.sa_port   = p->zp_raddr & zt_port_mask;
-	return (nni_copyout_sockaddr(&sa, data, szp, typ));
+	return (nni_copyout_sockaddr(&sa, data, szp, t));
 }
 
 static int
-zt_pipe_getopt_mtu(void *arg, void *data, size_t *szp, int typ)
+zt_pipe_get_mtu(void *arg, void *data, size_t *szp, nni_opt_type t)
 {
 	zt_pipe *p = arg;
-	return (nni_copyout_size(p->zp_mtu, data, szp, typ));
+	return (nni_copyout_size(p->zp_mtu, data, szp, t));
 }
 
-static nni_tran_pipe_option zt_pipe_options[] = {
+static nni_tran_option zt_pipe_options[] = {
 	{
-	    .po_name   = NNG_OPT_LOCADDR,
-	    .po_type   = NNI_TYPE_SOCKADDR,
-	    .po_getopt = zt_pipe_getopt_locaddr,
+	    .o_name = NNG_OPT_LOCADDR,
+	    .o_type = NNI_TYPE_SOCKADDR,
+	    .o_get  = zt_pipe_get_locaddr,
 	},
 	{
-	    .po_name   = NNG_OPT_REMADDR,
-	    .po_type   = NNI_TYPE_SOCKADDR,
-	    .po_getopt = zt_pipe_getopt_remaddr,
+	    .o_name = NNG_OPT_REMADDR,
+	    .o_type = NNI_TYPE_SOCKADDR,
+	    .o_get  = zt_pipe_get_remaddr,
 	},
 	{
-	    .po_name   = NNG_OPT_ZT_MTU,
-	    .po_type   = NNI_TYPE_SIZE,
-	    .po_getopt = zt_pipe_getopt_mtu,
+	    .o_name = NNG_OPT_ZT_MTU,
+	    .o_type = NNI_TYPE_SIZE,
+	    .o_get  = zt_pipe_get_mtu,
 	},
 	{
-	    .po_name   = NNG_OPT_ZT_NWID,
-	    .po_type   = NNI_TYPE_UINT64,
-	    .po_getopt = zt_pipe_get_nwid,
+	    .o_name = NNG_OPT_ZT_NWID,
+	    .o_type = NNI_TYPE_UINT64,
+	    .o_get  = zt_pipe_get_nwid,
 	},
 	{
-	    .po_name   = NNG_OPT_ZT_NODE,
-	    .po_type   = NNI_TYPE_UINT64,
-	    .po_getopt = zt_pipe_get_node,
+	    .o_name = NNG_OPT_ZT_NODE,
+	    .o_type = NNI_TYPE_UINT64,
+	    .o_get  = zt_pipe_get_node,
 	},
 	{
-	    .po_name   = NNG_OPT_RECVMAXSZ,
-	    .po_type   = NNI_TYPE_SIZE,
-	    .po_getopt = zt_pipe_get_recvmaxsz,
+	    .o_name = NNG_OPT_RECVMAXSZ,
+	    .o_type = NNI_TYPE_SIZE,
+	    .o_get  = zt_pipe_get_recvmaxsz,
 	},
 	// terminate list
 	{
-	    .po_name = NULL,
+	    .o_name = NULL,
 	},
 };
 
 static nni_tran_pipe_ops zt_pipe_ops = {
+	.p_init    = zt_pipe_init,
 	.p_fini    = zt_pipe_fini,
-	.p_start   = zt_pipe_start,
 	.p_send    = zt_pipe_send,
 	.p_recv    = zt_pipe_recv,
 	.p_close   = zt_pipe_close,
@@ -2898,110 +3097,209 @@ static nni_tran_pipe_ops zt_pipe_ops = {
 	.p_options = zt_pipe_options,
 };
 
-static nni_tran_ep_option zt_ep_options[] = {
+static nni_tran_option zt_dialer_options[] = {
 	{
-	    .eo_name   = NNG_OPT_RECVMAXSZ,
-	    .eo_type   = NNI_TYPE_SIZE,
-	    .eo_getopt = zt_ep_getopt_recvmaxsz,
-	    .eo_setopt = zt_ep_setopt_recvmaxsz,
+	    .o_name = NNG_OPT_RECVMAXSZ,
+	    .o_type = NNI_TYPE_SIZE,
+	    .o_get  = zt_ep_get_recvmaxsz,
+	    .o_set  = zt_ep_set_recvmaxsz,
+	    .o_chk  = zt_ep_chk_recvmaxsz,
 	},
 	{
-	    .eo_name   = NNG_OPT_URL,
-	    .eo_type   = NNI_TYPE_STRING,
-	    .eo_getopt = zt_ep_getopt_url,
-	    .eo_setopt = NULL,
+	    .o_name = NNG_OPT_URL,
+	    .o_type = NNI_TYPE_STRING,
+	    .o_get  = zt_ep_get_url,
 	},
 	{
-	    .eo_name   = NNG_OPT_ZT_HOME,
-	    .eo_type   = NNI_TYPE_STRING,
-	    .eo_getopt = zt_ep_getopt_home,
-	    .eo_setopt = zt_ep_setopt_home,
+	    .o_name = NNG_OPT_ZT_HOME,
+	    .o_type = NNI_TYPE_STRING,
+	    .o_get  = zt_ep_get_home,
+	    .o_set  = zt_ep_set_home,
+	    .o_chk  = zt_ep_chk_string,
 	},
 	{
-	    .eo_name   = NNG_OPT_ZT_NODE,
-	    .eo_type   = NNI_TYPE_UINT64,
-	    .eo_getopt = zt_ep_getopt_node,
-	    .eo_setopt = NULL,
+	    .o_name = NNG_OPT_ZT_NODE,
+	    .o_type = NNI_TYPE_UINT64,
+	    .o_get  = zt_ep_get_node,
 	},
 	{
-	    .eo_name   = NNG_OPT_ZT_NWID,
-	    .eo_type   = NNI_TYPE_UINT64,
-	    .eo_getopt = zt_ep_getopt_nwid,
-	    .eo_setopt = NULL,
+	    .o_name = NNG_OPT_ZT_NWID,
+	    .o_type = NNI_TYPE_UINT64,
+	    .o_get  = zt_ep_get_nwid,
 	},
 	{
-	    .eo_name   = NNG_OPT_ZT_NETWORK_STATUS,
-	    .eo_type   = NNI_TYPE_INT32, // enumeration really
-	    .eo_getopt = zt_ep_getopt_nw_status,
-	    .eo_setopt = NULL,
+	    .o_name = NNG_OPT_ZT_NETWORK_STATUS,
+	    .o_type = NNI_TYPE_INT32, // enumeration really
+	    .o_get  = zt_ep_get_nw_status,
 	},
 	{
-	    .eo_name   = NNG_OPT_ZT_NETWORK_NAME,
-	    .eo_type   = NNI_TYPE_STRING,
-	    .eo_getopt = zt_ep_getopt_nw_name,
-	    .eo_setopt = NULL,
+	    .o_name = NNG_OPT_ZT_NETWORK_NAME,
+	    .o_type = NNI_TYPE_STRING,
+	    .o_get  = zt_ep_get_nw_name,
 	},
 	{
-	    .eo_name   = NNG_OPT_ZT_PING_TIME,
-	    .eo_type   = NNI_TYPE_DURATION,
-	    .eo_getopt = zt_ep_getopt_ping_time,
-	    .eo_setopt = zt_ep_setopt_ping_time,
+	    .o_name = NNG_OPT_ZT_PING_TIME,
+	    .o_type = NNI_TYPE_DURATION,
+	    .o_get  = zt_ep_get_ping_time,
+	    .o_set  = zt_ep_set_ping_time,
+	    .o_chk  = zt_ep_chk_time,
 	},
 	{
-	    .eo_name   = NNG_OPT_ZT_PING_TRIES,
-	    .eo_type   = NNI_TYPE_INT32,
-	    .eo_getopt = zt_ep_getopt_ping_tries,
-	    .eo_setopt = zt_ep_setopt_ping_tries,
+	    .o_name = NNG_OPT_ZT_PING_TRIES,
+	    .o_type = NNI_TYPE_INT32,
+	    .o_get  = zt_ep_get_ping_tries,
+	    .o_set  = zt_ep_set_ping_tries,
+	    .o_chk  = zt_ep_chk_tries,
 	},
 	{
-	    .eo_name   = NNG_OPT_ZT_CONN_TIME,
-	    .eo_type   = NNI_TYPE_DURATION,
-	    .eo_getopt = zt_ep_getopt_conn_time,
-	    .eo_setopt = zt_ep_setopt_conn_time,
+	    .o_name = NNG_OPT_ZT_CONN_TIME,
+	    .o_type = NNI_TYPE_DURATION,
+	    .o_get  = zt_ep_get_conn_time,
+	    .o_set  = zt_ep_set_conn_time,
+	    .o_chk  = zt_ep_chk_time,
 	},
 	{
-	    .eo_name   = NNG_OPT_ZT_CONN_TRIES,
-	    .eo_type   = NNI_TYPE_INT32,
-	    .eo_getopt = zt_ep_getopt_conn_tries,
-	    .eo_setopt = zt_ep_setopt_conn_tries,
+	    .o_name = NNG_OPT_ZT_CONN_TRIES,
+	    .o_type = NNI_TYPE_INT32,
+	    .o_get  = zt_ep_get_conn_tries,
+	    .o_set  = zt_ep_set_conn_tries,
+	    .o_chk  = zt_ep_chk_tries,
 	},
 	{
-	    .eo_name   = NNG_OPT_ZT_ORBIT,
-	    .eo_type   = NNI_TYPE_UINT64, // use opaque for two
-	    .eo_getopt = NULL,
-	    .eo_setopt = zt_ep_setopt_orbit,
+	    .o_name = NNG_OPT_ZT_ORBIT,
+	    .o_type = NNI_TYPE_UINT64, // use opaque for two
+	    .o_set  = zt_ep_set_orbit,
+	    .o_chk  = zt_ep_chk_orbit,
 	},
 	{
-	    .eo_name   = NNG_OPT_ZT_DEORBIT,
-	    .eo_type   = NNI_TYPE_UINT64,
-	    .eo_getopt = NULL,
-	    .eo_setopt = zt_ep_setopt_deorbit,
+	    .o_name = NNG_OPT_ZT_DEORBIT,
+	    .o_type = NNI_TYPE_UINT64,
+	    .o_set  = zt_ep_set_deorbit,
+	    .o_chk  = zt_ep_chk_deorbit,
 	},
+	{
+	    .o_name = NNG_OPT_ZT_ADD_LOCAL_ADDR,
+	    .o_type = NNI_TYPE_SOCKADDR,
+	    .o_set  = zt_ep_set_add_local_addr,
+	    .o_chk  = zt_ep_chk_add_local_addr,
+	},
+	{
+	    .o_name = NNG_OPT_ZT_CLEAR_LOCAL_ADDRS,
+	    .o_type = NNI_TYPE_OPAQUE,
+	    .o_set  = zt_ep_set_clear_local_addrs,
+	    .o_chk  = zt_ep_chk_clear_local_addrs,
+	},
+
 	// terminate list
 	{
-	    .eo_name = NULL,
+	    .o_name = NULL,
 	},
 };
 
-static nni_tran_ep_ops zt_ep_ops = {
-	.ep_init    = zt_ep_init,
-	.ep_fini    = zt_ep_fini,
-	.ep_connect = zt_ep_connect,
-	.ep_bind    = zt_ep_bind,
-	.ep_accept  = zt_ep_accept,
-	.ep_close   = zt_ep_close,
-	.ep_options = zt_ep_options,
+static nni_tran_option zt_listener_options[] = {
+	{
+	    .o_name = NNG_OPT_RECVMAXSZ,
+	    .o_type = NNI_TYPE_SIZE,
+	    .o_get  = zt_ep_get_recvmaxsz,
+	    .o_set  = zt_ep_set_recvmaxsz,
+	    .o_chk  = zt_ep_chk_recvmaxsz,
+	},
+	{
+	    .o_name = NNG_OPT_URL,
+	    .o_type = NNI_TYPE_STRING,
+	    .o_get  = zt_ep_get_url,
+	},
+	{
+	    .o_name = NNG_OPT_ZT_HOME,
+	    .o_type = NNI_TYPE_STRING,
+	    .o_get  = zt_ep_get_home,
+	    .o_set  = zt_ep_set_home,
+	    .o_chk  = zt_ep_chk_string,
+	},
+	{
+	    .o_name = NNG_OPT_ZT_NODE,
+	    .o_type = NNI_TYPE_UINT64,
+	    .o_get  = zt_ep_get_node,
+	},
+	{
+	    .o_name = NNG_OPT_ZT_NWID,
+	    .o_type = NNI_TYPE_UINT64,
+	    .o_get  = zt_ep_get_nwid,
+	},
+	{
+	    .o_name = NNG_OPT_ZT_NETWORK_STATUS,
+	    .o_type = NNI_TYPE_INT32, // enumeration really
+	    .o_get  = zt_ep_get_nw_status,
+	},
+	{
+	    .o_name = NNG_OPT_ZT_NETWORK_NAME,
+	    .o_type = NNI_TYPE_STRING,
+	    .o_get  = zt_ep_get_nw_name,
+	},
+	{
+	    .o_name = NNG_OPT_ZT_PING_TIME,
+	    .o_type = NNI_TYPE_DURATION,
+	    .o_get  = zt_ep_get_ping_time,
+	    .o_set  = zt_ep_set_ping_time,
+	    .o_chk  = zt_ep_chk_time,
+	},
+	{
+	    .o_name = NNG_OPT_ZT_PING_TRIES,
+	    .o_type = NNI_TYPE_INT32,
+	    .o_get  = zt_ep_get_ping_tries,
+	    .o_set  = zt_ep_set_ping_tries,
+	    .o_chk  = zt_ep_chk_tries,
+	},
+	{
+	    .o_name = NNG_OPT_ZT_ORBIT,
+	    .o_type = NNI_TYPE_UINT64, // use opaque for two
+	    .o_set  = zt_ep_set_orbit,
+	    .o_chk  = zt_ep_chk_orbit,
+	},
+	{
+	    .o_name = NNG_OPT_ZT_DEORBIT,
+	    .o_type = NNI_TYPE_UINT64,
+	    .o_set  = zt_ep_set_deorbit,
+	    .o_chk  = zt_ep_chk_deorbit,
+	},
+	{
+	    .o_name = NNG_OPT_LOCADDR,
+	    .o_type = NNI_TYPE_SOCKADDR,
+	    .o_get  = zt_ep_get_locaddr,
+	},
+	// terminate list
+	{
+	    .o_name = NULL,
+	},
+};
+
+static nni_tran_dialer_ops zt_dialer_ops = {
+	.d_init    = zt_dialer_init,
+	.d_fini    = zt_ep_fini,
+	.d_connect = zt_ep_connect,
+	.d_close   = zt_ep_close,
+	.d_options = zt_dialer_options,
+};
+
+static nni_tran_listener_ops zt_listener_ops = {
+	.l_init    = zt_listener_init,
+	.l_fini    = zt_ep_fini,
+	.l_bind    = zt_ep_bind,
+	.l_accept  = zt_ep_accept,
+	.l_close   = zt_ep_close,
+	.l_options = zt_listener_options,
 };
 
 // This is the ZeroTier transport linkage, and should be the
 // only global symbol in this entire file.
 static struct nni_tran zt_tran = {
-	.tran_version = NNI_TRANSPORT_VERSION,
-	.tran_scheme  = "zt",
-	.tran_ep      = &zt_ep_ops,
-	.tran_pipe    = &zt_pipe_ops,
-	.tran_init    = zt_tran_init,
-	.tran_fini    = zt_tran_fini,
+	.tran_version  = NNI_TRANSPORT_VERSION,
+	.tran_scheme   = "zt",
+	.tran_dialer   = &zt_dialer_ops,
+	.tran_listener = &zt_listener_ops,
+	.tran_pipe     = &zt_pipe_ops,
+	.tran_init     = zt_tran_init,
+	.tran_fini     = zt_tran_fini,
 };
 
 int

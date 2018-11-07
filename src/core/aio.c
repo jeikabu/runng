@@ -37,23 +37,29 @@ static nni_aio *nni_aio_expire_aio;
 // as well as the expire list on the AIOs.  We will not permit an AIO
 // to be marked done if an expiration is outstanding.
 //
-// In order to synchronize with the expiration, we set a flag when we
-// are going to cancel due to expiration, and then let the expiration
-// thread dispatch the notification to the user (after ensuring that
-// the provider is done with the aio.)  This ensures that the completion
-// task will be dispatch *exactly* once, and only after nothing in
-// the provider or the framework is using it further.  (The consumer
-// will probably still be using, but if the consumer calls nni_aio_wait
-// or nni_aio_stop, then the consumer will have exclusive access to it.
-// Provided, of course, that the consumer does not reuse the aio for
-// another operation in the callback.)
+// In order to synchronize with the expiration, we record the aio as
+// expiring, and wait for that record to be cleared (or at least not
+// equal to the aio) before destroying it.
 //
-// In order to guard against aio reuse during teardown, we set a fini
+// The aio framework is tightly bound up with the taskq framework. We
+// "prepare" the task for an aio when a caller marks an aio as starting
+// (with nni_aio_begin), and that marks the task as bus. Then, all we have
+// to do is wait for the task to complete (the busy flag to be cleared)
+// when we want to know if the aio's operation itself is complete.
+//
+// In order to guard against aio reuse during teardown, we set the a_stop
 // flag.  Any attempt to initialize for a new operation after that point
 // will fail and the caller will get NNG_ECANCELED indicating this.  The
 // provider that calls nni_aio_begin() MUST check the return value, and
 // if it comes back nonzero (NNG_ECANCELED) then it must simply discard the
 // request and return.
+//
+// Calling nni_aio_wait waits for the current outstanding operation to
+// complete, but does not block another one from being started on the
+// same aio.  To synchronously stop the aio and prevent any further
+// operations from starting on it, call nni_aio_stop.  To prevent the
+// operations from starting, without waiting for any existing one to
+// complete, call nni_aio_close.
 
 // An nni_aio is an async I/O handle.
 struct nng_aio {
@@ -64,7 +70,6 @@ struct nng_aio {
 
 	// These fields are private to the aio framework.
 	bool      a_stop;    // shutting down (no new operations)
-	bool      a_closed;  // close called, but not fini (yet)
 	bool      a_sleep;   // sleeping with no action
 	int       a_sleeprv; // result when sleep wakes
 	nni_task *a_task;
@@ -90,7 +95,8 @@ struct nng_aio {
 	void *a_outputs[4];
 
 	// Provider-use fields.
-	nni_aio_cancelfn a_prov_cancel;
+	nni_aio_cancelfn a_cancel_fn;
+	void *           a_cancel_arg;
 	void *           a_prov_data;
 	nni_list_node    a_prov_node;
 	void *           a_prov_extra[4]; // Extra data used by provider
@@ -110,7 +116,6 @@ nni_aio_init(nni_aio **aiop, nni_cb cb, void *arg)
 	if ((aio = NNI_ALLOC_STRUCT(aio)) == NULL) {
 		return (NNG_ENOMEM);
 	}
-	memset(aio, 0, sizeof(*aio));
 	if ((rv = nni_task_init(&aio->a_task, NULL, cb, arg)) != 0) {
 		NNI_FREE_STRUCT(aio);
 		return (rv);
@@ -119,10 +124,7 @@ nni_aio_init(nni_aio **aiop, nni_cb cb, void *arg)
 	aio->a_timeout   = NNG_DURATION_INFINITE;
 	aio->a_iov       = aio->a_iovinl;
 	aio->a_niovalloc = 0;
-	if (arg == NULL) {
-		arg = aio;
-	}
-	*aiop = aio;
+	*aiop            = aio;
 	return (0);
 }
 
@@ -130,7 +132,24 @@ void
 nni_aio_fini(nni_aio *aio)
 {
 	if (aio != NULL) {
-		nni_aio_stop(aio);
+
+		nni_aio_cancelfn fn;
+		void *           arg;
+
+		// This is like aio_close, but we don't want to dispatch
+		// the task.  And unlike aio_stop, we don't want to wait
+		// for the task.  (Because we implicitly do task_fini.)
+		nni_mtx_lock(&nni_aio_lk);
+		fn                = aio->a_cancel_fn;
+		arg               = aio->a_cancel_arg;
+		aio->a_cancel_fn  = NULL;
+		aio->a_cancel_arg = NULL;
+		aio->a_stop       = true;
+		nni_mtx_unlock(&nni_aio_lk);
+
+		if (fn != NULL) {
+			fn(aio, arg, NNG_ECLOSED);
+		}
 
 		// Wait for the aio to be "done"; this ensures that we don't
 		// destroy an aio from a "normal" completion callback while
@@ -138,6 +157,10 @@ nni_aio_fini(nni_aio *aio)
 
 		nni_mtx_lock(&nni_aio_lk);
 		while (nni_aio_expire_aio == aio) {
+			if (nni_thr_is_self(&nni_aio_expire_thr)) {
+				nni_aio_expire_aio = NULL;
+				break;
+			}
 			nni_cv_wait(&nni_aio_expire_cv);
 		}
 		nni_mtx_unlock(&nni_aio_lk);
@@ -194,11 +217,20 @@ void
 nni_aio_stop(nni_aio *aio)
 {
 	if (aio != NULL) {
+		nni_aio_cancelfn fn;
+		void *           arg;
+
 		nni_mtx_lock(&nni_aio_lk);
-		aio->a_stop = true;
+		fn                = aio->a_cancel_fn;
+		arg               = aio->a_cancel_arg;
+		aio->a_cancel_fn  = NULL;
+		aio->a_cancel_arg = NULL;
+		aio->a_stop       = true;
 		nni_mtx_unlock(&nni_aio_lk);
 
-		nni_aio_abort(aio, NNG_ECANCELED);
+		if (fn != NULL) {
+			fn(aio, arg, NNG_ECANCELED);
+		}
 
 		nni_aio_wait(aio);
 	}
@@ -208,16 +240,19 @@ void
 nni_aio_close(nni_aio *aio)
 {
 	if (aio != NULL) {
-		nni_aio_cancelfn cancelfn;
+		nni_aio_cancelfn fn;
+		void *           arg;
 
 		nni_mtx_lock(&nni_aio_lk);
-		cancelfn           = aio->a_prov_cancel;
-		aio->a_prov_cancel = NULL;
-		aio->a_closed      = true;
+		fn                = aio->a_cancel_fn;
+		arg               = aio->a_cancel_arg;
+		aio->a_cancel_fn  = NULL;
+		aio->a_cancel_arg = NULL;
+		aio->a_stop       = true;
 		nni_mtx_unlock(&nni_aio_lk);
 
-		if (cancelfn != NULL) {
-			cancelfn(aio, NNG_ECLOSED);
+		if (fn != NULL) {
+			fn(aio, arg, NNG_ECLOSED);
 		}
 	}
 }
@@ -316,25 +351,25 @@ nni_aio_begin(nni_aio *aio)
 	// We should not reschedule anything at this point.
 	if (aio->a_stop) {
 		aio->a_result = NNG_ECANCELED;
+		aio->a_count  = 0;
+		nni_list_node_remove(&aio->a_expire_node);
+		aio->a_cancel_fn  = NULL;
+		aio->a_cancel_arg = NULL;
+		aio->a_expire     = NNI_TIME_NEVER;
+		aio->a_sleep      = false;
 		nni_mtx_unlock(&nni_aio_lk);
+
+		nni_task_dispatch(aio->a_task);
 		return (NNG_ECANCELED);
 	}
-	aio->a_result      = 0;
-	aio->a_count       = 0;
-	aio->a_prov_cancel = NULL;
-	aio->a_prov_data   = NULL;
+	aio->a_result     = 0;
+	aio->a_count      = 0;
+	aio->a_cancel_fn  = NULL;
+	aio->a_cancel_arg = NULL;
 	for (unsigned i = 0; i < NNI_NUM_ELEMENTS(aio->a_outputs); i++) {
 		aio->a_outputs[i] = NULL;
 	}
 	nni_task_prep(aio->a_task);
-	if (aio->a_closed) {
-		aio->a_result = NNG_ECLOSED;
-		aio->a_expire = NNI_TIME_NEVER;
-		aio->a_sleep  = false;
-		nni_mtx_unlock(&nni_aio_lk);
-		nni_task_dispatch(aio->a_task);
-		return (NNG_ECLOSED);
-	}
 	nni_mtx_unlock(&nni_aio_lk);
 	return (0);
 }
@@ -360,17 +395,13 @@ nni_aio_schedule(nni_aio *aio, nni_aio_cancelfn cancelfn, void *data)
 	nni_mtx_lock(&nni_aio_lk);
 	if (aio->a_stop) {
 		nni_mtx_unlock(&nni_aio_lk);
-		return (NNG_ECANCELED);
-	}
-	if (aio->a_closed) {
-		nni_mtx_unlock(&nni_aio_lk);
 		return (NNG_ECLOSED);
 	}
 
-	// If cancellation occurred in between "begin" and "schedule",
-	// then cancel it right now.
-	aio->a_prov_cancel = cancelfn;
-	aio->a_prov_data   = data;
+	NNI_ASSERT(aio->a_cancel_fn == NULL);
+	aio->a_cancel_fn  = cancelfn;
+	aio->a_cancel_arg = data;
+
 	if (aio->a_expire != NNI_TIME_NEVER) {
 		nni_aio_expire_add(aio);
 	}
@@ -383,16 +414,19 @@ nni_aio_schedule(nni_aio *aio, nni_aio_cancelfn cancelfn, void *data)
 void
 nni_aio_abort(nni_aio *aio, int rv)
 {
-	nni_aio_cancelfn cancelfn;
+	nni_aio_cancelfn fn;
+	void *           arg;
 
 	nni_mtx_lock(&nni_aio_lk);
-	cancelfn           = aio->a_prov_cancel;
-	aio->a_prov_cancel = NULL;
+	fn                = aio->a_cancel_fn;
+	arg               = aio->a_cancel_arg;
+	aio->a_cancel_fn  = NULL;
+	aio->a_cancel_arg = NULL;
 	nni_mtx_unlock(&nni_aio_lk);
 
 	// Stop any I/O at the provider level.
-	if (cancelfn != NULL) {
-		cancelfn(aio, rv);
+	if (fn != NULL) {
+		fn(aio, arg, rv);
 	}
 }
 
@@ -406,9 +440,10 @@ nni_aio_finish_impl(
 
 	nni_list_node_remove(&aio->a_expire_node);
 
-	aio->a_result      = rv;
-	aio->a_count       = count;
-	aio->a_prov_cancel = NULL;
+	aio->a_result     = rv;
+	aio->a_count      = count;
+	aio->a_cancel_fn  = NULL;
+	aio->a_cancel_arg = NULL;
 	if (msg) {
 		aio->a_msg = msg;
 	}
@@ -512,7 +547,7 @@ nni_aio_expire_loop(void *arg)
 	NNI_ARG_UNUSED(arg);
 
 	for (;;) {
-		nni_aio_cancelfn cancelfn;
+		nni_aio_cancelfn fn;
 		nni_time         now;
 		nni_aio *        aio;
 		int              rv;
@@ -545,8 +580,10 @@ nni_aio_expire_loop(void *arg)
 		nni_list_remove(aios, aio);
 		rv = aio->a_sleep ? aio->a_sleeprv : NNG_ETIMEDOUT;
 
-		if ((cancelfn = aio->a_prov_cancel) != NULL) {
-
+		if ((fn = aio->a_cancel_fn) != NULL) {
+			void *arg         = aio->a_cancel_arg;
+			aio->a_cancel_fn  = NULL;
+			aio->a_cancel_arg = NULL;
 			// Place a temporary hold on the aio.  This prevents it
 			// from being destroyed.
 			nni_aio_expire_aio = aio;
@@ -556,7 +593,7 @@ nni_aio_expire_loop(void *arg)
 			// terminate the aio - we've tried, but it has to run
 			// to it's natural conclusion.
 			nni_mtx_unlock(&nni_aio_lk);
-			cancelfn(aio, rv);
+			fn(aio, arg, rv);
 			nni_mtx_lock(&nni_aio_lk);
 
 			nni_aio_expire_aio = NULL;
@@ -642,8 +679,10 @@ nni_aio_iov_advance(nni_aio *aio, size_t n)
 }
 
 static void
-nni_sleep_cancel(nng_aio *aio, int rv)
+nni_sleep_cancel(nng_aio *aio, void *arg, int rv)
 {
+	NNI_ARG_UNUSED(arg);
+
 	nni_mtx_lock(&nni_aio_lk);
 	if (!aio->a_sleep) {
 		nni_mtx_unlock(&nni_aio_lk);

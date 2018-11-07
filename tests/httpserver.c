@@ -25,6 +25,7 @@
 const char *doc1 = "<html><body>Someone <b>is</b> home!</body</html>";
 const char *doc2 = "This is a text file.";
 const char *doc3 = "<html><body>This is doc number 3.</body></html>";
+const char *doc4 = "<html><body>Whoops, Errored!</body></html>";
 
 void
 cleanup(void)
@@ -68,8 +69,7 @@ httpdo(nng_url *url, nng_http_req *req, nng_http_res *res, void **datap,
 	}
 
 	clen = 0;
-	if ((nng_http_res_get_status(res) == NNG_HTTP_STATUS_OK) &&
-	    ((ptr = nng_http_res_get_header(res, "Content-Length")) != NULL)) {
+	if ((ptr = nng_http_res_get_header(res, "Content-Length")) != NULL) {
 		clen = atoi(ptr);
 	}
 
@@ -156,6 +156,30 @@ fail:
 	}
 
 	return (rv);
+}
+
+static void
+httpecho(nng_aio *aio)
+{
+	nng_http_req *req = nng_aio_get_input(aio, 0);
+	nng_http_res *res;
+	int           rv;
+	void *        body;
+	size_t        len;
+
+	nng_http_req_get_data(req, &body, &len);
+
+	if (((rv = nng_http_res_alloc(&res)) != 0) ||
+	    ((rv = nng_http_res_copy_data(res, body, len)) != 0) ||
+	    ((rv = nng_http_res_set_header(
+	          res, "Content-type", "text/plain")) != 0) ||
+	    ((rv = nng_http_res_set_status(res, NNG_HTTP_STATUS_OK)) != 0)) {
+		nng_http_res_free(res);
+		nng_aio_finish(aio, rv);
+		return;
+	}
+	nng_aio_set_output(aio, 0, res);
+	nng_aio_finish(aio, 0);
 }
 
 TestMain("HTTP Server", {
@@ -377,7 +401,21 @@ TestMain("HTTP Server", {
 			snprintf(fullurl, sizeof(fullurl), "%s/docs/", urlstr);
 			So(httpget(fullurl, &data, &size, &stat, &ctype) == 0);
 			So(stat == NNG_HTTP_STATUS_NOT_FOUND);
-			So(size == 0);
+		});
+
+		Convey("Custom error page works", {
+			char     fullurl[256];
+			void *   data;
+			size_t   size;
+			uint16_t stat;
+			char *   ctype;
+
+			So(nng_http_server_set_error_page(s, 404, doc4) == 0);
+			snprintf(fullurl, sizeof(fullurl), "%s/docs/", urlstr);
+			So(httpget(fullurl, &data, &size, &stat, &ctype) == 0);
+			So(stat == NNG_HTTP_STATUS_NOT_FOUND);
+			So(size == strlen(doc4));
+			So(memcmp(data, doc4, size) == 0);
 		});
 
 		Convey("Bad method gives 405", {
@@ -397,7 +435,6 @@ TestMain("HTTP Server", {
 			So(httpdo(curl, req, res, &data, &size) == 0);
 			So(nng_http_res_get_status(res) ==
 			    NNG_HTTP_STATUS_METHOD_NOT_ALLOWED);
-			So(size == 0);
 			nng_http_req_free(req);
 			nng_http_res_free(res);
 			nng_url_free(curl);
@@ -419,7 +456,6 @@ TestMain("HTTP Server", {
 			So(httpdo(curl, req, res, &data, &size) == 0);
 			So(nng_http_res_get_status(res) ==
 			    NNG_HTTP_STATUS_HTTP_VERSION_NOT_SUPP);
-			So(size == 0);
 			nng_http_req_free(req);
 			nng_http_res_free(res);
 			nng_url_free(curl);
@@ -441,7 +477,190 @@ TestMain("HTTP Server", {
 			So(httpdo(curl, req, res, &data, &size) == 0);
 			So(nng_http_res_get_status(res) ==
 			    NNG_HTTP_STATUS_BAD_REQUEST);
-			So(size == 0);
+			nng_http_req_free(req);
+			nng_http_res_free(res);
+			nng_url_free(curl);
+		});
+	});
+	Convey("Custom POST handler works", {
+		char     urlstr[32];
+		nng_url *url;
+
+		trantest_next_address(urlstr, "http://127.0.0.1:%u");
+		So(nng_url_parse(&url, urlstr) == 0);
+		So(nng_http_server_hold(&s, url) == 0);
+
+		Reset({
+			nng_http_server_release(s);
+			nng_url_free(url);
+		});
+
+		So(nng_http_handler_alloc(&h, "/post", httpecho) == 0);
+		So(nng_http_handler_set_method(h, "POST") == 0);
+		So(nng_http_server_add_handler(s, h) == 0);
+		So(nng_http_server_start(s) == 0);
+
+		nng_msleep(100);
+
+		Convey("Echo POST works", {
+			char          fullurl[256];
+			size_t        size;
+			nng_http_req *req;
+			nng_http_res *res;
+			nng_url *     curl;
+			char          txdata[5];
+			char *        rxdata;
+
+			snprintf(txdata, sizeof(txdata), "1234");
+			So(nng_http_res_alloc(&res) == 0);
+			snprintf(fullurl, sizeof(fullurl), "%s/post", urlstr);
+			So(nng_url_parse(&curl, fullurl) == 0);
+			So(nng_http_req_alloc(&req, curl) == 0);
+			nng_http_req_set_data(req, txdata, strlen(txdata));
+			So(nng_http_req_set_method(req, "POST") == 0);
+			So(httpdo(curl, req, res, (void **) &rxdata, &size) ==
+			    0);
+			So(nng_http_res_get_status(res) == NNG_HTTP_STATUS_OK);
+			So(size == strlen(txdata));
+			So(strncmp(txdata, rxdata, size) == 0);
+			nng_http_req_free(req);
+			nng_http_res_free(res);
+			nng_url_free(curl);
+		});
+
+		Convey("Get method gives 405", {
+			char          fullurl[256];
+			void *        data;
+			size_t        size;
+			nng_http_req *req;
+			nng_http_res *res;
+			nng_url *     curl;
+
+			So(nng_http_res_alloc(&res) == 0);
+			snprintf(fullurl, sizeof(fullurl), "%s/post", urlstr);
+			So(nng_url_parse(&curl, fullurl) == 0);
+			So(nng_http_req_alloc(&req, curl) == 0);
+			So(nng_http_req_set_method(req, "GET") == 0);
+
+			So(httpdo(curl, req, res, &data, &size) == 0);
+			So(nng_http_res_get_status(res) ==
+			    NNG_HTTP_STATUS_METHOD_NOT_ALLOWED);
+			nng_http_req_free(req);
+			nng_http_res_free(res);
+			nng_url_free(curl);
+		});
+	});
+
+	Convey("Redirect handler works", {
+		char     urlstr[32];
+		nng_url *url;
+
+		trantest_next_address(urlstr, "http://127.0.0.1:%u");
+		So(nng_url_parse(&url, urlstr) == 0);
+		So(nng_http_server_hold(&s, url) == 0);
+
+		Reset({
+			nng_http_server_release(s);
+			nng_url_free(url);
+		});
+
+		Convey("GET redirect works", {
+			char          fullurl[256];
+			nng_http_req *req;
+			nng_http_res *res;
+			nng_url *     curl;
+			const char *  dest;
+			void *        data;
+			size_t        size;
+
+			So(nng_http_handler_alloc_redirect(&h, "/here", 301,
+			       "http://127.0.0.1/there") == 0);
+			So(nng_http_server_add_handler(s, h) == 0);
+			So(nng_http_server_start(s) == 0);
+			nng_msleep(100);
+
+			So(nng_http_res_alloc(&res) == 0);
+			snprintf(fullurl, sizeof(fullurl), "%s/here", urlstr);
+			So(nng_url_parse(&curl, fullurl) == 0);
+			So(nng_http_req_alloc(&req, curl) == 0);
+			So(nng_http_req_set_method(req, "GET") == 0);
+
+			So(httpdo(curl, req, res, &data, &size) == 0);
+			So(nng_http_res_get_status(res) == 301);
+			So((dest = nng_http_res_get_header(res, "Location")) !=
+			    NULL);
+			So(strcmp(dest, "http://127.0.0.1/there") == 0);
+			So(data != NULL);
+			So(size > 0);
+			nng_http_req_free(req);
+			nng_http_res_free(res);
+			nng_url_free(curl);
+		});
+
+		Convey("Tree redirect works", {
+			char          fullurl[256];
+			nng_http_req *req;
+			nng_http_res *res;
+			nng_url *     curl;
+			const char *  dest;
+			void *        data;
+			size_t        size;
+
+			// We'll use a 303 to ensure codes carry thru
+			So(nng_http_handler_alloc_redirect(&h, "/here", 303,
+			       "http://127.0.0.1/there") == 0);
+			So(nng_http_handler_set_tree(h) == 0);
+			So(nng_http_server_add_handler(s, h) == 0);
+			So(nng_http_server_start(s) == 0);
+			nng_msleep(100);
+
+			So(nng_http_res_alloc(&res) == 0);
+			snprintf(fullurl, sizeof(fullurl),
+			    "%s/here/i/go/again", urlstr);
+			So(nng_url_parse(&curl, fullurl) == 0);
+			So(nng_http_req_alloc(&req, curl) == 0);
+			So(nng_http_req_set_method(req, "GET") == 0);
+
+			So(httpdo(curl, req, res, &data, &size) == 0);
+			So(nng_http_res_get_status(res) == 303);
+			So((dest = nng_http_res_get_header(res, "Location")) !=
+			    NULL);
+			So(strcmp(dest, "http://127.0.0.1/there/i/go/again") ==
+			    0);
+			nng_http_req_free(req);
+			nng_http_res_free(res);
+			nng_url_free(curl);
+		});
+
+		Convey("POST Redirect works", {
+			char          fullurl[256];
+			size_t        size;
+			nng_http_req *req;
+			nng_http_res *res;
+			nng_url *     curl;
+			char          txdata[5];
+			const char *  dest;
+			void *        data;
+
+			So(nng_http_handler_alloc_redirect(&h, "/here", 301,
+			       "http://127.0.0.1/there") == 0);
+			So(nng_http_server_add_handler(s, h) == 0);
+			So(nng_http_server_start(s) == 0);
+			nng_msleep(100);
+
+			snprintf(txdata, sizeof(txdata), "1234");
+			So(nng_http_res_alloc(&res) == 0);
+			snprintf(fullurl, sizeof(fullurl), "%s/here", urlstr);
+			So(nng_url_parse(&curl, fullurl) == 0);
+			So(nng_http_req_alloc(&req, curl) == 0);
+			nng_http_req_set_data(req, txdata, strlen(txdata));
+			So(nng_http_req_set_method(req, "POST") == 0);
+			So(httpdo(curl, req, res, (void **) &data, &size) ==
+			    0);
+			So(nng_http_res_get_status(res) == 301);
+			So((dest = nng_http_res_get_header(res, "Location")) !=
+			    NULL);
+			So(strcmp(dest, "http://127.0.0.1/there") == 0);
 			nng_http_req_free(req);
 			nng_http_res_free(res);
 			nng_url_free(curl);

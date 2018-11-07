@@ -133,9 +133,9 @@ resp0_ctx_init(void **ctxp, void *sarg)
 }
 
 static void
-resp0_ctx_cancel_send(nni_aio *aio, int rv)
+resp0_ctx_cancel_send(nni_aio *aio, void *arg, int rv)
 {
-	resp0_ctx * ctx = nni_aio_get_prov_data(aio);
+	resp0_ctx * ctx = arg;
 	resp0_sock *s   = ctx->sock;
 
 	nni_mtx_lock(&s->mtx);
@@ -402,15 +402,14 @@ resp0_pipe_send_cb(void *arg)
 	nni_msg *   msg;
 	size_t      len;
 
-	nni_mtx_lock(&s->mtx);
-	p->busy = false;
 	if (nni_aio_result(p->aio_send) != 0) {
 		nni_msg_free(nni_aio_get_msg(p->aio_send));
 		nni_aio_set_msg(p->aio_send, NULL);
-		nni_pipe_stop(p->npipe);
-		nni_mtx_unlock(&s->mtx);
+		nni_pipe_close(p->npipe);
 		return;
 	}
+	nni_mtx_lock(&s->mtx);
+	p->busy = false;
 	if ((ctx = nni_list_first(&p->sendq)) == NULL) {
 		// Nothing else to send.
 		if (p->id == s->ctx->pipe_id) {
@@ -438,9 +437,9 @@ resp0_pipe_send_cb(void *arg)
 }
 
 static void
-resp0_cancel_recv(nni_aio *aio, int rv)
+resp0_cancel_recv(nni_aio *aio, void *arg, int rv)
 {
-	resp0_ctx * ctx = nni_aio_get_prov_data(aio);
+	resp0_ctx * ctx = arg;
 	resp0_sock *s   = ctx->sock;
 
 	nni_mtx_lock(&s->mtx);
@@ -512,7 +511,7 @@ resp0_pipe_recv_cb(void *arg)
 	size_t      len;
 
 	if (nni_aio_result(p->aio_recv) != 0) {
-		nni_pipe_stop(p->npipe);
+		nni_pipe_close(p->npipe);
 		return;
 	}
 
@@ -533,7 +532,7 @@ resp0_pipe_recv_cb(void *arg)
 			// Peer is speaking garbage, kick it.
 			nni_msg_free(msg);
 			nni_aio_set_msg(p->aio_recv, NULL);
-			nni_pipe_stop(p->npipe);
+			nni_pipe_close(p->npipe);
 			return;
 		}
 		body = nni_msg_body(msg);
@@ -587,21 +586,21 @@ drop:
 }
 
 static int
-resp0_sock_setopt_maxttl(void *arg, const void *buf, size_t sz, int typ)
+resp0_sock_set_maxttl(void *arg, const void *buf, size_t sz, nni_opt_type t)
 {
 	resp0_sock *s = arg;
-	return (nni_copyin_int(&s->ttl, buf, sz, 1, 255, typ));
+	return (nni_copyin_int(&s->ttl, buf, sz, 1, 255, t));
 }
 
 static int
-resp0_sock_getopt_maxttl(void *arg, void *buf, size_t *szp, int typ)
+resp0_sock_get_maxttl(void *arg, void *buf, size_t *szp, nni_opt_type t)
 {
 	resp0_sock *s = arg;
-	return (nni_copyout_int(s->ttl, buf, szp, typ));
+	return (nni_copyout_int(s->ttl, buf, szp, t));
 }
 
 static int
-resp0_sock_getopt_sendfd(void *arg, void *buf, size_t *szp, int typ)
+resp0_sock_get_sendfd(void *arg, void *buf, size_t *szp, nni_opt_type t)
 {
 	resp0_sock *s = arg;
 	int         rv;
@@ -610,11 +609,11 @@ resp0_sock_getopt_sendfd(void *arg, void *buf, size_t *szp, int typ)
 	if ((rv = nni_pollable_getfd(s->sendable, &fd)) != 0) {
 		return (rv);
 	}
-	return (nni_copyout_int(fd, buf, szp, typ));
+	return (nni_copyout_int(fd, buf, szp, t));
 }
 
 static int
-resp0_sock_getopt_recvfd(void *arg, void *buf, size_t *szp, int typ)
+resp0_sock_get_recvfd(void *arg, void *buf, size_t *szp, nni_opt_type t)
 {
 	resp0_sock *s = arg;
 	int         rv;
@@ -623,7 +622,7 @@ resp0_sock_getopt_recvfd(void *arg, void *buf, size_t *szp, int typ)
 	if ((rv = nni_pollable_getfd(s->recvable, &fd)) != 0) {
 		return (rv);
 	}
-	return (nni_copyout_int(fd, buf, szp, typ));
+	return (nni_copyout_int(fd, buf, szp, t));
 }
 
 static void
@@ -657,28 +656,28 @@ static nni_proto_ctx_ops resp0_ctx_ops = {
 	.ctx_recv = resp0_ctx_recv,
 };
 
-static nni_proto_sock_option resp0_sock_options[] = {
+static nni_proto_option resp0_sock_options[] = {
 	{
-	    .pso_name   = NNG_OPT_MAXTTL,
-	    .pso_type   = NNI_TYPE_INT32,
-	    .pso_getopt = resp0_sock_getopt_maxttl,
-	    .pso_setopt = resp0_sock_setopt_maxttl,
+	    .o_name = NNG_OPT_MAXTTL,
+	    .o_type = NNI_TYPE_INT32,
+	    .o_get  = resp0_sock_get_maxttl,
+	    .o_set  = resp0_sock_set_maxttl,
 	},
 	{
-	    .pso_name   = NNG_OPT_RECVFD,
-	    .pso_type   = NNI_TYPE_INT32,
-	    .pso_getopt = resp0_sock_getopt_recvfd,
-	    .pso_setopt = NULL,
+	    .o_name = NNG_OPT_RECVFD,
+	    .o_type = NNI_TYPE_INT32,
+	    .o_get  = resp0_sock_get_recvfd,
+	    .o_set  = NULL,
 	},
 	{
-	    .pso_name   = NNG_OPT_SENDFD,
-	    .pso_type   = NNI_TYPE_INT32,
-	    .pso_getopt = resp0_sock_getopt_sendfd,
-	    .pso_setopt = NULL,
+	    .o_name = NNG_OPT_SENDFD,
+	    .o_type = NNI_TYPE_INT32,
+	    .o_get  = resp0_sock_get_sendfd,
+	    .o_set  = NULL,
 	},
 	// terminate list
 	{
-	    .pso_name = NULL,
+	    .o_name = NULL,
 	},
 };
 

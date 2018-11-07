@@ -234,7 +234,7 @@ bus0_pipe_getq_cb(void *arg)
 
 	if (nni_aio_result(p->aio_getq) != 0) {
 		// closed?
-		nni_pipe_stop(p->npipe);
+		nni_pipe_close(p->npipe);
 		return;
 	}
 	nni_aio_set_msg(p->aio_send, nni_aio_get_msg(p->aio_getq));
@@ -252,7 +252,7 @@ bus0_pipe_send_cb(void *arg)
 		// closed?
 		nni_msg_free(nni_aio_get_msg(p->aio_send));
 		nni_aio_set_msg(p->aio_send, NULL);
-		nni_pipe_stop(p->npipe);
+		nni_pipe_close(p->npipe);
 		return;
 	}
 
@@ -267,7 +267,7 @@ bus0_pipe_recv_cb(void *arg)
 	nni_msg *  msg;
 
 	if (nni_aio_result(p->aio_recv) != 0) {
-		nni_pipe_stop(p->npipe);
+		nni_pipe_close(p->npipe);
 		return;
 	}
 	msg = nni_aio_get_msg(p->aio_recv);
@@ -277,7 +277,7 @@ bus0_pipe_recv_cb(void *arg)
 		// XXX: bump a nomemory stat
 		nni_msg_free(msg);
 		nni_aio_set_msg(p->aio_recv, NULL);
-		nni_pipe_stop(p->npipe);
+		nni_pipe_close(p->npipe);
 		return;
 	}
 
@@ -295,7 +295,7 @@ bus0_pipe_putq_cb(void *arg)
 	if (nni_aio_result(p->aio_putq) != 0) {
 		nni_msg_free(nni_aio_get_msg(p->aio_putq));
 		nni_aio_set_msg(p->aio_putq, NULL);
-		nni_pipe_stop(p->npipe);
+		nni_pipe_close(p->npipe);
 		return;
 	}
 
@@ -439,10 +439,10 @@ static nni_proto_pipe_ops bus0_pipe_ops = {
 	.pipe_stop  = bus0_pipe_stop,
 };
 
-static nni_proto_sock_option bus0_sock_options[] = {
+static nni_proto_option bus0_sock_options[] = {
 	// terminate list
 	{
-	    .pso_name = NULL,
+	    .o_name = NULL,
 	},
 };
 
