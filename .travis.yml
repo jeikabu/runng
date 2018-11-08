@@ -24,6 +24,7 @@ addons:
 before_install:
   # Using `source` so can update PATH environment variable
   - source ./scripts/install.sh
+  - cmake --version
 
 script:
   - cargo build
