@@ -11,7 +11,7 @@ addons:
   apt:
     packages:
       # To build nng
-      - cmake
+      #- cmake
       - ninja-build
       # To build kcov
       - libcurl4-openssl-dev
