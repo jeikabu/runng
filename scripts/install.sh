@@ -11,6 +11,6 @@ fi
 if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
     wget https://cmake.org/files/v3.11/cmake-3.11.4-Linux-x86_64.tar.gz
     tar xzf cmake-3.11.4-Linux-x86_64.tar.gz
-    export CMAKE_ROOT=`pwd`cmake-3.11.4-Linux-x86_64/share/cmake-3.11/
-    export PATH=`pwd`cmake-3.11.4-Linux-x86_64/bin:$PATH
+    export CMAKE_ROOT=`pwd`/cmake-3.11.4-Linux-x86_64/share/cmake-3.11/
+    export PATH=`pwd`/cmake-3.11.4-Linux-x86_64/bin:$PATH
 fi
