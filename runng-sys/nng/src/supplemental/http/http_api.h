@@ -27,6 +27,8 @@ typedef struct nng_http_conn    nni_http_conn;
 typedef struct nng_http_handler nni_http_handler;
 typedef struct nng_http_server  nni_http_server;
 typedef struct nng_http_client  nni_http_client;
+typedef struct nng_http_chunk   nni_http_chunk;
+typedef struct nng_http_chunks  nni_http_chunks;
 
 // These functions are private to the internal framework, and really should
 // not be used elsewhere.
@@ -45,6 +47,33 @@ extern int   nni_http_res_get_buf(nni_http_res *, void **, size_t *);
 extern int   nni_http_res_parse(nni_http_res *, void *, size_t, size_t *);
 extern void  nni_http_res_get_data(nni_http_res *, void **, size_t *);
 extern char *nni_http_res_headers(nni_http_res *);
+
+// Chunked transfer encoding.  For the moment this is not part of our public
+// API.  We can change that later.
+
+// nni_http_chunk_list_init creates a list of chunks, which shall not exceed
+// the specified overall size.  (Size 0 means no limit.)
+extern int nni_http_chunks_init(nni_http_chunks **, size_t);
+
+extern void nni_http_chunks_free(nni_http_chunks *);
+
+// nni_http_chunk_iter iterates over all chunks in the list.
+// Pass NULL for the last chunk to start at the head.  Returns NULL when done.
+extern nni_http_chunk *nni_http_chunks_iter(
+    nni_http_chunks *, nni_http_chunk *);
+
+// nni_http_chunk_list_size returns the combined size of all chunks in list.
+extern size_t nni_http_chunks_size(nni_http_chunks *);
+
+// nni_http_chunk_size returns the size of given chunk.
+extern size_t nni_http_chunk_size(nni_http_chunk *);
+// nni_http_chunk_data returns a pointer to the data.
+extern void *nni_http_chunk_data(nni_http_chunk *);
+
+extern int nni_http_chunks_parse(nni_http_chunks *, void *, size_t, size_t *);
+
+extern void nni_http_read_chunks(
+    nni_http_conn *, nni_http_chunks *, nni_aio *);
 
 // Private to the server. (Used to support session hijacking.)
 extern void  nni_http_conn_set_ctx(nni_http_conn *, void *);
@@ -67,9 +96,9 @@ extern void *nni_http_conn_get_ctx(nni_http_conn *);
 // These initialization functions create stream for HTTP transactions.
 // They should only be used by the server or client HTTP implementations,
 // and are not for use by other code.
-extern int nni_http_conn_init_tcp(nni_http_conn **, void *);
+extern int nni_http_conn_init_tcp(nni_http_conn **, nni_tcp_conn *);
 extern int nni_http_conn_init_tls(
-    nni_http_conn **, struct nng_tls_config *, void *);
+    nni_http_conn **, struct nng_tls_config *, nni_tcp_conn *);
 
 extern void nni_http_conn_close(nni_http_conn *);
 extern void nni_http_conn_fini(nni_http_conn *);
@@ -101,6 +130,8 @@ extern int nni_http_req_copy_data(nni_http_req *, const void *, size_t);
 extern int nni_http_res_copy_data(nni_http_res *, const void *, size_t);
 extern int nni_http_req_set_data(nni_http_req *, const void *, size_t);
 extern int nni_http_res_set_data(nni_http_res *, const void *, size_t);
+extern int nni_http_req_alloc_data(nni_http_req *, size_t);
+extern int nni_http_res_alloc_data(nni_http_res *, size_t);
 extern const char *nni_http_req_get_method(nni_http_req *);
 extern const char *nni_http_req_get_version(nni_http_req *);
 extern const char *nni_http_req_get_uri(nni_http_req *);
@@ -118,6 +149,13 @@ extern int         nni_http_res_set_reason(nni_http_res *, const char *);
 // nni_http_res_alloc_error().  This is a hint to the server to replace
 // the HTML body with customized content if it exists.
 extern bool nni_http_res_is_error(nni_http_res *);
+
+// nni_http_alloc_html_error allocates a string corresponding to an
+// HTML error.  This can be set as the body of the res.  The status
+// will be looked up using HTTP status code lookups, but the details
+// will be added if present as further body text.  The result can
+// be freed with nni_strfree() later.
+extern int nni_http_alloc_html_error(char **, uint16_t, const char *);
 
 extern void nni_http_read(nni_http_conn *, nni_aio *);
 extern void nni_http_read_full(nni_http_conn *, nni_aio *);
@@ -212,7 +250,7 @@ extern int nni_http_hijack(nni_http_conn *);
 //
 // The callback function will receive the following arguments (via
 // nng_aio_get_input(): nni_http_request *, nni_http_handler *, and
-// nni_http_context_t *.  The first is a request object, for convenience.
+// nni_http_conn_t *.  The first is a request object, for convenience.
 // The second is the handler, from which the callback can obtain any other
 // data it has set.  The final is the http context, from which its possible
 // to hijack the session.
@@ -242,10 +280,19 @@ extern int nni_http_handler_init_directory(
 extern int nni_http_handler_init_static(
     nni_http_handler **, const char *, const void *, size_t, const char *);
 
+// nni_http_handler_init_redirect creates a handler that redirects the request.
+extern int nni_http_handler_init_redirect(
+    nni_http_handler **, const char *, uint16_t, const char *);
+
 // nni_http_handler_fini destroys a handler.  This should only be done before
 // the handler is added, or after it is deleted.  The server automatically
 // calls this for any handlers still registered with it if it is destroyed.
 extern void nni_http_handler_fini(nni_http_handler *);
+
+// nni_http_handler_collect_body informs the server that it should collect
+// the entitty data associated with the client request, and sets the maximum
+// size to accept.
+extern void nni_http_handler_collect_body(nni_http_handler *, bool, size_t);
 
 // nni_http_handler_set_tree marks the handler as servicing the entire
 // tree (e.g. a directory), rather than just a leaf node.  The handler
@@ -305,5 +352,21 @@ extern int nni_http_client_get_tls(
     nni_http_client *, struct nng_tls_config **);
 
 extern void nni_http_client_connect(nni_http_client *, nni_aio *);
+
+// nni_http_transact_conn is used to perform a round-trip exchange (i.e. a
+// single HTTP transaction).  It will not automatically close the connection,
+// unless some kind of significant error occurs.  The caller should dispose
+// of the connection if the aio does not complete successfully.
+// Note that this will fail with NNG_ENOTSUP if the server attempts to reply
+// with a chunked transfer encoding.
+extern void nni_http_transact_conn(
+    nni_http_conn *, nni_http_req *, nni_http_res *, nni_aio *);
+
+// nni_http_transact is used to execute a single transaction to a server.
+// The connection is opened, and will be closed when the transaction is
+// complete.  Note that this will fail with NNG_ENOTSUP if the server attempts
+// to reply with a chunked transfer encoding.
+extern void nni_http_transact(
+    nni_http_client *, nni_http_req *, nni_http_res *, nni_aio *);
 
 #endif // NNG_SUPPLEMENTAL_HTTP_HTTP_API_H

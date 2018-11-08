@@ -66,6 +66,7 @@ struct req0_sock {
 
 	nni_list readypipes;
 	nni_list busypipes;
+	nni_list stoppipes;
 	nni_list ctxs;
 
 	nni_list      sendq;  // contexts waiting to send.
@@ -74,7 +75,6 @@ struct req0_sock {
 	nni_pollable *sendable;
 
 	nni_mtx mtx;
-	nni_cv  cv;
 };
 
 // A req0_pipe is our per-pipe protocol private structure.
@@ -82,8 +82,8 @@ struct req0_pipe {
 	nni_pipe *    pipe;
 	req0_sock *   req;
 	nni_list_node node;
-	nni_list      ctxs;    // ctxs with pending traffic
-	bool          sending; // if busy sending
+	nni_list      ctxs; // ctxs with pending traffic
+	bool          closed;
 	nni_aio *     aio_send;
 	nni_aio *     aio_recv;
 };
@@ -113,10 +113,10 @@ req0_sock_init(void **sp, nni_sock *sock)
 	    s->reqids, 0x80000000u, 0xffffffffu, nni_random() | 0x80000000u);
 
 	nni_mtx_init(&s->mtx);
-	nni_cv_init(&s->cv, &s->mtx);
 
 	NNI_LIST_INIT(&s->readypipes, req0_pipe, node);
 	NNI_LIST_INIT(&s->busypipes, req0_pipe, node);
+	NNI_LIST_INIT(&s->stoppipes, req0_pipe, node);
 	NNI_LIST_INIT(&s->sendq, req0_ctx, sqnode);
 	NNI_LIST_INIT(&s->ctxs, req0_ctx, snode);
 
@@ -170,10 +170,9 @@ req0_sock_fini(void *arg)
 	req0_sock *s = arg;
 
 	nni_mtx_lock(&s->mtx);
-	while ((!nni_list_empty(&s->readypipes)) ||
-	    (!nni_list_empty(&s->busypipes))) {
-		nni_cv_wait(&s->cv);
-	}
+	NNI_ASSERT(nni_list_empty(&s->busypipes));
+	NNI_ASSERT(nni_list_empty(&s->stoppipes));
+	NNI_ASSERT(nni_list_empty(&s->readypipes));
 	nni_mtx_unlock(&s->mtx);
 	if (s->ctx) {
 		req0_ctx_fini(s->ctx);
@@ -181,7 +180,6 @@ req0_sock_fini(void *arg)
 	nni_pollable_free(s->recvable);
 	nni_pollable_free(s->sendable);
 	nni_idhash_fini(s->reqids);
-	nni_cv_fini(&s->cv);
 	nni_mtx_fini(&s->mtx);
 	NNI_FREE_STRUCT(s);
 }
@@ -190,9 +188,13 @@ static void
 req0_pipe_stop(void *arg)
 {
 	req0_pipe *p = arg;
+	req0_sock *s = p->req;
 
 	nni_aio_stop(p->aio_recv);
 	nni_aio_stop(p->aio_send);
+	nni_mtx_lock(&s->mtx);
+	nni_list_node_remove(&p->node);
+	nni_mtx_unlock(&s->mtx);
 }
 
 static void
@@ -239,7 +241,7 @@ req0_pipe_start(void *arg)
 	}
 
 	nni_mtx_lock(&s->mtx);
-	if (s->closed) {
+	if (s->closed || p->closed) {
 		nni_mtx_unlock(&s->mtx);
 		return (NNG_ECLOSED);
 	}
@@ -264,14 +266,11 @@ req0_pipe_close(void *arg)
 
 	nni_mtx_lock(&s->mtx);
 	// This removes the node from either busypipes or readypipes.
-	// It doesn't much matter which.
-	p->sending = false;
-	if (nni_list_node_active(&p->node)) {
-		nni_list_node_remove(&p->node);
-		if (s->closed) {
-			nni_cv_wake(&s->cv);
-		}
-	}
+	// It doesn't much matter which.  We stick the pipe on the stop
+	// list, so that we can wait for that to close down safely.
+	p->closed = true;
+	nni_list_node_remove(&p->node);
+	nni_list_append(&s->stoppipes, p);
 	if (nni_list_empty(&s->readypipes)) {
 		nni_pollable_clear(s->sendable);
 	}
@@ -305,7 +304,7 @@ req0_send_cb(void *arg)
 		// We failed to send... clean up and deal with it.
 		nni_msg_free(nni_aio_get_msg(p->aio_send));
 		nni_aio_set_msg(p->aio_send, NULL);
-		nni_pipe_stop(p->pipe);
+		nni_pipe_close(p->pipe);
 		return;
 	}
 
@@ -313,7 +312,7 @@ req0_send_cb(void *arg)
 	// in the ready list, and re-run the sendq.
 
 	nni_mtx_lock(&s->mtx);
-	if (!p->sending) {
+	if (p->closed || s->closed) {
 		// This occurs if the req0_pipe_close has been called.
 		// In that case we don't want any more processing.
 		nni_mtx_unlock(&s->mtx);
@@ -321,7 +320,6 @@ req0_send_cb(void *arg)
 	}
 	nni_list_remove(&s->busypipes, p);
 	nni_list_append(&s->readypipes, p);
-	p->sending = false;
 	if (nni_list_empty(&s->sendq)) {
 		nni_pollable_raise(s->sendable);
 	}
@@ -345,7 +343,7 @@ req0_recv_cb(void *arg)
 	uint32_t   id;
 
 	if (nni_aio_result(p->aio_recv) != 0) {
-		nni_pipe_stop(p->pipe);
+		nni_pipe_close(p->pipe);
 		return;
 	}
 
@@ -409,7 +407,7 @@ req0_recv_cb(void *arg)
 
 malformed:
 	nni_msg_free(msg);
-	nni_pipe_stop(p->pipe);
+	nni_pipe_close(p->pipe);
 }
 
 static void
@@ -534,7 +532,6 @@ req0_run_sendq(req0_sock *s, nni_list *aiolist)
 
 		nni_list_remove(&s->readypipes, p);
 		nni_list_append(&s->busypipes, p);
-		p->sending = true;
 
 		if ((aio = ctx->saio) != NULL) {
 			ctx->saio = NULL;
@@ -593,9 +590,9 @@ req0_ctx_reset(req0_ctx *ctx)
 }
 
 static void
-req0_ctx_cancel_recv(nni_aio *aio, int rv)
+req0_ctx_cancel_recv(nni_aio *aio, void *arg, int rv)
 {
-	req0_ctx * ctx = nni_aio_get_prov_data(aio);
+	req0_ctx * ctx = arg;
 	req0_sock *s   = ctx->sock;
 
 	nni_mtx_lock(&s->mtx);
@@ -669,9 +666,9 @@ req0_ctx_recv(void *arg, nni_aio *aio)
 }
 
 static void
-req0_ctx_cancel_send(nni_aio *aio, int rv)
+req0_ctx_cancel_send(nni_aio *aio, void *arg, int rv)
 {
-	req0_ctx * ctx = nni_aio_get_prov_data(aio);
+	req0_ctx * ctx = arg;
 	req0_sock *s   = ctx->sock;
 
 	nni_mtx_lock(&s->mtx);
@@ -715,6 +712,11 @@ req0_ctx_send(void *arg, nni_aio *aio)
 		return;
 	}
 	nni_mtx_lock(&s->mtx);
+	if (s->closed) {
+		nni_mtx_unlock(&s->mtx);
+		nni_aio_finish_error(aio, NNG_ECLOSED);
+		return;
+	}
 	// Sending a new request cancels the old one, including any
 	// outstanding reply.
 	if (ctx->raio != NULL) {

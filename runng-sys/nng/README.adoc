@@ -134,9 +134,11 @@ With a Linux or UNIX environment:
 [source,sh]
 ----
   $ mkdir build
+  $ cd build
   $ cmake -G Ninja ..
   $ ninja
   $ ninja test
+  $ ninja install
 ----
 
 == API Documentation

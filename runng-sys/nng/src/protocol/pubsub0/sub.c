@@ -164,7 +164,7 @@ sub0_recv_cb(void *arg)
 	nni_msg *  msg;
 
 	if (nni_aio_result(p->aio_recv) != 0) {
-		nni_pipe_stop(p->pipe);
+		nni_pipe_close(p->pipe);
 		return;
 	}
 
@@ -182,7 +182,7 @@ sub0_recv_cb(void *arg)
 		// Any other error we stop the pipe for.  It's probably
 		// NNG_ECLOSED anyway.
 		nng_msg_free(msg);
-		nni_pipe_stop(p->pipe);
+		nni_pipe_close(p->pipe);
 		return;
 	}
 	nni_pipe_recv(p->pipe, p->aio_recv);
@@ -228,9 +228,13 @@ sub0_subscribe(void *arg, const void *buf, size_t sz, nni_opt_type t)
 		nni_mtx_unlock(&s->lk);
 		return (NNG_ENOMEM);
 	}
-	if ((newtopic->buf = nni_alloc(sz)) == NULL) {
-		nni_mtx_unlock(&s->lk);
-		return (NNG_ENOMEM);
+	if (sz > 0) {
+		if ((newtopic->buf = nni_alloc(sz)) == NULL) {
+			nni_mtx_unlock(&s->lk);
+			return (NNG_ENOMEM);
+		}
+	} else {
+		newtopic->buf = NULL;
 	}
 	NNI_LIST_NODE_INIT(&newtopic->node);
 	newtopic->len = sz;

@@ -11,6 +11,7 @@
 #include "core/nng_impl.h"
 
 #include <ctype.h>
+#include <stdio.h>
 #include <string.h>
 
 #ifdef NNG_PLATFORM_WINDOWS
@@ -37,22 +38,23 @@ struct resolv_item {
 	int          passive;
 	const char * name;
 	int          proto;
+	int          socktype;
 	uint16_t     port;
 	nni_aio *    aio;
 	nng_sockaddr sa;
 };
 
 static void
-resolv_cancel(nni_aio *aio, int rv)
+resolv_cancel(nni_aio *aio, void *arg, int rv)
 {
-	resolv_item *item;
+	resolv_item *item = arg;
 
 	nni_mtx_lock(&resolv_mtx);
-	if ((item = nni_aio_get_prov_data(aio)) == NULL) {
+	if (item != nni_aio_get_prov_extra(aio, 0)) {
 		nni_mtx_unlock(&resolv_mtx);
 		return;
 	}
-	nni_aio_set_prov_data(aio, NULL);
+	nni_aio_set_prov_extra(aio, 0, NULL);
 	if (nni_aio_list_active(aio)) {
 		// We have not been picked up by a resolver thread yet,
 		// so we can just discard everything.
@@ -69,7 +71,7 @@ resolv_cancel(nni_aio *aio, int rv)
 }
 
 static int
-resolv_gai_errno(int rv)
+resolv_errno(int rv)
 {
 	switch (rv) {
 	case 0:
@@ -114,9 +116,10 @@ resolv_task(resolv_item *item)
 	}
 	hints.ai_protocol = item->proto;
 	hints.ai_family   = item->family;
+	hints.ai_socktype = item->socktype;
 
 	if ((rv = getaddrinfo(item->name, "80", &hints, &results)) != 0) {
-		rv = resolv_gai_errno(rv);
+		rv = resolv_errno(rv);
 		goto done;
 	}
 
@@ -164,7 +167,7 @@ done:
 
 static void
 resolv_ip(const char *host, const char *serv, int passive, int family,
-    int proto, nni_aio *aio)
+    int proto, int socktype, nni_aio *aio)
 {
 	resolv_item *item;
 	int          fam;
@@ -221,17 +224,19 @@ resolv_ip(const char *host, const char *serv, int passive, int family,
 		return;
 	}
 	memset(&item->sa, 0, sizeof(item->sa));
-	item->passive = passive;
-	item->name    = host;
-	item->proto   = proto;
-	item->aio     = aio;
-	item->family  = fam;
-	item->port    = htons((uint16_t) port);
+	item->passive  = passive;
+	item->name     = host;
+	item->proto    = proto;
+	item->aio      = aio;
+	item->family   = fam;
+	item->socktype = socktype;
+	item->port     = htons((uint16_t) port);
 
 	nni_mtx_lock(&resolv_mtx);
 	if (resolv_fini) {
 		rv = NNG_ECLOSED;
 	} else {
+		nni_aio_set_prov_extra(aio, 0, item);
 		rv = nni_aio_schedule(aio, resolv_cancel, item);
 	}
 	if (rv != 0) {
@@ -246,17 +251,17 @@ resolv_ip(const char *host, const char *serv, int passive, int family,
 }
 
 void
-nni_plat_tcp_resolv(
+nni_tcp_resolv(
     const char *host, const char *serv, int family, int passive, nni_aio *aio)
 {
-	resolv_ip(host, serv, passive, family, IPPROTO_TCP, aio);
+	resolv_ip(host, serv, passive, family, IPPROTO_TCP, SOCK_STREAM, aio);
 }
 
 void
-nni_plat_udp_resolv(
+nni_udp_resolv(
     const char *host, const char *serv, int family, int passive, nni_aio *aio)
 {
-	resolv_ip(host, serv, passive, family, IPPROTO_UDP, aio);
+	resolv_ip(host, serv, passive, family, IPPROTO_UDP, SOCK_DGRAM, aio);
 }
 
 void
@@ -279,7 +284,7 @@ resolv_worker(void *notused)
 			continue;
 		}
 
-		item = nni_aio_get_prov_data(aio);
+		item = nni_aio_get_prov_extra(aio, 0);
 		nni_aio_list_remove(aio);
 
 		// Now attempt to do the work.  This runs synchronously.
@@ -290,7 +295,7 @@ resolv_worker(void *notused)
 		// Check to make sure we were not canceled.
 		if ((aio = item->aio) != NULL) {
 			nng_sockaddr *sa = nni_aio_get_input(aio, 0);
-			nni_aio_set_prov_data(aio, NULL);
+			nni_aio_set_prov_extra(aio, 0, NULL);
 			item->aio = NULL;
 			memcpy(sa, &item->sa, sizeof(*sa));
 			nni_aio_finish(aio, rv, 0);
@@ -299,6 +304,47 @@ resolv_worker(void *notused)
 		}
 	}
 	nni_mtx_unlock(&resolv_mtx);
+}
+
+int
+nni_ntop(const nni_sockaddr *sa, char *ipstr, char *portstr)
+{
+	void *   ap;
+	uint16_t port;
+	int      af;
+	switch (sa->s_family) {
+	case NNG_AF_INET:
+		ap   = (void *) &sa->s_in.sa_addr;
+		port = sa->s_in.sa_port;
+		af   = AF_INET;
+		break;
+	case NNG_AF_INET6:
+		ap   = (void *) &sa->s_in6.sa_addr;
+		port = sa->s_in6.sa_port;
+		af   = AF_INET6;
+		break;
+	default:
+		return (NNG_EINVAL);
+	}
+	if (ipstr != NULL) {
+		if (af == AF_INET6) {
+			size_t l;
+			ipstr[0] = '[';
+			InetNtopA(af, ap, ipstr + 1, INET6_ADDRSTRLEN);
+			l          = strlen(ipstr);
+			ipstr[l++] = ']';
+			ipstr[l++] = '\0';
+		} else {
+			InetNtopA(af, ap, ipstr, INET6_ADDRSTRLEN);
+		}
+	}
+	if (portstr != NULL) {
+#ifdef NNG_LITTLE_ENDIAN
+		port = ((port >> 8) & 0xff) | ((port & 0xff) << 8);
+#endif
+		snprintf(portstr, 6, "%u", port);
+	}
+	return (0);
 }
 
 int

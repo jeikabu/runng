@@ -158,10 +158,12 @@ nng_send(nng_socket s, void *buf, size_t len, int flags)
 	}
 	memcpy(nng_msg_body(msg), buf, len);
 	if ((rv = nng_sendmsg(s, msg, flags)) != 0) {
+		// If nng_sendmsg() succeeded, then it took ownership.
 		nng_msg_free(msg);
-	}
-	if (flags & NNG_FLAG_ALLOC) {
-		nni_free(buf, len);
+	} else {
+		if (flags & NNG_FLAG_ALLOC) {
+			nni_free(buf, len);
+		}
 	}
 	return (rv);
 }
@@ -1329,69 +1331,47 @@ nng_msg_header_append(nng_msg *msg, const void *data, size_t sz)
 	return (nni_msg_header_append(msg, data, sz));
 }
 
-int
-nng_msg_header_append_u32(nng_msg *msg, uint32_t val)
-{
-	return (nni_msg_header_append_u32(msg, val));
-}
-
-int
-nng_msg_header_insert_u32(nng_msg *msg, uint32_t val)
-{
-	return (nni_msg_header_insert_u32(msg, val));
-}
-
-int
-nng_msg_header_chop_u32(nng_msg *msg, uint32_t *valp)
-{
-	if (nni_msg_header_len(msg) < sizeof(uint32_t)) {
-		return (NNG_EINVAL);
+#define DEF_MSG_ADD_N(op, n)                                      \
+	int nng_msg_header_##op##_u##n(nng_msg *m, uint##n##_t v) \
+	{                                                         \
+		return (nni_msg_header_##op##_u##n(m, v));        \
+	}                                                         \
+	int nng_msg_##op##_u##n(nng_msg *m, uint##n##_t v)        \
+	{                                                         \
+		return (nni_msg_##op##_u##n(m, v));               \
 	}
-	*valp = nni_msg_header_chop_u32(msg);
-	return (0);
-}
-
-int
-nng_msg_header_trim_u32(nng_msg *msg, uint32_t *valp)
-{
-	if (nni_msg_header_len(msg) < sizeof(uint32_t)) {
-		return (NNG_EINVAL);
+#define DEF_MSG_REM_N(op, n)                                        \
+	int nng_msg_header_##op##_u##n(nng_msg *m, uint##n##_t *vp) \
+	{                                                           \
+		if (nni_msg_header_len(m) < sizeof(*vp)) {          \
+			return (NNG_EINVAL);                        \
+		}                                                   \
+		*vp = nni_msg_header_##op##_u##n(m);                \
+		return (0);                                         \
+	}                                                           \
+	int nng_msg_##op##_u##n(nng_msg *m, uint##n##_t *vp)        \
+	{                                                           \
+		if (nni_msg_len(m) < sizeof(*vp)) {                 \
+			return (NNG_EINVAL);                        \
+		}                                                   \
+		*vp = nni_msg_##op##_u##n(m);                       \
+		return (0);                                         \
 	}
-	*valp = nni_msg_header_trim_u32(msg);
-	return (0);
-}
 
-int
-nng_msg_append_u32(nng_msg *msg, uint32_t val)
-{
-	return (nni_msg_append_u32(msg, val));
-}
+#define DEF_MSG_ADD(op) \
+	DEF_MSG_ADD_N(op, 16) DEF_MSG_ADD_N(op, 32) DEF_MSG_ADD_N(op, 64)
+#define DEF_MSG_REM(op) \
+	DEF_MSG_REM_N(op, 16) DEF_MSG_REM_N(op, 32) DEF_MSG_REM_N(op, 64)
 
-int
-nng_msg_insert_u32(nng_msg *msg, uint32_t val)
-{
-	return (nni_msg_insert_u32(msg, val));
-}
+DEF_MSG_ADD(append)
+DEF_MSG_ADD(insert)
+DEF_MSG_REM(chop)
+DEF_MSG_REM(trim)
 
-int
-nng_msg_chop_u32(nng_msg *msg, uint32_t *valp)
-{
-	if (nni_msg_len(msg) < sizeof(uint32_t)) {
-		return (NNG_EINVAL);
-	}
-	*valp = nni_msg_chop_u32(msg);
-	return (0);
-}
-
-int
-nng_msg_trim_u32(nng_msg *msg, uint32_t *valp)
-{
-	if (nni_msg_len(msg) < sizeof(uint32_t)) {
-		return (NNG_EINVAL);
-	}
-	*valp = nni_msg_trim_u32(msg);
-	return (0);
-}
+#undef DEF_MSG_ADD_N
+#undef DEF_MSG_REM_N
+#undef DEF_MSG_ADD
+#undef DEF_MSG_REM
 
 int
 nng_msg_header_insert(nng_msg *msg, const void *data, size_t sz)
@@ -1601,73 +1581,20 @@ nng_aio_finish(nng_aio *aio, int rv)
 	nni_aio_finish(aio, rv, nni_aio_count(aio));
 }
 
-#if 0
-int
-nng_snapshot_create(nng_socket sock, nng_snapshot **snapp)
-{
-	// Stats TBD.
-	NNI_ARG_UNUSED(sock)
-	NNI_ARG_UNUSED(snapp)
-	return (NNG_ENOTSUP);
-}
-
 void
-nng_snapshot_free(nng_snapshot *snap)
+nng_aio_defer(nng_aio *aio, nng_aio_cancelfn fn, void *arg)
 {
-	NNI_ARG_UNUSED(snap)
-	// Stats TBD.
+	nni_aio_schedule(aio, fn, arg);
 }
 
-int
-nng_snapshot_update(nng_snapshot *snap)
+bool
+nng_aio_begin(nng_aio *aio)
 {
-	NNI_ARG_UNUSED(snap)
-	// Stats TBD.
-	return (NNG_ENOTSUP);
+	if (nni_aio_begin(aio) != 0) {
+		return (false);
+	}
+	return (true);
 }
-
-int
-nng_snapshot_next(nng_snapshot *snap, nng_stat **statp)
-{
-	NNI_ARG_UNUSED(snap)
-	NNI_ARG_UNUSED(statp)
-	// Stats TBD.
-	*statp = NULL;
-	return (NNG_ENOTSUP);
-}
-
-const char *
-nng_stat_name(nng_stat *stat)
-{
-	NNI_ARG_UNUSED(stat)
-	// Stats TBD.
-	return (NULL);
-}
-
-int
-nng_stat_type(nng_stat *stat)
-{
-	NNI_ARG_UNUSED(stat)
-	// Stats TBD.
-	return (0);
-}
-
-int
-nng_stat_unit(nng_stat *stat)
-{
-	NNI_ARG_UNUSED(stat)
-    // Stats TBD.
-    return (0);
-}
-
-int64_t
-nng_stat_value(nng_stat *stat)
-{
-	NNI_ARG_UNUSED(stat)
-	// Stats TBD.
-	return (0);
-}
-#endif
 
 int
 nng_url_parse(nng_url **result, const char *ustr)

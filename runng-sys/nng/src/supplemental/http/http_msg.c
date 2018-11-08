@@ -77,12 +77,8 @@ http_headers_reset(nni_list *hdrs)
 	http_header *h;
 	while ((h = nni_list_first(hdrs)) != NULL) {
 		nni_list_remove(hdrs, h);
-		if (h->name != NULL) {
-			nni_strfree(h->name);
-		}
-		if (h->value != NULL) {
-			nni_free(h->value, strlen(h->value) + 1);
-		}
+		nni_strfree(h->name);
+		nni_strfree(h->value);
 		NNI_FREE_STRUCT(h);
 	}
 }
@@ -107,9 +103,10 @@ nni_http_req_reset(nni_http_req *req)
 	nni_strfree(req->meth);
 	nni_strfree(req->uri);
 	req->vers = req->meth = req->uri = NULL;
-	if (req->bufsz) {
-		req->buf[0] = '\0';
-	}
+	nni_free(req->buf, req->bufsz);
+	req->bufsz  = 0;
+	req->buf    = NULL;
+	req->parsed = false;
 }
 
 void
@@ -119,32 +116,31 @@ nni_http_res_reset(nni_http_res *res)
 	http_entity_reset(&res->data);
 	nni_strfree(res->rsn);
 	nni_strfree(res->vers);
-	res->vers = NULL;
-	res->rsn  = NULL;
-	res->code = 0;
-	if (res->bufsz) {
-		res->buf[0] = '\0';
-	}
+	res->vers   = NULL;
+	res->rsn    = NULL;
+	res->code   = 0;
+	res->parsed = false;
+	nni_free(res->buf, res->bufsz);
+	res->buf   = NULL;
+	res->bufsz = 0;
 }
 
 void
 nni_http_req_free(nni_http_req *req)
 {
-	nni_http_req_reset(req);
-	if (req->bufsz) {
-		nni_free(req->buf, req->bufsz);
+	if (req != NULL) {
+		nni_http_req_reset(req);
+		NNI_FREE_STRUCT(req);
 	}
-	NNI_FREE_STRUCT(req);
 }
 
 void
 nni_http_res_free(nni_http_res *res)
 {
-	nni_http_res_reset(res);
-	if (res->bufsz) {
-		nni_free(res->buf, res->bufsz);
+	if (res != NULL) {
+		nni_http_res_reset(res);
+		NNI_FREE_STRUCT(res);
 	}
-	NNI_FREE_STRUCT(res);
 }
 
 static int
@@ -181,13 +177,11 @@ http_set_header(nni_list *hdrs, const char *key, const char *val)
 	http_header *h;
 	NNI_LIST_FOREACH (hdrs, h) {
 		if (nni_strcasecmp(key, h->name) == 0) {
-			char * news;
-			size_t len = strlen(val) + 1;
-			if ((news = nni_alloc(len)) == NULL) {
+			char *news;
+			if ((news = nni_strdup(val)) == NULL) {
 				return (NNG_ENOMEM);
 			}
-			snprintf(news, len, "%s", val);
-			nni_free(h->value, strlen(h->value) + 1);
+			nni_strfree(h->value);
 			h->value = news;
 			return (0);
 		}
@@ -200,12 +194,11 @@ http_set_header(nni_list *hdrs, const char *key, const char *val)
 		NNI_FREE_STRUCT(h);
 		return (NNG_ENOMEM);
 	}
-	if ((h->value = nni_alloc(strlen(val) + 1)) == NULL) {
+	if ((h->value = nni_strdup(val)) == NULL) {
 		nni_strfree(h->name);
 		NNI_FREE_STRUCT(h);
 		return (NNG_ENOMEM);
 	}
-	strncpy(h->value, val, strlen(val) + 1);
 	nni_list_append(hdrs, h);
 	return (0);
 }
@@ -228,13 +221,13 @@ http_add_header(nni_list *hdrs, const char *key, const char *val)
 	http_header *h;
 	NNI_LIST_FOREACH (hdrs, h) {
 		if (nni_strcasecmp(key, h->name) == 0) {
-			char * news;
-			size_t len = strlen(h->value) + strlen(val) + 3;
-			if ((news = nni_alloc(len)) == NULL) {
-				return (NNG_ENOMEM);
+			char *news;
+			int   rv;
+			rv = nni_asprintf(&news, "%s, %s", h->value, val);
+			if (rv != 0) {
+				return (rv);
 			}
-			snprintf(news, len, "%s, %s", h->value, val);
-			nni_free(h->value, strlen(h->value) + 1);
+			nni_strfree(h->value);
 			h->value = news;
 			return (0);
 		}
@@ -247,12 +240,11 @@ http_add_header(nni_list *hdrs, const char *key, const char *val)
 		NNI_FREE_STRUCT(h);
 		return (NNG_ENOMEM);
 	}
-	if ((h->value = nni_alloc(strlen(val) + 1)) == NULL) {
+	if ((h->value = nni_strdup(val)) == NULL) {
 		nni_strfree(h->name);
 		NNI_FREE_STRUCT(h);
 		return (NNG_ENOMEM);
 	}
-	strncpy(h->value, val, strlen(val) + 1);
 	nni_list_append(hdrs, h);
 	return (0);
 }
@@ -310,7 +302,7 @@ static int
 http_entity_alloc_data(nni_http_entity *entity, size_t size)
 {
 	void *newdata;
-	if ((newdata = nni_alloc(size)) == NULL) {
+	if ((newdata = nni_zalloc(size)) == NULL) {
 		return (NNG_ENOMEM);
 	}
 	http_entity_set_data(entity, newdata, size);
@@ -394,6 +386,17 @@ nni_http_req_copy_data(nni_http_req *req, const void *data, size_t size)
 }
 
 int
+nni_http_req_alloc_data(nni_http_req *req, size_t size)
+{
+	int rv;
+
+	if ((rv = http_entity_alloc_data(&req->data, size)) != 0) {
+		return (rv);
+	}
+	return (0);
+}
+
+int
 nni_http_res_copy_data(nni_http_res *res, const void *data, size_t size)
 {
 	int rv;
@@ -404,6 +407,20 @@ nni_http_res_copy_data(nni_http_res *res, const void *data, size_t size)
 		return (rv);
 	}
 	res->iserr = false;
+	return (0);
+}
+
+// nni_http_res_alloc_data allocates the data region, but does not update any
+// headers.  The intended use is for client implementations that want to
+// allocate a buffer to receive the entity into.
+int
+nni_http_res_alloc_data(nni_http_res *res, size_t size)
+{
+	int rv;
+
+	if ((rv = http_entity_alloc_data(&res->data, size)) != 0) {
+		return (rv);
+	}
 	return (0);
 }
 
@@ -482,7 +499,7 @@ http_asprintf(char **bufp, size_t *szp, nni_list *hdrs, const char *fmt, ...)
 	va_end(ap);
 
 	len += http_sprintf_headers(NULL, 0, hdrs);
-	len += 5; // \r\n\r\n\0
+	len += 3; // \r\n\0
 
 	if (len <= *szp) {
 		buf = *bufp;
@@ -503,6 +520,7 @@ http_asprintf(char **bufp, size_t *szp, nni_list *hdrs, const char *fmt, ...)
 	buf += n;
 	len -= n;
 	snprintf(buf, len, "\r\n");
+	NNI_ASSERT(len == 3);
 	return (0);
 }
 
@@ -564,7 +582,7 @@ nni_http_req_get_buf(nni_http_req *req, void **data, size_t *szp)
 		return (rv);
 	}
 	*data = req->buf;
-	*szp  = strlen(req->buf);
+	*szp  = req->bufsz - 1; // exclude terminating NUL
 	return (0);
 }
 
@@ -577,7 +595,7 @@ nni_http_res_get_buf(nni_http_res *res, void **data, size_t *szp)
 		return (rv);
 	}
 	*data = res->buf;
-	*szp  = strlen(res->buf);
+	*szp  = res->bufsz - 1; // exclude terminating NUL
 	return (0);
 }
 
@@ -998,36 +1016,49 @@ nni_http_res_set_reason(nni_http_res *res, const char *reason)
 }
 
 int
+nni_http_alloc_html_error(char **html, uint16_t code, const char *details)
+{
+	const char *rsn = nni_http_reason(code);
+
+	return (nni_asprintf(html,
+	    "<!DOCTYPE html>\n"
+	    "<html><head><title>%d %s</title>\n"
+	    "<style>"
+	    "body { font-family: Arial, sans serif; text-align: center }\n"
+	    "h1 { font-size: 36px; }"
+	    "span { background-color: gray; color: white; padding: 7px; "
+	    "border-radius: 5px }"
+	    "h2 { font-size: 24px; }"
+	    "p { font-size: 20px; }"
+	    "</style></head>"
+	    "<body><p>&nbsp;</p>"
+	    "<h1><span>%d</span></h1>"
+	    "<h2>%s</h2>"
+	    "<p>%s</p>"
+	    "</body></html>",
+	    code, rsn, code, rsn, details != NULL ? details : ""));
+}
+
+int
 nni_http_res_alloc_error(nni_http_res **resp, uint16_t err)
 {
-	char          html[512];
+	char *        html = NULL;
+	nni_http_res *res  = NULL;
 	int           rv;
-	nni_http_res *res;
 
-	if ((rv = nni_http_res_alloc(&res)) != 0) {
-		return (rv);
-	}
-
-	// very simple builtin error page
-	(void) snprintf(html, sizeof(html),
-	    "<head><title>%d %s</title></head>"
-	    "<body><p/><h1 align=\"center\">"
-	    "<span style=\"font-size: 36px; border-radius: 5px; "
-	    "background-color: black; color: white; padding: 7px; "
-	    "font-family: Arial, sans serif;\">%d</span></h1>"
-	    "<p align=\"center\">"
-	    "<span style=\"font-size: 24px; font-family: Arial, sans serif;\">"
-	    "%s</span></p></body>",
-	    err, nni_http_reason(err), err, nni_http_reason(err));
-
-	res->code = err;
-	if (((rv = nni_http_res_set_header(
+	if (((rv = nni_http_res_alloc(&res)) != 0) ||
+	    ((rv = nni_http_alloc_html_error(&html, err, NULL)) != 0) ||
+	    ((rv = nni_http_res_set_header(
 	          res, "Content-Type", "text/html; charset=UTF-8")) != 0) ||
 	    ((rv = nni_http_res_copy_data(res, html, strlen(html))) != 0)) {
+		nni_strfree(html);
 		nni_http_res_free(res);
 	} else {
+		nni_strfree(html);
+		res->code  = err;
 		res->iserr = true;
 		*resp      = res;
 	}
+
 	return (rv);
 }

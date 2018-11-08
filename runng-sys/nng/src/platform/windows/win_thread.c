@@ -1,6 +1,6 @@
 //
-// Copyright 2017 Garrett D'Amore <garrett@damore.org>
-// Copyright 2017 Capitar IT Group BV <info@capitar.com>
+// Copyright 2018 Staysail Systems, Inc. <info@staysail.tech>
+// Copyright 2018 Capitar IT Group BV <info@capitar.com>
 //
 // This software is supplied under the terms of the MIT License, a
 // copy of which should be located in the distribution where this
@@ -19,7 +19,13 @@
 void *
 nni_alloc(size_t sz)
 {
-	return (calloc(sz, 1));
+	return (sz > 0 ? malloc(sz) : NULL);
+}
+
+void *
+nni_zalloc(size_t sz)
+{
+	return (sz > 0 ? calloc(1, sz) : NULL);
 }
 
 void
@@ -115,6 +121,44 @@ nni_atomic_flag_reset(nni_atomic_flag *f)
 	InterlockedExchange(&f->f, 0);
 }
 
+void
+nni_atomic_inc64(nni_atomic_u64 *v, uint64_t bump)
+{
+	InterlockedAddNoFence64(&v->v, (LONGLONG) bump);
+}
+
+void
+nni_atomic_dec64(nni_atomic_u64 *v, uint64_t bump)
+{
+	// Windows lacks a sub, so we add the negative.
+	InterlockedAddNoFence64(&v->v, (0ll - (LONGLONG) bump));
+}
+
+uint64_t
+nni_atomic_get64(nni_atomic_u64 *v)
+{
+
+	return ((uint64_t)(InterlockedExchangeAdd64(&v->v, 0)));
+}
+
+void
+nni_atomic_set64(nni_atomic_u64 *v, uint64_t u)
+{
+	(void) InterlockedExchange64(&v->v, (LONGLONG) u);
+}
+
+uint64_t
+nni_atomic_swap64(nni_atomic_u64 *v, uint64_t u)
+{
+	return ((uint64_t)(InterlockedExchange64(&v->v, (LONGLONG) u)));
+}
+
+void
+nni_atomic_init64(nni_atomic_u64 *v)
+{
+	InterlockedExchange64(&v->v, 0);
+}
+
 static unsigned int __stdcall nni_plat_thr_main(void *arg)
 {
 	nni_plat_thr *thr = arg;
@@ -181,7 +225,7 @@ nni_plat_init(int (*helper)(void))
 	AcquireSRWLockExclusive(&lock);
 
 	if (!plat_inited) {
-		if (((rv = nni_win_iocp_sysinit()) != 0) ||
+		if (((rv = nni_win_io_sysinit()) != 0) ||
 		    ((rv = nni_win_ipc_sysinit()) != 0) ||
 		    ((rv = nni_win_tcp_sysinit()) != 0) ||
 		    ((rv = nni_win_udp_sysinit()) != 0) ||
@@ -206,7 +250,7 @@ nni_plat_fini(void)
 	nni_win_ipc_sysfini();
 	nni_win_udp_sysfini();
 	nni_win_tcp_sysfini();
-	nni_win_iocp_sysfini();
+	nni_win_io_sysfini();
 	WSACleanup();
 	plat_inited = 0;
 }
