@@ -11,7 +11,7 @@ addons:
   apt:
     packages:
       # To build nng
-      #- cmake
+      - cmake
       - ninja-build
       # To build kcov
       - libcurl4-openssl-dev
@@ -24,7 +24,6 @@ addons:
 before_install:
   # Using `source` so can update PATH environment variable
   - source ./scripts/install.sh
-  - cmake --version
 
 script:
   - cargo build
