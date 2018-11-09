@@ -33,11 +33,11 @@ impl MsgBuilder {
         let mut msg = NngMsg::new()?;
         let len = self.header.len();
         if len > 0 {
-            msg.header_append(self.header.as_ptr() as *const c_void, len)?;
+            msg.header_append(self.header.as_ptr(), len)?;
         }
         let len = self.body.len();
         if len > 0 {
-            msg.append(self.body.as_ptr() as *const c_void, len)?;
+            msg.append(self.body.as_ptr(), len)?;
         }
         Ok(msg)
     }

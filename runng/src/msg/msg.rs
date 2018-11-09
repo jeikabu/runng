@@ -61,15 +61,15 @@ impl NngMsg {
         }
     }
 
-    pub fn append(&mut self, data: *const c_void, size: usize) -> NngReturn {
+    pub fn append(&mut self, data: *const u8, size: usize) -> NngReturn {
         unsafe {
-            NngFail::from_i32(nng_msg_append(self.msg(), data, size))
+            NngFail::from_i32(nng_msg_append(self.msg(), data as *const c_void, size))
         }
     }
 
-    pub fn insert(&mut self, data: *const c_void, size: usize) -> NngReturn {
+    pub fn insert(&mut self, data: *const u8, size: usize) -> NngReturn {
         unsafe {
-            NngFail::from_i32(nng_msg_insert(self.msg(), data, size))
+            NngFail::from_i32(nng_msg_insert(self.msg(), data as *const c_void, size))
         }
     }
 
@@ -85,15 +85,15 @@ impl NngMsg {
         }
     }
 
-    pub fn header_append(&mut self, data: *const c_void, size: usize) -> NngReturn {
+    pub fn header_append(&mut self, data: *const u8, size: usize) -> NngReturn {
         unsafe {
-            NngFail::from_i32(nng_msg_header_append(self.msg(), data, size))
+            NngFail::from_i32(nng_msg_header_append(self.msg(), data as *const c_void, size))
         }
     }
 
-    pub fn header_insert(&mut self, data: *const c_void, size: usize) -> NngReturn {
+    pub fn header_insert(&mut self, data: *const u8, size: usize) -> NngReturn {
         unsafe {
-            NngFail::from_i32(nng_msg_header_insert(self.msg(), data, size))
+            NngFail::from_i32(nng_msg_header_insert(self.msg(), data as *const c_void, size))
         }
     }
 

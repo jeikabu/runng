@@ -106,6 +106,9 @@ impl Socket for Rep0 {
     fn socket(&self) -> &NngSocket {
         &self.socket
     }
+    fn take(self) -> NngSocket {
+        self.socket
+    }
 }
 
 impl Listen for Rep0 {}

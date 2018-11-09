@@ -3,6 +3,7 @@ use runng_sys::*;
 use std::{
     error,
     fmt,
+    io,
 };
 
 #[derive(Debug)]
@@ -118,7 +119,13 @@ impl error::Error for NngError {
 }
 impl fmt::Display for NngError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self,)
+        write!(f, "{}", self)
+    }
+}
+
+impl From<NngFail> for io::Error {
+    fn from(err: NngFail) -> io::Error {
+        io::Error::from(io::ErrorKind::Other)
     }
 }
 
