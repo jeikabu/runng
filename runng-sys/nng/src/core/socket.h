@@ -25,6 +25,7 @@ extern uint16_t    nni_sock_peer_id(nni_sock *);
 extern const char *nni_sock_proto_name(nni_sock *);
 extern const char *nni_sock_peer_name(nni_sock *);
 extern void *      nni_sock_proto_data(nni_sock *);
+extern void        nni_sock_add_stat(nni_sock *, nni_stat_item *);
 
 extern struct nni_proto_pipe_ops *nni_sock_proto_pipe_ops(nni_sock *);
 
@@ -37,20 +38,6 @@ extern int      nni_sock_sendmsg(nni_sock *, nni_msg *, int);
 extern void     nni_sock_send(nni_sock *, nni_aio *);
 extern void     nni_sock_recv(nni_sock *, nni_aio *);
 extern uint32_t nni_sock_id(nni_sock *);
-
-// nni_sock_pipe_add adds the pipe to the socket. It is called by
-// the generic pipe creation code.  It also adds the socket to the
-// ep list, and starts the pipe.  It does all these to ensure that
-// we have complete success or failure, and there is no point where
-// a pipe could wind up orphaned.
-extern int  nni_sock_pipe_add(nni_sock *, nni_pipe *);
-extern void nni_sock_pipe_remove(nni_sock *, nni_pipe *);
-
-extern int  nni_sock_add_dialer(nni_sock *, nni_dialer *);
-extern void nni_sock_remove_dialer(nni_sock *, nni_dialer *);
-
-extern int  nni_sock_add_listener(nni_sock *, nni_listener *);
-extern void nni_sock_remove_listener(nni_sock *, nni_listener *);
 
 // These are socket methods that protocol operations can expect to call.
 // Note that each of these should be called without any locks held, since
@@ -75,10 +62,6 @@ extern uint32_t nni_sock_flags(nni_sock *);
 // types.)  The second argument is a mask of events for which the callback
 // should be executed.
 extern void nni_sock_set_pipe_cb(nni_sock *sock, int, nng_pipe_cb, void *);
-
-extern void nni_sock_run_pipe_cb(nni_sock *sock, int, uint32_t);
-
-extern bool nni_sock_closing(nni_sock *sock);
 
 // nni_ctx_open is used to open/create a new context structure.
 // Contexts are not supported by most protocols, but for those that do,
@@ -122,5 +105,13 @@ extern int nni_ctx_getopt(
 // nni_ctx_setopt is used to set a context option.
 extern int nni_ctx_setopt(
     nni_ctx *, const char *, const void *, size_t, nni_opt_type);
+
+// nni_sock_bump_rx is called by a protocol when a message is received by
+// a consuming app.  It bumps the rxmsgs by one and rxbytes by the size.
+extern void nni_sock_bump_rx(nni_sock *s, uint64_t sz);
+
+// nni_sock_bump_rx is called by a protocol when a message is sent by
+// a consuming app.  It bumps the txmsgs by one and txbytes by the size.
+extern void nni_sock_bump_tx(nni_sock *s, uint64_t sz);
 
 #endif // CORE_SOCKET_H

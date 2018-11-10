@@ -9,7 +9,9 @@
 //
 
 #include "core/nng_impl.h"
+#include "sockimpl.h"
 
+#include <stdio.h>
 #include <string.h>
 
 // This file contains functions relating to pipes.
@@ -17,51 +19,17 @@
 // Operations on pipes (to the transport) are generally blocking operations,
 // performed in the context of the protocol.
 
-struct nni_pipe {
-	uint32_t           p_id;
-	nni_tran_pipe_ops  p_tran_ops;
-	nni_proto_pipe_ops p_proto_ops;
-	void *             p_tran_data;
-	void *             p_proto_data;
-	nni_list_node      p_sock_node;
-	nni_list_node      p_ep_node;
-	nni_sock *         p_sock;
-	nni_listener *     p_listener;
-	nni_dialer *       p_dialer;
-	bool               p_closed;
-	nni_atomic_flag    p_stop;
-	bool               p_cbs;
-	int                p_refcnt;
-	nni_mtx            p_mtx;
-	nni_cv             p_cv;
-	nni_list_node      p_reap_node;
-	nni_aio *          p_start_aio;
-};
-
 static nni_idhash *nni_pipes;
 static nni_mtx     nni_pipe_lk;
-
-static nni_list nni_pipe_reap_list;
-static nni_mtx  nni_pipe_reap_lk;
-static nni_cv   nni_pipe_reap_cv;
-static nni_thr  nni_pipe_reap_thr;
-static int      nni_pipe_reap_run;
-
-static void nni_pipe_reaper(void *);
 
 int
 nni_pipe_sys_init(void)
 {
 	int rv;
 
-	NNI_LIST_INIT(&nni_pipe_reap_list, nni_pipe, p_reap_node);
 	nni_mtx_init(&nni_pipe_lk);
-	nni_mtx_init(&nni_pipe_reap_lk);
-	nni_cv_init(&nni_pipe_reap_cv, &nni_pipe_reap_lk);
 
-	if (((rv = nni_idhash_init(&nni_pipes)) != 0) ||
-	    ((rv = nni_thr_init(&nni_pipe_reap_thr, nni_pipe_reaper, 0)) !=
-	        0)) {
+	if ((rv = nni_idhash_init(&nni_pipes)) != 0) {
 		return (rv);
 	}
 
@@ -73,25 +41,13 @@ nni_pipe_sys_init(void)
 	nni_idhash_set_limits(
 	    nni_pipes, 1, 0x7fffffff, nni_random() & 0x7fffffff);
 
-	nni_pipe_reap_run = 1;
-	nni_thr_run(&nni_pipe_reap_thr);
-
 	return (0);
 }
 
 void
 nni_pipe_sys_fini(void)
 {
-	if (nni_pipe_reap_run) {
-		nni_mtx_lock(&nni_pipe_reap_lk);
-		nni_pipe_reap_run = 0;
-		nni_cv_wake(&nni_pipe_reap_cv);
-		nni_mtx_unlock(&nni_pipe_reap_lk);
-	}
-
-	nni_thr_fini(&nni_pipe_reap_thr);
-	nni_cv_fini(&nni_pipe_reap_cv);
-	nni_mtx_fini(&nni_pipe_reap_lk);
+	nni_reap_drain();
 	nni_mtx_fini(&nni_pipe_lk);
 	if (nni_pipes != NULL) {
 		nni_idhash_fini(nni_pipes);
@@ -99,19 +55,26 @@ nni_pipe_sys_fini(void)
 	}
 }
 
-void
-nni_pipe_destroy(nni_pipe *p)
+static void
+pipe_destroy(nni_pipe *p)
 {
 	if (p == NULL) {
 		return;
 	}
 
-	if (p->p_cbs) {
-		nni_sock_run_pipe_cb(p->p_sock, NNG_PIPE_EV_REM_POST, p->p_id);
-	}
+	nni_pipe_run_cb(p, NNG_PIPE_EV_REM_POST);
 
-	// Stop any pending negotiation.
-	nni_aio_stop(p->p_start_aio);
+	// Make sure any unlocked holders are done with this.
+	// This happens during initialization for example.
+	nni_mtx_lock(&nni_pipe_lk);
+	if (p->p_id != 0) {
+		nni_idhash_remove(nni_pipes, p->p_id);
+	}
+	// This wait guarantees that all callers are done with us.
+	while (p->p_refcnt != 0) {
+		nni_cv_wait(&p->p_cv);
+	}
+	nni_mtx_unlock(&nni_pipe_lk);
 
 	if (p->p_proto_data != NULL) {
 		p->p_proto_ops.pipe_stop(p->p_proto_data);
@@ -120,25 +83,8 @@ nni_pipe_destroy(nni_pipe *p)
 		p->p_tran_ops.p_stop(p->p_tran_data);
 	}
 
-	// We have exclusive access at this point, so we can check if
-	// we are still on any lists.
-	nni_dialer_remove_pipe(p->p_dialer, p);     // dialer may be NULL
-	nni_listener_remove_pipe(p->p_listener, p); // listener may be NULL
-
-	if (nni_list_node_active(&p->p_sock_node)) {
-		nni_sock_pipe_remove(p->p_sock, p);
-	}
-
-	// Make sure any unlocked holders are done with this.
-	// This happens during initialization for example.
-	nni_mtx_lock(&nni_pipe_lk);
-	if (p->p_id != 0) {
-		nni_idhash_remove(nni_pipes, p->p_id);
-	}
-	while (p->p_refcnt != 0) {
-		nni_cv_wait(&p->p_cv);
-	}
-	nni_mtx_unlock(&nni_pipe_lk);
+	nni_stat_remove(&p->p_stats.s_root);
+	nni_pipe_remove(p);
 
 	if (p->p_proto_data != NULL) {
 		p->p_proto_ops.pipe_fini(p->p_proto_data);
@@ -146,7 +92,7 @@ nni_pipe_destroy(nni_pipe *p)
 	if (p->p_tran_data != NULL) {
 		p->p_tran_ops.p_fini(p->p_tran_data);
 	}
-	nni_aio_fini(p->p_start_aio);
+	nni_cv_fini(&p->p_cv);
 	nni_mtx_fini(&p->p_mtx);
 	NNI_FREE_STRUCT(p);
 }
@@ -206,9 +152,6 @@ nni_pipe_send(nni_pipe *p, nni_aio *aio)
 void
 nni_pipe_close(nni_pipe *p)
 {
-	// abort any pending negotiation/start process.
-	nni_aio_close(p->p_start_aio);
-
 	nni_mtx_lock(&p->p_mtx);
 	if (p->p_closed) {
 		// We already did a close.
@@ -226,33 +169,8 @@ nni_pipe_close(nni_pipe *p)
 	if (p->p_tran_data != NULL) {
 		p->p_tran_ops.p_close(p->p_tran_data);
 	}
-}
 
-bool
-nni_pipe_closed(nni_pipe *p)
-{
-	bool rv;
-	nni_mtx_lock(&p->p_mtx);
-	rv = p->p_closed;
-	nni_mtx_unlock(&p->p_mtx);
-	return (rv);
-}
-
-void
-nni_pipe_stop(nni_pipe *p)
-{
-	// Guard against recursive calls.
-	if (nni_atomic_flag_test_and_set(&p->p_stop)) {
-		return;
-	}
-
-	nni_pipe_close(p);
-
-	// Put it on the reaplist for async cleanup
-	nni_mtx_lock(&nni_pipe_reap_lk);
-	nni_list_append(&nni_pipe_reap_list, p);
-	nni_cv_wake(&nni_pipe_reap_cv);
-	nni_mtx_unlock(&nni_pipe_reap_lk);
+	nni_reap(&p->p_reap, (nni_cb) pipe_destroy, p);
 }
 
 uint16_t
@@ -261,38 +179,30 @@ nni_pipe_peer(nni_pipe *p)
 	return (p->p_tran_ops.p_peer(p->p_tran_data));
 }
 
-static void
-nni_pipe_start_cb(void *arg)
+void
+nni_pipe_stats_init(nni_pipe *p)
 {
-	nni_pipe *p   = arg;
-	nni_sock *s   = p->p_sock;
-	nni_aio * aio = p->p_start_aio;
-	uint32_t  id  = nni_pipe_id(p);
+#ifdef NNG_ENABLE_STATS
+	nni_pipe_stats *st = &p->p_stats;
 
-	if (nni_aio_result(aio) != 0) {
-		nni_pipe_stop(p);
-		return;
+	if (p->p_listener != NULL) {
+		st->s_ep_id.si_name  = "listener";
+		st->s_ep_id.si_desc  = "listener for pipe";
+		st->s_ep_id.si_value = nni_listener_id(p->p_listener);
+	} else {
+		st->s_ep_id.si_name  = "dialer";
+		st->s_ep_id.si_desc  = "dialer for pipe";
+		st->s_ep_id.si_value = nni_dialer_id(p->p_dialer);
 	}
 
-	p->p_cbs = true; // We're running all cbs going forward
-
-	nni_sock_run_pipe_cb(s, NNG_PIPE_EV_ADD_PRE, id);
-	if (nni_pipe_closed(p)) {
-		nni_pipe_stop(p);
-		return;
-	}
-
-	if ((p->p_proto_ops.pipe_start(p->p_proto_data) != 0) ||
-	    nni_sock_closing(s)) {
-		nni_pipe_stop(p);
-		return;
-	}
-
-	nni_sock_run_pipe_cb(s, NNG_PIPE_EV_ADD_POST, id);
+	nni_stat_append(NULL, &st->s_root);
+#else
+	NNI_ARG_UNUSED(p);
+#endif
 }
 
 int
-nni_pipe_create2(nni_pipe **pp, nni_sock *sock, nni_tran *tran, void *tdata)
+nni_pipe_create(nni_pipe **pp, nni_sock *sock, nni_tran *tran, void *tdata)
 {
 	nni_pipe *          p;
 	int                 rv;
@@ -306,7 +216,6 @@ nni_pipe_create2(nni_pipe **pp, nni_sock *sock, nni_tran *tran, void *tdata)
 	}
 
 	// Make a private copy of the transport ops.
-	p->p_start_aio  = NULL;
 	p->p_tran_ops   = *tran->tran_pipe;
 	p->p_tran_data  = tdata;
 	p->p_proto_ops  = *pops;
@@ -317,42 +226,43 @@ nni_pipe_create2(nni_pipe **pp, nni_sock *sock, nni_tran *tran, void *tdata)
 	p->p_refcnt     = 0;
 
 	nni_atomic_flag_reset(&p->p_stop);
-	NNI_LIST_NODE_INIT(&p->p_reap_node);
 	NNI_LIST_NODE_INIT(&p->p_sock_node);
 	NNI_LIST_NODE_INIT(&p->p_ep_node);
 
 	nni_mtx_init(&p->p_mtx);
 	nni_cv_init(&p->p_cv, &nni_pipe_lk);
 
-	if ((rv = nni_aio_init(&p->p_start_aio, nni_pipe_start_cb, p)) == 0) {
-		uint64_t id;
-		nni_mtx_lock(&nni_pipe_lk);
-		if ((rv = nni_idhash_alloc(nni_pipes, &id, p)) == 0) {
-			p->p_id = (uint32_t) id;
-		}
-		nni_mtx_unlock(&nni_pipe_lk);
+	nni_mtx_lock(&nni_pipe_lk);
+	if ((rv = nni_idhash_alloc32(nni_pipes, &p->p_id, p)) == 0) {
+		p->p_refcnt = 1;
 	}
+	nni_mtx_unlock(&nni_pipe_lk);
 
-	if ((rv != 0) ||
+	nni_pipe_stats *st = &p->p_stats;
+	snprintf(st->s_scope, sizeof(st->s_scope), "pipe%u", p->p_id);
+
+	nni_stat_init_scope(&st->s_root, st->s_scope, "pipe statistics");
+
+	nni_stat_init_id(&st->s_id, "id", "pipe id", p->p_id);
+	nni_stat_append(&st->s_root, &st->s_id);
+
+	// name and description fleshed out later.
+	nni_stat_init_id(&st->s_ep_id, "", "", 0);
+	nni_stat_append(&st->s_root, &st->s_ep_id);
+
+	nni_stat_init_id(&st->s_sock_id, "socket", "socket for pipe",
+	    nni_sock_id(p->p_sock));
+	nni_stat_append(&st->s_root, &st->s_sock_id);
+
+	if ((rv != 0) || ((rv = tran->tran_pipe->p_init(tdata, p)) != 0) ||
 	    ((rv = pops->pipe_init(&p->p_proto_data, p, sdata)) != 0)) {
-		nni_pipe_destroy(p);
+		nni_pipe_close(p);
+		nni_pipe_rele(p);
 		return (rv);
 	}
 
 	*pp = p;
 	return (0);
-}
-
-void
-nni_pipe_set_listener(nni_pipe *p, nni_listener *l)
-{
-	p->p_listener = l;
-}
-
-void
-nni_pipe_set_dialer(nni_pipe *p, nni_dialer *d)
-{
-	p->p_dialer = d;
 }
 
 int
@@ -367,7 +277,9 @@ nni_pipe_getopt(
 		}
 		return (o->o_get(p->p_tran_data, val, szp, t));
 	}
-	// Maybe the endpoint knows?
+
+	// Maybe the endpoint knows? The guarantees on pipes ensure that the
+	// pipe will not outlive its creating endpoint.
 	if (p->p_dialer != NULL) {
 		return (nni_dialer_getopt(p->p_dialer, name, val, szp, t));
 	}
@@ -377,32 +289,10 @@ nni_pipe_getopt(
 	return (NNG_ENOTSUP);
 }
 
-void
-nni_pipe_start(nni_pipe *p)
-{
-	if (p->p_tran_ops.p_start == NULL) {
-		nni_aio_finish(p->p_start_aio, 0, 0);
-	} else {
-		p->p_tran_ops.p_start(p->p_tran_data, p->p_start_aio);
-	}
-}
-
 void *
 nni_pipe_get_proto_data(nni_pipe *p)
 {
 	return (p->p_proto_data);
-}
-
-void
-nni_pipe_sock_list_init(nni_list *list)
-{
-	NNI_LIST_INIT(list, nni_pipe, p_sock_node);
-}
-
-void
-nni_pipe_ep_list_init(nni_list *list)
-{
-	NNI_LIST_INIT(list, nni_pipe, p_ep_node);
 }
 
 uint32_t
@@ -414,40 +304,17 @@ nni_pipe_sock_id(nni_pipe *p)
 uint32_t
 nni_pipe_listener_id(nni_pipe *p)
 {
-	if (p->p_listener != NULL) {
-		return (nni_listener_id(p->p_listener));
-	}
-	return (0);
+	return (p->p_listener ? nni_listener_id(p->p_listener) : 0);
 }
+
 uint32_t
 nni_pipe_dialer_id(nni_pipe *p)
 {
-	if (p->p_dialer != NULL) {
-		return (nni_dialer_id(p->p_dialer));
-	}
-	return (0);
+	return (p->p_dialer ? nni_dialer_id(p->p_dialer) : 0);
 }
 
-static void
-nni_pipe_reaper(void *notused)
+void
+nni_pipe_add_stat(nni_pipe *p, nni_stat_item *item)
 {
-	NNI_ARG_UNUSED(notused);
-
-	nni_mtx_lock(&nni_pipe_reap_lk);
-	for (;;) {
-		nni_pipe *p;
-		if ((p = nni_list_first(&nni_pipe_reap_list)) != NULL) {
-			nni_list_remove(&nni_pipe_reap_list, p);
-
-			nni_mtx_unlock(&nni_pipe_reap_lk);
-			nni_pipe_destroy(p);
-			nni_mtx_lock(&nni_pipe_reap_lk);
-			continue;
-		}
-		if (!nni_pipe_reap_run) {
-			break;
-		}
-		nni_cv_wait(&nni_pipe_reap_cv);
-	}
-	nni_mtx_unlock(&nni_pipe_reap_lk);
+	nni_stat_append(&p->p_stats.s_root, item);
 }

@@ -157,9 +157,6 @@ nni_copyin_str(char *s, const void *v, size_t sz, size_t maxsz, nni_opt_type t)
 
 	switch (t) {
 	case NNI_TYPE_STRING:
-		z = strlen(v) + 1;
-		NNI_ASSERT(sz == z);
-		break;
 	case NNI_TYPE_OPAQUE:
 		if ((z = nni_strnlen(v, sz)) >= sz) {
 			return (NNG_EINVAL); // missing terminator
@@ -197,6 +194,30 @@ nni_copyin_u64(uint64_t *up, const void *v, size_t sz, nni_opt_type t)
 	}
 	if (up != NULL) {
 		*up = u;
+	}
+	return (0);
+}
+
+int
+nni_copyin_sockaddr(nng_sockaddr *ap, const void *v, size_t sz, nni_opt_type t)
+{
+	nng_sockaddr a;
+
+	switch (t) {
+	case NNI_TYPE_SOCKADDR:
+		a = *(nng_sockaddr *) v;
+		break;
+	case NNI_TYPE_OPAQUE:
+		if (sz != sizeof(nng_sockaddr)) {
+			return (NNG_EINVAL);
+		}
+		memcpy(&a, v, sz);
+		break;
+	default:
+		return (NNG_EBADTYPE);
+	}
+	if (ap != NULL) {
+		*ap = a;
 	}
 	return (0);
 }

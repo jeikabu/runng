@@ -133,9 +133,9 @@ resp0_ctx_init(void **ctxp, void *sarg)
 }
 
 static void
-resp0_ctx_cancel_send(nni_aio *aio, int rv)
+resp0_ctx_cancel_send(nni_aio *aio, void *arg, int rv)
 {
-	resp0_ctx * ctx = nni_aio_get_prov_data(aio);
+	resp0_ctx * ctx = arg;
 	resp0_sock *s   = ctx->sock;
 
 	nni_mtx_lock(&s->mtx);
@@ -405,7 +405,7 @@ resp0_pipe_send_cb(void *arg)
 	if (nni_aio_result(p->aio_send) != 0) {
 		nni_msg_free(nni_aio_get_msg(p->aio_send));
 		nni_aio_set_msg(p->aio_send, NULL);
-		nni_pipe_stop(p->npipe);
+		nni_pipe_close(p->npipe);
 		return;
 	}
 	nni_mtx_lock(&s->mtx);
@@ -437,9 +437,9 @@ resp0_pipe_send_cb(void *arg)
 }
 
 static void
-resp0_cancel_recv(nni_aio *aio, int rv)
+resp0_cancel_recv(nni_aio *aio, void *arg, int rv)
 {
-	resp0_ctx * ctx = nni_aio_get_prov_data(aio);
+	resp0_ctx * ctx = arg;
 	resp0_sock *s   = ctx->sock;
 
 	nni_mtx_lock(&s->mtx);
@@ -511,7 +511,7 @@ resp0_pipe_recv_cb(void *arg)
 	size_t      len;
 
 	if (nni_aio_result(p->aio_recv) != 0) {
-		nni_pipe_stop(p->npipe);
+		nni_pipe_close(p->npipe);
 		return;
 	}
 
@@ -532,7 +532,7 @@ resp0_pipe_recv_cb(void *arg)
 			// Peer is speaking garbage, kick it.
 			nni_msg_free(msg);
 			nni_aio_set_msg(p->aio_recv, NULL);
-			nni_pipe_stop(p->npipe);
+			nni_pipe_close(p->npipe);
 			return;
 		}
 		body = nni_msg_body(msg);
