@@ -54,19 +54,19 @@ pub trait Socket: Sized {
 }
 
 pub trait Listen: Socket {
-    fn listen(&self, url: &str) -> NngReturn {
+    fn listen(self, url: &str) -> NngResult<Self> {
         unsafe {
             let res = nng_listen(self.nng_socket(), to_cstr(url).1, std::ptr::null_mut(), 0);
-            NngFail::from_i32(res)
+            NngFail::succeed(res, self)
         }
     }
 }
 
 pub trait Dial: Socket {
-    fn dial(&self, url: &str) -> NngReturn {
+    fn dial(self, url: &str) -> NngResult<Self> {
         unsafe {
             let res = nng_dial(self.nng_socket(), to_cstr(url).1, std::ptr::null_mut(), 0);
-            NngFail::from_i32(res)
+            NngFail::succeed(res, self)
         }
     }
 }

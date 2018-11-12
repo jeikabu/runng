@@ -71,11 +71,9 @@ mod tests {
     #[test]
     fn it_works() {
         let factory = runng::Latest::new();
-        let publisher = factory.publisher_open().unwrap();
-        let subscriber = factory.subscriber_open().unwrap();
         let url = "inproc://test";
-        publisher.listen(url).unwrap();
-        subscriber.dial(url).unwrap();
+        let publisher = factory.publisher_open().unwrap().listen(url).unwrap();
+        let subscriber = factory.subscriber_open().unwrap().dial(url).unwrap();
         let topic: Vec<u8> = vec![0];
         subscriber.subscribe(&topic);
         let mut msg = NngMsg::new().unwrap();
@@ -88,10 +86,9 @@ mod tests {
     fn thrift_works() {
         let url = "inproc://test2";
         let factory = runng::Latest::new();
-        let replier = factory.replier_open().unwrap();
-        let requester = factory.requester_open().unwrap();
-        replier.listen(url).unwrap();
-        requester.dial(url).unwrap();
+        let replier = factory.replier_open().unwrap()
+            .listen(url).unwrap();
+        let requester = factory.requester_open().unwrap().dial(url).unwrap();
 
         let mut channel = TNngChannel::new(requester.take()).unwrap();
         let (readable, writable) = channel.split().unwrap();

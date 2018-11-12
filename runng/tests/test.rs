@@ -25,10 +25,8 @@ fn it_works() {
     let url = get_url();
 
     let factory = Latest::new();
-    let req = factory.requester_open().unwrap();
-    let rep = factory.replier_open().unwrap();
-    rep.listen(&url).unwrap();
-    req.dial(&url).unwrap();
+    let rep = factory.replier_open().unwrap().listen(&url).unwrap();
+    let req = factory.requester_open().unwrap().dial(&url).unwrap();
     req.send(msg::NngMsg::new().unwrap());
     rep.recv().unwrap();
 }
@@ -38,12 +36,11 @@ fn aio() {
     let url = get_url();
 
     let factory = Latest::new();
-    let replier = factory.replier_open().unwrap();
-    replier.listen(&url).unwrap();
-    let mut rep_ctx = replier.create_async_context().unwrap();
+    let mut rep_ctx = factory.replier_open().unwrap()
+        .listen(&url).unwrap()
+        .create_async_context().unwrap();
 
-    let requester = factory.requester_open().unwrap();
-    requester.dial(&url).unwrap();
+    let requester = factory.requester_open().unwrap().dial(&url).unwrap();
     let mut req_ctx = requester.create_async_context().unwrap();
     let req_future = req_ctx.send(msg::NngMsg::new().unwrap());
     rep_ctx.receive().wait().unwrap().unwrap();
@@ -71,10 +68,9 @@ fn pubsub() {
     let url = get_url();
     let factory = Latest::new();
 
-    let publisher = factory.publisher_open().unwrap();
-    publisher.listen(&url).unwrap();
-    let subscriber = factory.subscriber_open().unwrap();
-    subscriber.dial(&url).unwrap();
+    let publisher = factory.publisher_open().unwrap()
+        .listen(&url).unwrap();
+    let subscriber = factory.subscriber_open().unwrap().dial(&url).unwrap();
 
     let num_msg_per_subscriber = 4;
 
@@ -108,10 +104,10 @@ fn pushpull() {
     let url = get_url();
     let factory = Latest::new();
 
-    let pusher = factory.pusher_open().unwrap();
-    pusher.listen(&url).unwrap();
-    let puller = factory.puller_open().unwrap();
-    puller.dial(&url).unwrap();
+    let pusher = factory.pusher_open().unwrap()
+        .listen(&url).unwrap();
+    let puller = factory.puller_open().unwrap()
+        .dial(&url).unwrap();
     let count = 4;
     let push_thread = thread::spawn(move || {
         let mut push_ctx = pusher.create_async_context().unwrap();
@@ -138,10 +134,10 @@ fn broker() {
 
     let factory = Latest::new();
 
-    let broker_pull = factory.puller_open().unwrap();
-    let broker_push = factory.publisher_open().unwrap();
-    broker_pull.listen(&url_broker_in).unwrap();
-    broker_push.listen(&url_broker_out).unwrap();
+    let broker_pull = factory.puller_open().unwrap()
+        .listen(&url_broker_in).unwrap();
+    let broker_push = factory.publisher_open().unwrap()
+        .listen(&url_broker_out).unwrap();
     
     thread::sleep(Duration::from_millis(50));
 
@@ -154,10 +150,10 @@ fn broker() {
         }
     });
 
-    let publisher = factory.pusher_open().unwrap();
-    publisher.dial(&url_broker_in).unwrap();
-    let subscriber = factory.subscriber_open().unwrap();
-    subscriber.dial(&url_broker_out).unwrap();
+    let publisher = factory.pusher_open().unwrap()
+        .dial(&url_broker_in).unwrap();
+    let subscriber = factory.subscriber_open().unwrap()
+        .dial(&url_broker_out).unwrap();
 
     thread::spawn(move || {
         let mut sub_ctx = subscriber.create_async_context().unwrap();
