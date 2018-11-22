@@ -2,5 +2,5 @@
 members = [
     "runng",
     "runng-sys",
-    "runng-thrift",
+    #"runng-thrift",
 ]
