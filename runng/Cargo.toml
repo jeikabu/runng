@@ -1,6 +1,6 @@
 [package]
 name = "runng"
-version = "0.1.1"
+version = "0.1.4"
 authors = ["Jake W <jeikabu@gmail.com>"]
 
 description = "High-level wrapper around nng (Nanomsg-Next-Generation) aka Nanomsg2"
@@ -14,7 +14,7 @@ travis-ci = { repository = "jeikabu/runng", branch = "master" }
 codecov = { repository = "jeikabu/runng", branch = "master", service = "github" }
 
 [dependencies]
-runng-sys = { path = "../runng-sys" }
+runng-sys = { version = "1.1.0", path = "../runng-sys" }
 futures = "0.1"
 byteorder = "1.2"
 

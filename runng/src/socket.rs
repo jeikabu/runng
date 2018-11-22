@@ -20,16 +20,34 @@ impl Drop for NngSocket {
         unsafe {
             println!("Socket close: {:?}", self.socket);
             let res = NngFail::from_i32(nng_close(self.socket));
-            if let Err(res) = res {
-                println!("nng_close {:?}", res);
-                panic!(res);
+            match res {
+                Ok(()) => {},
+                // Can't panic here.  Thrift's TIoChannel::split() clones the socket handle so we may get ECLOSED
+                Err(NngFail::Err(NngError::ECLOSED)) => {},
+                Err(res) => {
+                    println!("nng_close {:?}", res);
+                    panic!(res);
+                },
             }
         }
     }
 }
 
-pub trait Socket {
+impl Socket for NngSocket {
+    fn socket(&self) -> &NngSocket {
+        self
+    }
+    fn take(self) -> NngSocket {
+        self
+    }
+}
+
+impl SendMsg for NngSocket {}
+impl RecvMsg for NngSocket {}
+
+pub trait Socket: Sized {
     fn socket(&self) -> &NngSocket;
+    fn take(self) -> NngSocket;
     unsafe fn nng_socket(&self) -> nng_socket {
         self.socket().nng_socket()
     }
@@ -61,26 +79,21 @@ fn to_cstr(string: &str) -> (CString, *const i8) {
 }
 
 pub trait SendMsg: Socket {
-    fn send(&self) -> NngReturn {
+    fn send(&self, msg: msg::NngMsg) -> NngReturn {
         let mut req_msg: *mut nng_msg = std::ptr::null_mut();
         let res = unsafe {
-            let res = nng_msg_alloc(&mut req_msg, 0);
-            if res != 0 {
-                res
-            } else {
-                nng_sendmsg(self.nng_socket(), req_msg, 0)
-            }
+            nng_sendmsg(self.nng_socket(), msg.take(), 0)
         };
         NngFail::from_i32(res)
     }
 }
 
 pub trait RecvMsg: Socket {
-    fn recv(&self) -> NngResult<nng_msg> {
+    fn recv(&self) -> NngResult<msg::NngMsg> {
         unsafe {
             let mut recv_ptr: *mut nng_msg = std::ptr::null_mut();
             let res = nng_recvmsg(self.nng_socket(), &mut recv_ptr, 0);
-            NngFail::succeed_then(res, || *recv_ptr)
+            NngFail::succeed_then(res, || msg::NngMsg::new_msg(recv_ptr))
         }
     }
 }

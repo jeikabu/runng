@@ -29,7 +29,7 @@ fn it_works() {
     let rep = factory.replier_open().unwrap();
     rep.listen(&url).unwrap();
     req.dial(&url).unwrap();
-    req.send().unwrap();
+    req.send(msg::NngMsg::new().unwrap());
     rep.recv().unwrap();
 }
 
@@ -62,7 +62,7 @@ fn msg() {
     let data = vec![0, 1, 2, 3, 4, 5, 6, 7];
     let mut msg = builder.clean().append_slice(&data).build().unwrap();
     let mut nngmsg = msg::NngMsg::new().unwrap();
-    nngmsg.append(data.as_ptr() as *const ::std::os::raw::c_void, data.len()).unwrap();
+    nngmsg.append(data.as_ptr(), data.len()).unwrap();
     assert_eq!(nngmsg.body(), msg.body());
 }
 
