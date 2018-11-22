@@ -21,11 +21,11 @@ use std::{
         {Error, ErrorKind},
     }
 };
-// use thrift::transport::{
-//     TIoChannel,
-//     ReadHalf,
-//     WriteHalf,
-// };
+use thrift::transport::{
+    TIoChannel,
+    ReadHalf,
+    WriteHalf,
+};
 
 pub struct TNngChannel {
     message: NngMsg,
@@ -41,20 +41,6 @@ impl TNngChannel {
         })
     }
 
-    // FIXME: this should be in `impl TIoChannel`, but cannot construct Read/WriteHalf defined in thrift crate
-    pub fn split(self) -> thrift::Result<(ReadHalf<Self>, WriteHalf<Self>)>
-    where
-        Self: Sized,
-    {
-        let clone = unsafe {
-            ResultWrapper(TNngChannel::new(NngSocket::new(self.socket.nng_socket())))?
-        };
-        Ok((
-            ReadHalf { handle: self },
-            WriteHalf { handle: clone }
-        ))
-    }
-
     fn helper(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let size_of_buf = std::mem::size_of_val(buf);
         buf.copy_from_slice(&self.message.body()[..size_of_buf]);
@@ -64,9 +50,20 @@ impl TNngChannel {
     }
 }
 
-// impl TIoChannel for TNngChannel {
-    
-// }
+impl TIoChannel for TNngChannel {
+    fn split(self) -> thrift::Result<(ReadHalf<Self>, WriteHalf<Self>)>
+    where
+        Self: Sized,
+    {
+        let clone = unsafe {
+            ResultWrapper(TNngChannel::new(NngSocket::new(self.socket.nng_socket())))?
+        };
+        Ok((
+            ReadHalf::new(self),
+            WriteHalf::new(clone)
+        ))
+    }
+}
 
 impl Read for TNngChannel {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {

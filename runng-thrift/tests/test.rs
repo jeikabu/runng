@@ -9,7 +9,7 @@ use runng_thrift::*;
 mod test_service;
 
 #[cfg(test)]
-mod tests {
+mod thrift_tests {
     use super::*;
     use runng::{
         Dial,
@@ -50,9 +50,11 @@ mod tests {
         thread,
         sync::Arc,
     };
-    use thrift::server::{
-        TProcessor,
-    };
+    use thrift::{
+        server::{TProcessor},
+        transport::{TIoChannel},
+    }
+    ;
     #[derive(Debug)]
     pub struct TServer<PRC>
     where
@@ -117,13 +119,11 @@ mod tests {
         client.test().unwrap();
     }
     
-    #[test]
+    //#[test]
     fn thrift_works() {
         let url = "inproc://test3";
         let serviceName = "blah";
         let factory = runng::Latest::new();
-
-        
 
         let replier = factory.replier_open().unwrap();
         replier.listen(url).unwrap();
