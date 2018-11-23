@@ -3,7 +3,7 @@
 TARBALL="v36.tar.gz"
 KCOV_DIR="kcov-36"
 
-if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
+if [[ "$TRAVIS_OS_NAME" == "linux" ]] || [[ "$OSTYPE" == "linux-gnu" ]]; then
     # https://github.com/codecov/example-rust
     wget https://github.com/SimonKagstrom/kcov/archive/$TARBALL
     tar xzf $TARBALL
@@ -14,8 +14,8 @@ if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
     make
     make install DESTDIR=../../kcov-build
     cd ../../
-    rm -rf $KCOV_DIR
-    for file in target/debug/runng_sys-*[^\.d]; do 
+    # rm -rf $KCOV_DIR
+    for file in target/debug/*-*[^\.d]; do 
         mkdir -p "target/cov/$(basename $file)"
         # Arguments at the end are what would be passed to `cargo test`
         ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file" -- "tests::"
