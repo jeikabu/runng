@@ -1,4 +1,4 @@
-use aio::{NngAio, AioCallback, AioCallbackArg};
+use aio::{NngAio, AioCallbackArg};
 use futures::{sync::oneshot};
 use msg::NngMsg;
 use runng_sys::*;

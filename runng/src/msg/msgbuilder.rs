@@ -2,20 +2,15 @@ extern crate byteorder;
 
 use self::byteorder::{BigEndian, WriteBytesExt};
 use msg::msg::NngMsg;
-use std::{
-    os::raw::c_void,
-};
 use super::*;
 
+#[derive(Default)]
 pub struct MsgBuilder {
     header: Vec<u8>,
     body: Vec<u8>,
 }
 
 impl MsgBuilder {
-    pub fn new() -> MsgBuilder {
-        MsgBuilder { header: Vec::new(), body: Vec::new() }
-    }
     pub fn append_u32(&mut self, data: u32) -> &mut Self {
         let mut bytes = [0u8; std::mem::size_of::<u32>()];
         bytes.as_mut().write_u32::<BigEndian>(data).unwrap();
