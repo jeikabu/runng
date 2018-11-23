@@ -144,7 +144,7 @@ fn broker() {
     thread::spawn(move || {
         let mut broker_pull_ctx = broker_pull.create_async_context().unwrap();
         let mut broker_push_ctx = broker_push.create_async_context().unwrap();
-        loop {
+        for _ in 0..10 {
             let msg = broker_pull_ctx.receive().wait().unwrap().unwrap().unwrap();
             broker_push_ctx.send(msg).wait().unwrap().unwrap();
         }
@@ -160,7 +160,7 @@ fn broker() {
 
         let topic: Vec<u8> = vec![0; 4];
         sub_ctx.subscribe(topic.as_slice()).unwrap();
-        loop {
+        for _ in 0..10 {
             let msg = sub_ctx.receive().wait().unwrap().unwrap().unwrap();
         }
     });
@@ -169,7 +169,7 @@ fn broker() {
 
     thread::spawn(move || {
         let mut pub_ctx = publisher.create_async_context().unwrap();
-        loop {
+        for _ in 0..10 {
             let mut msg = msg::NngMsg::new().unwrap();
             msg.append_u32(0).unwrap();
             pub_ctx.send(msg).wait().unwrap().unwrap();

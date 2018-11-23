@@ -51,10 +51,10 @@ be restricted to IPv4 using the scheme `tcp4://`.
 NOTE: Specifying `tcp6://` may not prevent IPv4 hosts from being used with
 IPv4-in-IPv6 addresses, particularly when using a wildcard hostname with
 listeners.
-The details of varies across operating systems.
+The details of this varies across operating systems.
 
-NOTE: Both `tcp6://` and `tcp4://` are _nng_ extensions, and will not
-be understood by other implementations such as _libnanomsg_.
+NOTE: Both `tcp6://` and `tcp4://` are _nng_ extensions, and might not
+be understood by other implementations.
 
 TIP: We recommend using either numeric IP addresses, or names that are
 specific to either IPv4 or IPv6 to prevent confusion and surprises.
@@ -90,20 +90,17 @@ the actual structure is either of type
 === Transport Options
 
 ((`NNG_OPT_TCP_KEEPALIVE`))::
-
-This option is used to configure TCP keep-alives.
-The value is of type `bool`, and defaults to `false`.
+(`bool`) Enable TCP keep-alives, defaults to `false`.
 
 ((`NNG_OPT_TCP_NODELAY`))::
-
-This option is used to configure Nagle's algorithm.
+(`bool`) Disable Nagle's algorithm.
 When enabled (`false`), the underlying TCP stream will attempt
 to buffer and coalesce messages before sending them on, waiting
 a short interval to improve buffering and reduce the overhead
 caused by sending too-small messages.
 This comes at a cost to latency, and is not recommended with modern
 high speed networks.
-The value is of type `bool` and defaults to `true`.
+Defaults to `true`.
 
 == SEE ALSO
 
