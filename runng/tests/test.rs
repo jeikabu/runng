@@ -6,7 +6,6 @@ use futures::future::Future;
 use runng::protocol::*;
 use runng::socket::*;
 use runng::*;
-use runng_sys::nng_msg;
 use std::{thread, time::Duration};
 
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -24,7 +23,7 @@ fn it_works() -> NngReturn {
     let factory = Latest::new();
     let rep = factory.replier_open()?.listen(&url)?;
     let req = factory.requester_open()?.dial(&url)?;
-    req.send(msg::NngMsg::new()?);
+    req.send(msg::NngMsg::new()?)?;
     rep.recv()?;
 
     Ok(())
@@ -54,7 +53,7 @@ fn aio() -> NngReturn {
 
 #[test]
 fn msg() -> NngReturn {
-    let mut builder = msg::MsgBuilder::new();
+    let mut builder = msg::MsgBuilder::default();
     let value: u32 = 0x01234567;
     builder.append_u32(value);
     let mut msg = builder.build()?;
@@ -92,7 +91,7 @@ fn pubsub() -> NngReturn {
         let mut pub_ctx = publisher.create_async_context()?;
 
         // Beginning of message body contains topic
-        let msg = msg::MsgBuilder::new()
+        let msg = msg::MsgBuilder::default()
             .append_u32(0)
             .append_u32(1)
             .build()?;
@@ -105,8 +104,8 @@ fn pubsub() -> NngReturn {
         Ok(())
     });
 
-    sub_thread.join().unwrap();
-    pub_thread.join().unwrap();
+    sub_thread.join().unwrap()?;
+    pub_thread.join().unwrap()?;
 
     Ok(())
 }
@@ -138,8 +137,8 @@ fn pushpull() -> NngReturn {
         }
         Ok(())
     });
-    push_thread.join().unwrap();
-    pull_thread.join().unwrap();
+    push_thread.join().unwrap()?;
+    pull_thread.join().unwrap()?;
 
     Ok(())
 }

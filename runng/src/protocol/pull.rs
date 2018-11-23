@@ -1,8 +1,8 @@
-use aio::{NngAio, AioCallback, AioCallbackArg};
+use aio::{NngAio, AioCallbackArg};
 use futures::{sync::oneshot};
 use msg::NngMsg;
 use runng_sys::*;
-use std::{rc::Rc, ffi::CString};
+use std::{rc::Rc};
 use super::*;
 
 pub struct Pull0 {

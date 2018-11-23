@@ -1,17 +1,17 @@
 [package]
 name = "runng-sys"
-version = "1.1.0"
+version = "1.1.0+1"
 authors = ["Jake W <jeikabu@gmail.com>"]
 
 description = "Bindings to nng (Nanomsg-Next-Generation) aka Nanomsg2"
-keywords = ["nng", "nanomsg"]
+keywords = ["nng", "nanomsg", "zeromq"]
+categories = ["network-programming", "external-ffi-bindings", "os"]
 license = "MIT"
 repository = "https://github.com/jeikabu/runng"
 
 [badges]
 appveyor = { repository = "jake-ruyi/runng", branch = "master", service = "github" }
 travis-ci = { repository = "jeikabu/runng", branch = "master" }
-codecov = { repository = "jeikabu/runng", branch = "master", service = "github" }
 
 [dependencies]
 
