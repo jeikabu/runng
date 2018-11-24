@@ -19,7 +19,7 @@ if [[ "$TRAVIS_OS_NAME" == "linux" ]] || [[ "$OSTYPE" == "linux-gnu" ]]; then
         echo "Found $(basename $file)..."
         mkdir -p "target/cov/$(basename $file)"
         # Arguments at the end are what would be passed to `cargo test`
-        $HOME/kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file" -- "tests::"
+        RUST_BACKTRACE=1 $HOME/kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file" -- "tests::"
     done
     # Upload reports in current directory
     # https://github.com/SimonKagstrom/kcov/blob/master/doc/codecov.md

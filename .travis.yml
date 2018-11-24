@@ -32,14 +32,14 @@ before_install:
   # Using `source` so can update PATH environment variable
   - source ./scripts/install.sh
 
-before_script:
-  - rustup component add clippy-preview
+# before_script:
+#   - rustup component add clippy-preview
 
 script:
   # Clippy output for bindgen.rs is massive and causes travis job to fail...
   #- cargo clippy
   - cargo build
-  - cargo test "tests::"
+  - RUST_BACKTRACE=1 cargo test "tests::"
 
 after_success:
   - ./scripts/after_success.sh
