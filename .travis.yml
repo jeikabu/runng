@@ -39,7 +39,7 @@ script:
   # Clippy output for bindgen.rs is massive and causes travis job to fail...
   #- cargo clippy
   - cargo build
-  - cargo test -- "tests::"
+  - cargo test "tests::"
 
 after_success:
   - ./scripts/after_success.sh
