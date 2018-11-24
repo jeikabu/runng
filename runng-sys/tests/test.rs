@@ -1,5 +1,8 @@
 extern crate runng_sys;
 
+#[cfg(test)]
+mod tests {
+
 use runng_sys::*;
 use std::ffi::CString;
 
@@ -41,4 +44,6 @@ fn it_works() {
         nng_close(rep_socket);
     }
     
+}
+
 }

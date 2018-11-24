@@ -2,6 +2,9 @@ extern crate futures;
 extern crate runng;
 extern crate runng_sys;
 
+#[cfg(test)]
+mod tests {
+
 use futures::future::Future;
 use runng::protocol::*;
 use runng::socket::*;
@@ -198,4 +201,6 @@ fn broker() -> NngReturn {
     thread::sleep(Duration::from_secs(3));
 
     Ok(())
+}
+
 }
