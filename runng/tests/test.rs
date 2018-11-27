@@ -5,11 +5,22 @@ extern crate runng_sys;
 #[cfg(test)]
 mod tests {
 
-use futures::future::Future;
+use futures::{
+    Async,
+    future,
+    future::{
+        Future,
+    },
+    Stream,
+};
 use runng::protocol::*;
 use runng::socket::*;
 use runng::*;
-use std::{thread, time::Duration};
+use std::{
+    sync::Arc,
+    thread,
+    time::Duration
+};
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -45,10 +56,12 @@ fn aio() -> NngReturn {
     let requester = factory.requester_open()?.dial(&url)?;
     let mut req_ctx = requester.create_async_context()?;
     let req_future = req_ctx.send(msg::NngMsg::new()?);
-    rep_ctx.receive().wait().unwrap()?;
-    rep_ctx.reply(msg::NngMsg::new()?)
-        .wait()
-        .unwrap()?;
+    rep_ctx.receive()
+        .take(1).for_each(|request|{
+            let msg = msg::NngMsg::new().unwrap();
+            rep_ctx.reply(msg).wait().unwrap();
+            Ok(())
+        }).wait();
     req_future.wait().unwrap()?;
 
     Ok(())
@@ -85,9 +98,21 @@ fn pubsub() -> NngReturn {
         let mut sub_ctx = subscriber.create_async_context()?;
         let topic: Vec<u8> = vec![0; 4];
         sub_ctx.subscribe(topic.as_slice())?;
-        for _ in 0..num_msg_per_subscriber {
-            sub_ctx.receive().wait().unwrap().unwrap()?;
-        }
+
+        sub_ctx.receive()
+            // Process until receive stop message
+            .take_while(|res| {
+                const SIZE_OF_TOPIC: usize = std::mem::size_of::<u32>();
+                match res {
+                    Ok(msg) => future::ok(msg.len() - SIZE_OF_TOPIC > 0),
+                    Err(_) => future::ok(false),
+                }
+            })
+            // Increment count of received messages
+            .for_each(|_|{
+                //thread_count.fetch_add(1, Ordering::Relaxed);
+                Ok(())
+            }).wait().unwrap();
         Ok(())
     });
     let pub_thread = thread::spawn(move || -> NngReturn {
@@ -95,7 +120,7 @@ fn pubsub() -> NngReturn {
 
         // Beginning of message body contains topic
         let msg = msg::MsgBuilder::default()
-            .append_u32(0)
+            .append_u32(0) // topic
             .append_u32(1)
             .build()?;
 
@@ -104,6 +129,12 @@ fn pubsub() -> NngReturn {
             pub_ctx.send(msg).wait().unwrap()?;
             thread::sleep(Duration::from_millis(25));
         }
+
+        // Send stop message
+        let msg = msg::MsgBuilder::default()
+            .append_u32(0) // topic
+            .build()?;
+        pub_ctx.send(msg).wait().unwrap()?;
         Ok(())
     });
 
@@ -121,27 +152,54 @@ fn pushpull() -> NngReturn {
     let pusher = factory.pusher_open()?.listen(&url)?;
     let puller = factory.puller_open()?.dial(&url)?;
     let count = 4;
+
+    // Pusher
     let push_thread = thread::spawn(move || -> NngReturn {
         let mut push_ctx = pusher.create_async_context()?;
-        for _ in 0..count {
+        // Send messages
+        for i in 0..count {
+            let msg = msg::MsgBuilder::default()
+                .append_u32(i).build()?;
             push_ctx
-                .send(msg::NngMsg::new()?)
+                .send(msg)
                 .wait()
                 .unwrap()?;
         }
+        // Send a stop message
+        let stop_message = msg::NngMsg::new().unwrap();
+        push_ctx
+            .send(stop_message)
+            .wait()
+            .unwrap()?;
         Ok(())
     });
-    let recv_count = AtomicUsize::new(0);
+
+    // Puller
+    let recv_count = Arc::new(AtomicUsize::new(0));
+    let thread_count = recv_count.clone();
     let pull_thread = thread::spawn(move || -> NngReturn {
         let mut pull_ctx = puller.create_async_context()?;
-        for _ in 0..count {
-            pull_ctx.receive().wait().unwrap().unwrap()?;
-            recv_count.fetch_add(1, Ordering::Relaxed);
-        }
+        pull_ctx.receive()
+            // Process until receive stop message
+            .take_while(|res| {
+                match res {
+                    Ok(msg) => future::ok(msg.len() > 0),
+                    Err(_) => future::ok(false),
+                }
+            })
+            // Increment count of received messages
+            .for_each(|_|{
+                thread_count.fetch_add(1, Ordering::Relaxed);
+                Ok(())
+            }).wait().unwrap();
         Ok(())
     });
-    push_thread.join().unwrap()?;
-    pull_thread.join().unwrap()?;
+
+    push_thread.join().unwrap();
+    pull_thread.join().unwrap();
+
+    // Received number of messages we sent
+    assert_eq!(recv_count.load(Ordering::Relaxed), count as usize);
 
     Ok(())
 }
@@ -159,13 +217,17 @@ fn broker() -> NngReturn {
 
     thread::sleep(Duration::from_millis(50));
 
+    // Broker
     thread::spawn(move || -> NngReturn {
         let mut broker_pull_ctx = broker_pull.create_async_context()?;
         let mut broker_push_ctx = broker_push.create_async_context()?;
-        for _ in 0..10 {
-            let msg = broker_pull_ctx.receive().wait().unwrap().unwrap()?;
-            broker_push_ctx.send(msg).wait().unwrap()?;
-        }
+        broker_pull_ctx.receive().for_each(|msg|{
+            if let Ok(msg) = msg {
+                broker_push_ctx.send(msg);
+            }
+            Ok(())
+        }).wait().unwrap();
+        
         Ok(())
     });
 
@@ -174,27 +236,45 @@ fn broker() -> NngReturn {
         .subscriber_open()?
         .dial(&url_broker_out)?;
 
+    // Subscriber
     thread::spawn(move || -> NngReturn {
         let mut sub_ctx = subscriber.create_async_context()?;
 
         let topic: Vec<u8> = vec![0; 4];
         sub_ctx.subscribe(topic.as_slice())?;
-        for _ in 0..10 {
-            let msg = sub_ctx.receive().wait().unwrap().unwrap()?;
-        }
+        sub_ctx.receive()
+            // Process until receive stop message
+            .take_while(|res| {
+                const SIZE_OF_TOPIC: usize = std::mem::size_of::<u32>();
+                match res {
+                    Ok(msg) => future::ok(msg.len() - SIZE_OF_TOPIC > 0),
+                    Err(_) => future::ok(false),
+                }
+            })
+            .for_each(|_|{
+                //thread_count.fetch_add(1, Ordering::Relaxed);
+                Ok(())
+            }).wait().unwrap();
         Ok(())
     });
 
     thread::sleep(Duration::from_millis(50));
 
+    // Publisher
     thread::spawn(move || -> NngReturn {
         let mut pub_ctx = publisher.create_async_context()?;
         for _ in 0..10 {
             let mut msg = msg::NngMsg::new()?;
-            msg.append_u32(0)?;
+            msg.append_u32(0)?; // topic
+            msg.append_u32(1)?;
             pub_ctx.send(msg).wait().unwrap()?;
             thread::sleep(Duration::from_millis(200));
         }
+        // Send stop message
+        let mut msg = msg::NngMsg::new()?;
+        msg.append_u32(0)?; // topic
+        pub_ctx.send(msg).wait().unwrap()?;
+
         Ok(())
     });
 

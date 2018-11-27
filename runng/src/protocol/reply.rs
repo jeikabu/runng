@@ -1,6 +1,10 @@
 use aio::{NngAio, AioCallbackArg};
 use ctx::NngCtx;
-use futures::{sync::oneshot};
+use futures::{
+    Sink,
+    sync::oneshot,
+    sync::mpsc,
+    };
 use msg::NngMsg;
 use runng_sys::*;
 use std::{rc::Rc};
@@ -26,17 +30,15 @@ enum ReplyState {
 }
 
 pub trait AsyncReply {
-    fn receive(&mut self) -> MsgFuture;
-    fn reply(&mut self, NngMsg) -> NngReturnFuture;
+    fn receive(&mut self) -> mpsc::Receiver<NngResult<NngMsg>>;
+    fn reply(&mut self, NngMsg) -> oneshot::Receiver<NngReturn>;
 }
 
 pub struct AsyncReplyContext {
     ctx: Option<NngCtx>,
     state: ReplyState,
-    request_send: Option<MsgPromise>,
-    request_recv: Option<MsgFuture>,
-    reply_send: Option<NngReturnPromise>,
-    reply_recv: Option<NngReturnFuture>,
+    request_sender: Option<mpsc::Sender<NngResult<NngMsg>>>,
+    reply_sender: Option<oneshot::Sender<NngReturn>>,
 }
 
 impl AsyncReplyContext {
@@ -44,12 +46,6 @@ impl AsyncReplyContext {
         let aionng = self.ctx.as_ref().unwrap().aio();
         let ctxnng = self.ctx.as_ref().unwrap().ctx();
         self.state = ReplyState::Receiving;
-        let (request_send, request_recv) = oneshot::channel::<MsgFutureType>();
-        let (reply_send, reply_recv) = oneshot::channel::<NngReturn>();
-        self.request_send = Some(request_send);
-        self.request_recv = Some(request_recv);
-        self.reply_send = Some(reply_send);
-        self.reply_recv = Some(reply_recv);
         unsafe {
             nng_ctx_recv(ctxnng, aionng);
         }
@@ -61,10 +57,8 @@ impl Context for AsyncReplyContext {
         let ctx = AsyncReplyContext {
             ctx: None,
             state: ReplyState::Receiving,
-            request_send: None, 
-            request_recv: None,
-            reply_send: None,
-            reply_recv: None,
+            request_sender: None,
+            reply_sender: None,
         };
         Box::new(ctx)
     }
@@ -77,18 +71,22 @@ impl Context for AsyncReplyContext {
 }
 
 impl AsyncReply for AsyncReplyContext {
-    fn receive(&mut self) -> MsgFuture {
+    fn receive(&mut self) -> mpsc::Receiver<NngResult<NngMsg>> {
         if self.state != ReplyState::Receiving {
             panic!();
         }
-        self.request_recv.take().unwrap()
+        let (sender, receiver) = mpsc::channel(1024);
+        self.request_sender = Some(sender);
+        receiver
     }
 
-    fn reply(&mut self, msg: NngMsg) -> NngReturnFuture {
+    fn reply(&mut self, msg: NngMsg) -> oneshot::Receiver<NngReturn> {
         if self.state != ReplyState::Wait {
             panic!();
         }
         
+        let (sender, receiver) = oneshot::channel();
+        self.reply_sender = Some(sender);
         unsafe {
             let aio = self.ctx.as_ref().unwrap().aio();
             let ctx = self.ctx.as_ref().unwrap().ctx();
@@ -98,7 +96,7 @@ impl AsyncReply for AsyncReplyContext {
             nng_aio_set_msg(aio, msg.take());
             nng_ctx_send(ctx, aio);
         }
-        self.reply_recv.take().unwrap()
+        receiver
     }
 }
 
@@ -142,15 +140,31 @@ extern fn reply_callback(arg : AioCallbackArg) {
                             },
                         }
 
-                        let sender = ctx.request_send.take().unwrap();
-                        sender.send(Err(res)).unwrap();
+                        if let Some(ref mut sender) = ctx.request_sender {
+                            let res = sender.try_send(Err(res));
+                            if let Err(err) = res {
+                                if err.is_disconnected() {
+                                    sender.close();
+                                } else {
+                                    println!("Send failed: {}", err);
+                                }
+                            }
+                        }
                     },
                     Ok(()) => {
                         let msg = NngMsg::new_msg(nng_aio_get_msg(aionng));
                         // Reset state before signaling completion
                         ctx.state = ReplyState::Wait;
-                        let sender = ctx.request_send.take().unwrap();
-                        sender.send(Ok(msg)).unwrap();
+                        if let Some(ref mut sender) = ctx.request_sender {
+                            let res = sender.try_send(Ok(msg));
+                            if let Err(err) = res {
+                                if err.is_disconnected() {
+                                    // Not an error?
+                                } else {
+                                    println!("Receive failed: {}", err);
+                                }
+                            }
+                        }
                     }
                 }
             },
@@ -162,7 +176,7 @@ extern fn reply_callback(arg : AioCallbackArg) {
                     let _ = NngMsg::new_msg(nng_aio_get_msg(aionng));
                 }
                 
-                let sender = ctx.reply_send.take().unwrap();
+                let sender = ctx.reply_sender.take().unwrap();
                 // Reset state and start receiving again before
                 // signaling completion to avoid race condition where we say we're done, but 
                 // not yet ready for receive() to be called.
