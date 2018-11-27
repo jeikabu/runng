@@ -9,7 +9,7 @@ use runng_thrift::*;
 mod test_service;
 
 #[cfg(test)]
-mod thrift_tests {
+mod tests {
     use super::*;
     use runng::{
         Dial,

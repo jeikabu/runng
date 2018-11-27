@@ -17,4 +17,6 @@
 #include "nng/src/transport/inproc/inproc.h"
 #include "nng/src/transport/ipc/ipc.h"
 #include "nng/src/transport/tcp/tcp.h"
+#include "nng/src/transport/tls/tls.h"
 #include "nng/src/transport/ws/websocket.h"
+#include "nng/src/transport/zerotier/zerotier.h"
