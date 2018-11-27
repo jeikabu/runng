@@ -8,18 +8,10 @@ pub use self::pull::*;
 pub use self::reply::*;
 pub use self::request::*;
 
-use futures::{sync::oneshot};
 use msg::NngMsg;
 use runng_sys::*;
 use std::{rc::Rc};
 use super::*;
-
-type MsgFutureType = NngResult<NngMsg>;
-type MsgPromise = oneshot::Sender<MsgFutureType>;
-type MsgFuture = oneshot::Receiver<MsgFutureType>;
-type NngReturnPromise = oneshot::Sender<NngReturn>;
-type NngReturnFuture = oneshot::Receiver<NngReturn>;
-
 
 fn nng_open<T, O, S>(open_func: O, socket_create_func: S) -> NngResult<T>
     where O: Fn(&mut nng_socket) -> i32,

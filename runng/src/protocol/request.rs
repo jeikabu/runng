@@ -1,6 +1,12 @@
 use aio::{NngAio, AioCallbackArg};
 use ctx::NngCtx;
-use futures::{sync::oneshot};
+use futures::{
+    sync::oneshot::{
+        channel,
+        Receiver,
+        Sender,
+    }
+};
 use msg::NngMsg;
 use runng_sys::*;
 use std::{rc::Rc};
@@ -26,13 +32,13 @@ enum RequestState {
 }
 
 pub trait AsyncRequest {
-    fn send(&mut self, msg: NngMsg) -> MsgFuture;
+    fn send(&mut self, msg: NngMsg) -> Receiver<NngResult<NngMsg>>;
 }
 
 pub struct AsyncRequestContext {
     ctx: Option<NngCtx>,
     state: RequestState,
-    sender: Option<MsgPromise>
+    sender: Option<Sender<NngResult<NngMsg>>>
 }
 
 impl Context for AsyncRequestContext {
@@ -52,11 +58,11 @@ impl Context for AsyncRequestContext {
 }
 
 impl AsyncRequest for AsyncRequestContext {
-    fn send(&mut self, msg: NngMsg) -> MsgFuture {
+    fn send(&mut self, msg: NngMsg) -> Receiver<NngResult<NngMsg>> {
         if self.state != RequestState::Ready {
             panic!();
         }
-        let (sender, receiver) = oneshot::channel::<MsgFutureType>();
+        let (sender, receiver) = channel::<NngResult<NngMsg>>();
         self.sender = Some(sender);
         unsafe {
             let aio = self.ctx.as_ref().unwrap().aio();

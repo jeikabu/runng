@@ -1,5 +1,11 @@
 use aio::{NngAio, AioCallbackArg};
-use futures::{sync::oneshot};
+use futures::{
+    sync::oneshot::{
+        channel,
+        Receiver,
+        Sender,
+    }
+};
 use msg::NngMsg;
 use runng_sys::*;
 use std::{rc::Rc};
@@ -24,13 +30,13 @@ enum PublishState {
 }
 
 pub trait AsyncPublish {
-    fn send(&mut self, msg: NngMsg) -> NngReturnFuture;
+    fn send(&mut self, msg: NngMsg) -> Receiver<NngReturn>;
 }
 
 pub struct AsyncPublishContext {
     aio: Option<Rc<NngAio>>,
     state: PublishState,
-    sender: Option<NngReturnPromise>
+    sender: Option<Sender<NngReturn>>
 }
 
 impl Context for AsyncPublishContext {
@@ -49,11 +55,11 @@ impl Context for AsyncPublishContext {
 }
 
 impl AsyncPublish for AsyncPublishContext {
-    fn send(&mut self, msg: NngMsg) -> NngReturnFuture {
+    fn send(&mut self, msg: NngMsg) -> Receiver<NngReturn> {
         if self.state != PublishState::Ready {
             panic!();
         }
-        let (sender, receiver) = oneshot::channel::<NngReturn>();
+        let (sender, receiver) = channel::<NngReturn>();
         self.sender = Some(sender);
         unsafe {
             if let Some(ref aio) = self.aio {
@@ -106,7 +112,10 @@ extern fn publish_callback(arg : AioCallbackArg) {
                     }
                     // Reset state before signaling completion
                     ctx.state = PublishState::Ready;
-                    ctx.sender.take().unwrap().send(res).unwrap();
+                    let res = ctx.sender.take().unwrap().send(res);
+                    if let Err(_) = res {
+                        // Unable to send result.  Receiver probably went away.  Not necessarily a problem.
+                    }
                 } else {
                     panic!();
                 }
