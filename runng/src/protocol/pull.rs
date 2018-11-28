@@ -1,5 +1,12 @@
 use aio::{NngAio, AioCallbackArg};
-use futures::{sync::oneshot};
+use futures::{
+    Sink,
+    sync::mpsc::{
+        channel,
+        Receiver,
+        Sender,
+    }
+    };
 use msg::NngMsg;
 use runng_sys::*;
 use std::{rc::Rc};
@@ -25,22 +32,18 @@ enum PullState {
 }
 
 pub trait AsyncPull {
-    fn receive(&mut self) -> Option<MsgFuture>;
+    fn receive(&mut self) -> Receiver<NngResult<NngMsg>>;
 }
 
 pub struct AsyncPullContext {
     aio: Option<Rc<NngAio>>,
     state: PullState,
-    promise: Option<MsgPromise>,
-    future: Option<MsgFuture>,
+    sender: Option<Sender<NngResult<NngMsg>>>,
 }
 
 impl AsyncPullContext {
     fn start_receive(&mut self) {
         self.state = PullState::Receiving;
-        let (promise, future) = oneshot::channel::<MsgFutureType>();
-        self.promise = Some(promise);
-        self.future = Some(future);
         if let Some(ref mut aio) = self.aio {
             unsafe {
                 nng_recv_aio(aio.nng_socket(), aio.aio());
@@ -54,21 +57,22 @@ impl Context for AsyncPullContext {
         let ctx = Self {
             aio: None,
             state: PullState::Ready,
-            promise: None,
-            future: None,
+            sender: None,
         };
         Box::new(ctx)
     }
     fn init(&mut self, aio: Rc<NngAio>) -> NngReturn {
         self.aio = Some(aio);
-        self.start_receive();
         Ok(())
     }
 }
 
 impl AsyncPull for AsyncPullContext {
-    fn receive(&mut self) -> Option<MsgFuture> {
-        self.future.take()
+    fn receive(&mut self) -> Receiver<NngResult<NngMsg>> {
+        let (sender, receiver) = channel::<NngResult<NngMsg>>(1024);
+        self.sender = Some(sender);
+        self.start_receive();
+        receiver
     }
 }
 
@@ -114,16 +118,32 @@ extern fn pull_callback(arg : AioCallbackArg) {
                                     ctx.start_receive();
                                 },
                             }
-                            let promise = ctx.promise.take().unwrap();
-                            promise.send(Err(res)).unwrap();
+                            if let Some(ref mut sender) = ctx.sender {
+                                let res = sender.try_send(Err(res));
+                                if let Err(err) = res {
+                                    if err.is_disconnected() {
+                                        sender.close();
+                                    } else {
+                                        println!("Send failed: {}", err);
+                                    }
+                                }
+                            }
                         },
                         Ok(()) => {
                             let msg = NngMsg::new_msg(nng_aio_get_msg(aio));
-                            let promise = ctx.promise.take().unwrap();
                             // Make sure to reset state before signaling completion.  Otherwise
                             // have race-condition where receiver can receive None promise
                             ctx.start_receive();
-                            promise.send(Ok(msg)).unwrap();
+                            if let Some(ref mut sender) = ctx.sender {
+                                let res = sender.try_send(Ok(msg));
+                                if let Err(err) = res {
+                                    if err.is_disconnected() {
+                                        sender.close();
+                                    } else {
+                                        println!("Send failed: {}", err);
+                                    }
+                                }
+                            }
                         }
                     }
                 } else {
@@ -203,8 +223,11 @@ impl Context for AsyncSubscribeContext {
 }
 
 impl AsyncPull for AsyncSubscribeContext {
-    fn receive(&mut self) -> Option<MsgFuture> {
-        self.ctx.future.take()
+    fn receive(&mut self) -> Receiver<NngResult<NngMsg>> {
+        let (sender, receiver) = channel::<NngResult<NngMsg>>(1024);
+        self.ctx.sender = Some(sender);
+        self.ctx.start_receive();
+        receiver
     }
 }
 
