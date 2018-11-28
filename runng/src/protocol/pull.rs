@@ -36,7 +36,7 @@ pub trait AsyncPull {
 }
 
 pub struct AsyncPullContext {
-    aio: Option<Rc<NngAio>>,
+    aio: NngAio,
     state: PullState,
     sender: Option<Sender<NngResult<NngMsg>>>,
 }
@@ -44,26 +44,9 @@ pub struct AsyncPullContext {
 impl AsyncPullContext {
     fn start_receive(&mut self) {
         self.state = PullState::Receiving;
-        if let Some(ref mut aio) = self.aio {
-            unsafe {
-                nng_recv_aio(aio.nng_socket(), aio.aio());
-            }
+        unsafe {
+            nng_recv_aio(self.aio.nng_socket(), self.aio.nng_aio());
         }
-    }
-}
-
-impl Context for AsyncPullContext {
-    fn new() -> Box<Self> {
-        let ctx = Self {
-            aio: None,
-            state: PullState::Ready,
-            sender: None,
-        };
-        Box::new(ctx)
-    }
-    fn init(&mut self, aio: Rc<NngAio>) -> NngReturn {
-        self.aio = Some(aio);
-        Ok(())
     }
 }
 
@@ -92,7 +75,22 @@ impl RecvMsg for Pull0 {}
 impl AsyncSocket for Pull0 {
     type ContextType = AsyncPullContext;
     fn create_async_context(self) -> NngResult<Box<Self::ContextType>> {
-        create_async_context(self.socket, pull_callback)
+        let aio = NngAio::new(self.socket);
+        let ctx = Self::ContextType {
+            aio,
+            state: PullState::Ready,
+            sender: None,
+        };
+        
+        let mut ctx = Box::new(ctx);
+        // This mess is needed to convert Box<_> to c_void
+        let arg = ctx.as_mut() as *mut _ as AioCallbackArg;
+        let res = ctx.as_mut().aio.init(pull_callback, arg);
+        if let Err(err) = res {
+            Err(err)
+        } else {
+            Ok(ctx)
+        }
     }
 }
 
@@ -104,50 +102,46 @@ extern fn pull_callback(arg : AioCallbackArg) {
         match ctx.state {
             PullState::Ready => panic!(),
             PullState::Receiving => {
-                let aio = ctx.aio.as_ref().map(|aio| aio.aio());
-                if let Some(aio) = aio {
-                    let res = NngFail::from_i32(nng_aio_result(aio));
-                    match res {
-                        Err(res) => {
-                            match res {
-                                NngFail::Err(NngError::ECLOSED) => {
-                                    debug!("Closed");
-                                },
-                                _ => {
-                                    trace!("Reply.Receive: {:?}", res);
-                                    ctx.start_receive();
-                                },
-                            }
-                            if let Some(ref mut sender) = ctx.sender {
-                                let res = sender.try_send(Err(res));
-                                if let Err(err) = res {
-                                    if err.is_disconnected() {
-                                        sender.close();
-                                    } else {
-                                        debug!("Send failed: {}", err);
-                                    }
+                let aio = ctx.aio.nng_aio();
+                let res = NngFail::from_i32(nng_aio_result(aio));
+                match res {
+                    Err(res) => {
+                        match res {
+                            NngFail::Err(NngError::ECLOSED) => {
+                                debug!("Closed");
+                            },
+                            _ => {
+                                trace!("Reply.Receive: {:?}", res);
+                                ctx.start_receive();
+                            },
+                        }
+                        if let Some(ref mut sender) = ctx.sender {
+                            let res = sender.try_send(Err(res));
+                            if let Err(err) = res {
+                                if err.is_disconnected() {
+                                    sender.close();
+                                } else {
+                                    debug!("Send failed: {}", err);
                                 }
                             }
-                        },
-                        Ok(()) => {
-                            let msg = NngMsg::new_msg(nng_aio_get_msg(aio));
-                            // Make sure to reset state before signaling completion.  Otherwise
-                            // have race-condition where receiver can receive None promise
-                            ctx.start_receive();
-                            if let Some(ref mut sender) = ctx.sender {
-                                let res = sender.try_send(Ok(msg));
-                                if let Err(err) = res {
-                                    if err.is_disconnected() {
-                                        sender.close();
-                                    } else {
-                                        debug!("Send failed: {}", err);
-                                    }
+                        }
+                    },
+                    Ok(()) => {
+                        let msg = NngMsg::new_msg(nng_aio_get_msg(aio));
+                        // Make sure to reset state before signaling completion.  Otherwise
+                        // have race-condition where receiver can receive None promise
+                        ctx.start_receive();
+                        if let Some(ref mut sender) = ctx.sender {
+                            let res = sender.try_send(Ok(msg));
+                            if let Err(err) = res {
+                                if err.is_disconnected() {
+                                    sender.close();
+                                } else {
+                                    debug!("Send failed: {}", err);
                                 }
                             }
                         }
                     }
-                } else {
-                    panic!();
                 }
             },
         }
@@ -195,30 +189,14 @@ fn subscribe(socket: nng_socket, topic: &[u8]) -> NngReturn {
 }
 
 pub struct AsyncSubscribeContext {
-    ctx: AsyncPullContext
+    ctx: AsyncPullContext,
 }
 
 impl Subscribe for AsyncSubscribeContext {
     fn subscribe(&self, topic: &[u8]) -> NngReturn {
         unsafe {
-            if let Some(ref aio) = self.ctx.aio {
-                subscribe(aio.nng_socket(), topic)
-            } else {
-                panic!();
-            }
+            subscribe(self.ctx.aio.nng_socket(), topic)
         }
-    }
-}
-
-impl Context for AsyncSubscribeContext {
-    fn new() -> Box<AsyncSubscribeContext> {
-        let ctx = AsyncSubscribeContext {
-            ctx: *AsyncPullContext::new()
-        };
-        Box::new(ctx)
-    }
-    fn init(&mut self, aio: Rc<NngAio>) -> NngReturn {
-        self.ctx.init(aio)
     }
 }
 
@@ -246,6 +224,23 @@ impl RecvMsg for Sub0 {}
 impl AsyncSocket for Sub0 {
     type ContextType = AsyncSubscribeContext;
     fn create_async_context(self) -> NngResult<Box<Self::ContextType>> {
-        create_async_context(self.socket, pull_callback)
+        let aio = NngAio::new(self.socket);
+        let ctx = Self::ContextType {
+            ctx: AsyncPullContext {
+                aio,
+                state: PullState::Ready,
+                sender: None,
+            }
+        };
+        
+        let mut ctx = Box::new(ctx);
+        // This mess is needed to convert Box<_> to c_void
+        let arg = ctx.as_mut() as *mut _ as AioCallbackArg;
+        let res = ctx.as_mut().ctx.aio.init(pull_callback, arg);
+        if let Err(err) = res {
+            Err(err)
+        } else {
+            Ok(ctx)
+        }
     }
 }

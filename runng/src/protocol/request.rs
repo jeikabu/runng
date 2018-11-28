@@ -36,25 +36,9 @@ pub trait AsyncRequest {
 }
 
 pub struct AsyncRequestContext {
-    ctx: Option<NngCtx>,
+    ctx: NngCtx,
     state: RequestState,
     sender: Option<Sender<NngResult<NngMsg>>>
-}
-
-impl Context for AsyncRequestContext {
-    fn new() -> Box<AsyncRequestContext> {
-        let ctx = AsyncRequestContext {
-            ctx: None,
-            state: RequestState::Ready,
-            sender: None,
-        };
-        Box::new(ctx)
-    }
-    fn init(&mut self, aio: Rc<NngAio>) -> NngReturn {
-        let ctx = NngCtx::new(aio)?;
-        self.ctx = Some(ctx);
-        Ok(())
-    }
 }
 
 impl AsyncRequest for AsyncRequestContext {
@@ -65,8 +49,8 @@ impl AsyncRequest for AsyncRequestContext {
         let (sender, receiver) = channel::<NngResult<NngMsg>>();
         self.sender = Some(sender);
         unsafe {
-            let aio = self.ctx.as_ref().unwrap().aio();
-            let ctx = self.ctx.as_ref().unwrap().ctx();
+            let aio = self.ctx.aio().nng_aio();
+            let ctx = self.ctx.ctx();
             self.state = RequestState::Sending;
 
             // Nng assumes ownership of the message
@@ -94,15 +78,30 @@ impl SendMsg for Req0 {}
 impl AsyncSocket for Req0 {
     type ContextType = AsyncRequestContext;
     fn create_async_context(self) -> NngResult<Box<Self::ContextType>> {
-        create_async_context(self.socket, request_callback)
+        let ctx = NngCtx::new(self.socket)?;
+        let ctx = Self::ContextType {
+            ctx,
+            state: RequestState::Ready,
+            sender: None,
+        };
+        
+        let mut ctx = Box::new(ctx);
+        // This mess is needed to convert Box<_> to c_void
+        let arg = ctx.as_mut() as *mut _ as AioCallbackArg;
+        let res = ctx.as_mut().ctx.init(request_callback, arg);
+        if let Err(err) = res {
+            Err(err)
+        } else {
+            Ok(ctx)
+        }
     }
 }
 
 extern fn request_callback(arg : AioCallbackArg) {
     unsafe {
         let ctx = &mut *(arg as *mut AsyncRequestContext);
-        let aionng = ctx.ctx.as_ref().unwrap().aio();
-        let ctxnng = ctx.ctx.as_ref().unwrap().ctx();
+        let aionng = ctx.ctx.aio().nng_aio();
+        let ctxnng = ctx.ctx.ctx();
         trace!("callback Request:{:?}", ctx.state);
         match ctx.state {
             RequestState::Ready => panic!(),

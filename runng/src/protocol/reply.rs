@@ -35,7 +35,7 @@ pub trait AsyncReply {
 }
 
 pub struct AsyncReplyContext {
-    ctx: Option<NngCtx>,
+    ctx: NngCtx,
     state: ReplyState,
     request_sender: Option<mpsc::Sender<NngResult<NngMsg>>>,
     reply_sender: Option<oneshot::Sender<NngReturn>>,
@@ -43,30 +43,10 @@ pub struct AsyncReplyContext {
 
 impl AsyncReplyContext {
     fn start_receive(&mut self) {
-        let aionng = self.ctx.as_ref().unwrap().aio();
-        let ctxnng = self.ctx.as_ref().unwrap().ctx();
         self.state = ReplyState::Receiving;
         unsafe {
-            nng_ctx_recv(ctxnng, aionng);
+            nng_ctx_recv(self.ctx.ctx(), self.ctx.aio().nng_aio());
         }
-    }
-}
-
-impl Context for AsyncReplyContext {
-    fn new() -> Box<AsyncReplyContext> {
-        let ctx = AsyncReplyContext {
-            ctx: None,
-            state: ReplyState::Receiving,
-            request_sender: None,
-            reply_sender: None,
-        };
-        Box::new(ctx)
-    }
-    fn init(&mut self, aio: Rc<NngAio>) -> NngReturn {
-        let ctx = NngCtx::new(aio)?;
-        self.ctx = Some(ctx);
-        self.start_receive();
-        Ok(())
     }
 }
 
@@ -77,6 +57,7 @@ impl AsyncReply for AsyncReplyContext {
         }
         let (sender, receiver) = mpsc::channel(1024);
         self.request_sender = Some(sender);
+        self.start_receive();
         receiver
     }
 
@@ -88,13 +69,12 @@ impl AsyncReply for AsyncReplyContext {
         let (sender, receiver) = oneshot::channel();
         self.reply_sender = Some(sender);
         unsafe {
-            let aio = self.ctx.as_ref().unwrap().aio();
-            let ctx = self.ctx.as_ref().unwrap().ctx();
+            let aio = self.ctx.aio().nng_aio();
 
             self.state = ReplyState::Sending;
             // Nng assumes ownership of the message
             nng_aio_set_msg(aio, msg.take());
-            nng_ctx_send(ctx, aio);
+            nng_ctx_send(self.ctx.ctx(), aio);
         }
         receiver
     }
@@ -115,15 +95,31 @@ impl RecvMsg for Rep0 {}
 impl AsyncSocket for Rep0 {
     type ContextType = AsyncReplyContext;
     fn create_async_context(self) -> NngResult<Box<Self::ContextType>> {
-        create_async_context(self.socket, reply_callback)
+        let ctx = NngCtx::new(self.socket)?;
+        let ctx = Self::ContextType {
+            ctx,
+            state: ReplyState::Receiving,
+            request_sender: None,
+            reply_sender: None,
+        };
+        
+        let mut ctx = Box::new(ctx);
+        // This mess is needed to convert Box<_> to c_void
+        let arg = ctx.as_mut() as *mut _ as AioCallbackArg;
+        let res = ctx.as_mut().ctx.init(reply_callback, arg);
+        if let Err(err) = res {
+            Err(err)
+        } else {
+            Ok(ctx)
+        }
     }
 }
 
 extern fn reply_callback(arg : AioCallbackArg) {
     unsafe {
         let ctx = &mut *(arg as *mut AsyncReplyContext);
-        let aionng = ctx.ctx.as_ref().unwrap().aio();
-        let ctxnng = ctx.ctx.as_ref().unwrap().ctx();
+        let aionng = ctx.ctx.aio().nng_aio();
+        let ctxnng = ctx.ctx.ctx();
         trace!("callback Reply:{:?}", ctx.state);
         match ctx.state {
             ReplyState::Receiving => {

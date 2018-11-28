@@ -34,24 +34,9 @@ pub trait AsyncPublish {
 }
 
 pub struct AsyncPublishContext {
-    aio: Option<Rc<NngAio>>,
+    aio: NngAio,
     state: PublishState,
     sender: Option<Sender<NngReturn>>
-}
-
-impl Context for AsyncPublishContext {
-    fn new() -> Box<AsyncPublishContext> {
-        let ctx = AsyncPublishContext {
-            aio: None,
-            state: PublishState::Ready,
-            sender: None,
-        };
-        Box::new(ctx)
-    }
-    fn init(&mut self, aio: Rc<NngAio>) -> NngReturn {
-        self.aio = Some(aio);
-        Ok(())
-    }
 }
 
 impl AsyncPublish for AsyncPublishContext {
@@ -62,14 +47,13 @@ impl AsyncPublish for AsyncPublishContext {
         let (sender, receiver) = channel::<NngReturn>();
         self.sender = Some(sender);
         unsafe {
-            if let Some(ref aio) = self.aio {
-                self.state = PublishState::Sending;
+            self.state = PublishState::Sending;
 
-                // Nng takes ownership of the message
-                let msg = msg.take();
-                nng_aio_set_msg(aio.aio(), msg);
-                nng_send_aio(aio.nng_socket(), aio.aio());
-            }
+            // Nng takes ownership of the message
+            let msg = msg.take();
+            let nng_aio = self.aio.nng_aio();
+            nng_aio_set_msg(nng_aio, msg);
+            nng_send_aio(self.aio.nng_socket(), nng_aio);
         }
         
         receiver
@@ -92,7 +76,7 @@ impl SendMsg for Pub0 {}
 impl AsyncSocket for Pub0 {
     type ContextType = AsyncPublishContext;
     fn create_async_context(self) -> NngResult<Box<Self::ContextType>> {
-        create_async_context(self.socket, publish_callback)
+        create_async_context(self.socket)
     }
 }
 
@@ -104,20 +88,17 @@ extern fn publish_callback(arg : AioCallbackArg) {
         match ctx.state {
             PublishState::Ready => panic!(),
             PublishState::Sending => {
-                if let Some(ref mut aio) = ctx.aio {
-                    let res = NngFail::from_i32(nng_aio_result(aio.aio()));
-                    if let Err(_) = res {
-                        // Nng requires that we retrieve the message and free it
-                        let _ = NngMsg::new_msg(nng_aio_get_msg(aio.aio()));
-                    }
-                    // Reset state before signaling completion
-                    ctx.state = PublishState::Ready;
-                    let res = ctx.sender.take().unwrap().send(res);
-                    if let Err(_) = res {
-                        // Unable to send result.  Receiver probably went away.  Not necessarily a problem.
-                    }
-                } else {
-                    panic!();
+                let nng_aio = ctx.aio.nng_aio();
+                let res = NngFail::from_i32(nng_aio_result(nng_aio));
+                if let Err(_) = res {
+                    // Nng requires that we retrieve the message and free it
+                    let _ = NngMsg::new_msg(nng_aio_get_msg(nng_aio));
+                }
+                // Reset state before signaling completion
+                ctx.state = PublishState::Ready;
+                let res = ctx.sender.take().unwrap().send(res);
+                if let Err(_) = res {
+                    // Unable to send result.  Receiver probably went away.  Not necessarily a problem.
                 }
             },
         }
@@ -154,6 +135,26 @@ impl SendMsg for Push0 {}
 impl AsyncSocket for Push0 {
     type ContextType = AsyncPublishContext;
     fn create_async_context(self) -> NngResult<Box<Self::ContextType>> {
-        create_async_context(self.socket, publish_callback)
+        create_async_context(self.socket)
+    }
+}
+
+
+fn create_async_context(socket: NngSocket) -> NngResult<Box<AsyncPublishContext>> {
+    let aio = NngAio::new(socket);
+    let ctx = AsyncPublishContext {
+        aio,
+        state: PublishState::Ready,
+        sender: None,
+    };
+    
+    let mut ctx = Box::new(ctx);
+    // This mess is needed to convert Box<_> to c_void
+    let arg = ctx.as_mut() as *mut _ as AioCallbackArg;
+    let res = ctx.as_mut().aio.init(publish_callback, arg);
+    if let Err(err) = res {
+        Err(err)
+    } else {
+        Ok(ctx)
     }
 }

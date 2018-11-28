@@ -43,7 +43,6 @@ fn it_works() {
         nng_close(req_socket);
         nng_close(rep_socket);
     }
-    
 }
 
 }

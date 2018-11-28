@@ -25,21 +25,6 @@ fn nng_open<T, O, S>(open_func: O, socket_create_func: S) -> NngResult<T>
     })
 }
 
-trait Context {
-    fn new() -> Box<Self>;
-    fn init(&mut self, Rc<NngAio>) -> NngReturn;
-}
-
-fn create_async_context<T: Context>(socket: NngSocket, callback: AioCallback) -> NngResult<Box<T>> {
-    let mut ctx = T::new();
-    // This mess is needed to convert Box<_> to c_void
-    let ctx_ptr = ctx.as_mut() as *mut _ as AioCallbackArg;
-    let aio = NngAio::new(socket, callback, ctx_ptr)?;
-    let aio = Rc::new(aio);
-    (*ctx).init(aio.clone())?;
-    Ok(ctx)
-}
-
 pub trait AsyncSocket: Socket {
     type ContextType;
     fn create_async_context(self) -> NngResult<Box<Self::ContextType>>;
