@@ -8,6 +8,7 @@ keywords = ["nng", "nanomsg", "zeromq"]
 categories = ["network-programming", "external-ffi-bindings", "os"]
 license = "MIT"
 repository = "https://github.com/jeikabu/runng"
+readme = "README.md"
 
 [badges]
 appveyor = { repository = "jake-ruyi/runng", branch = "master", service = "github" }
