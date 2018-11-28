@@ -4,6 +4,9 @@ extern crate thrift;
 extern crate ordered_float;
 extern crate try_from;
 
+#[macro_use]
+extern crate log;
+
 use runng_thrift::*;
 
 mod test_service;
@@ -80,7 +83,7 @@ mod tests {
     struct Handler;
     impl TestServiceSyncHandler for Handler {
         fn handle_test(&self) -> thrift::Result<bool> {
-            println!("HANDLED!");
+            debug!("HANDLED!");
             Ok(true)
         }
     }
@@ -103,7 +106,7 @@ mod tests {
             let processor = TestServiceSyncProcessor::new(handler);
 
             processor.process(&mut in_proto, &mut out_proto).unwrap();
-            println!("Server done!");
+            debug!("Server done!");
         });
 
         let requester = factory.requester_open().unwrap();

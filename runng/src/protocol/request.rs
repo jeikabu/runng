@@ -103,7 +103,7 @@ extern fn request_callback(arg : AioCallbackArg) {
         let ctx = &mut *(arg as *mut AsyncRequestContext);
         let aionng = ctx.ctx.as_ref().unwrap().aio();
         let ctxnng = ctx.ctx.as_ref().unwrap().ctx();
-        println!("callback Request:{:?}", ctx.state);
+        trace!("callback Request:{:?}", ctx.state);
         match ctx.state {
             RequestState::Ready => panic!(),
             RequestState::Sending => {

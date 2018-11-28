@@ -43,6 +43,7 @@ impl Aio for NngCtx {
 impl Drop for NngCtx {
     fn drop(&mut self) {
         unsafe {
+            debug!("NngCtx.drop {:x}", self.ctx as u64);
             nng_ctx_close(self.ctx);
         }
     }

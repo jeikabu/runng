@@ -100,7 +100,7 @@ extern fn publish_callback(arg : AioCallbackArg) {
     unsafe {
         let ctx = &mut *(arg as *mut AsyncPublishContext);
         
-        println!("callback Publish:{:?}", ctx.state);
+        trace!("callback Publish:{:?}", ctx.state);
         match ctx.state {
             PublishState::Ready => panic!(),
             PublishState::Sending => {

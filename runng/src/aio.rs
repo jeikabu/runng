@@ -28,7 +28,7 @@ impl NngAio {
 impl Drop for NngAio {
     fn drop(&mut self) {
         unsafe {
-            //println!("Drop aio {:x}", self.aio as u64);
+            debug!("NngAio.drop {:x}", self.aio as u64);
             nng_aio_free(self.aio);
         }
     }

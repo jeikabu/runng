@@ -18,14 +18,14 @@ impl NngSocket {
 impl Drop for NngSocket {
     fn drop(&mut self) {
         unsafe {
-            println!("Socket close: {:?}", self.socket);
+            debug!("Socket close: {:?}", self.socket);
             let res = NngFail::from_i32(nng_close(self.socket));
             match res {
                 Ok(()) => {},
                 // Can't panic here.  Thrift's TIoChannel::split() clones the socket handle so we may get ECLOSED
                 Err(NngFail::Err(NngError::ECLOSED)) => {},
                 Err(res) => {
-                    println!("nng_close {:?}", res);
+                    debug!("nng_close {:?}", res);
                     panic!(res);
                 },
             }

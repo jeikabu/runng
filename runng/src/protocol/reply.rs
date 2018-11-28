@@ -124,7 +124,7 @@ extern fn reply_callback(arg : AioCallbackArg) {
         let ctx = &mut *(arg as *mut AsyncReplyContext);
         let aionng = ctx.ctx.as_ref().unwrap().aio();
         let ctxnng = ctx.ctx.as_ref().unwrap().ctx();
-        println!("callback Reply:{:?}", ctx.state);
+        trace!("callback Reply:{:?}", ctx.state);
         match ctx.state {
             ReplyState::Receiving => {
                 let res = NngFail::from_i32(nng_aio_result(aionng));
@@ -132,10 +132,10 @@ extern fn reply_callback(arg : AioCallbackArg) {
                     Err(res) => {
                         match res {
                             NngFail::Err(NngError::ECLOSED) => {
-                                println!("Closed");
+                                debug!("Closed");
                             },
                             _ => {
-                                println!("Reply.Receive: {:?}", res);
+                                trace!("Reply.Receive: {:?}", res);
                                 ctx.start_receive();
                             },
                         }
@@ -146,7 +146,7 @@ extern fn reply_callback(arg : AioCallbackArg) {
                                 if err.is_disconnected() {
                                     sender.close();
                                 } else {
-                                    println!("Send failed: {}", err);
+                                    debug!("Send failed: {}", err);
                                 }
                             }
                         }
@@ -161,7 +161,7 @@ extern fn reply_callback(arg : AioCallbackArg) {
                                 if err.is_disconnected() {
                                     // Not an error?
                                 } else {
-                                    println!("Receive failed: {}", err);
+                                    debug!("Receive failed: {}", err);
                                 }
                             }
                         }

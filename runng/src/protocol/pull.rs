@@ -100,7 +100,7 @@ extern fn pull_callback(arg : AioCallbackArg) {
     unsafe {
         let ctx = &mut *(arg as *mut AsyncPullContext);
         
-        println!("callback Subscribe:{:?}", ctx.state);
+        trace!("callback Subscribe:{:?}", ctx.state);
         match ctx.state {
             PullState::Ready => panic!(),
             PullState::Receiving => {
@@ -111,10 +111,10 @@ extern fn pull_callback(arg : AioCallbackArg) {
                         Err(res) => {
                             match res {
                                 NngFail::Err(NngError::ECLOSED) => {
-                                    println!("Closed");
+                                    debug!("Closed");
                                 },
                                 _ => {
-                                    println!("Reply.Receive: {:?}", res);
+                                    trace!("Reply.Receive: {:?}", res);
                                     ctx.start_receive();
                                 },
                             }
@@ -124,7 +124,7 @@ extern fn pull_callback(arg : AioCallbackArg) {
                                     if err.is_disconnected() {
                                         sender.close();
                                     } else {
-                                        println!("Send failed: {}", err);
+                                        debug!("Send failed: {}", err);
                                     }
                                 }
                             }
@@ -140,7 +140,7 @@ extern fn pull_callback(arg : AioCallbackArg) {
                                     if err.is_disconnected() {
                                         sender.close();
                                     } else {
-                                        println!("Send failed: {}", err);
+                                        debug!("Send failed: {}", err);
                                     }
                                 }
                             }
