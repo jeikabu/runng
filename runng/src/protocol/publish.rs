@@ -23,13 +23,14 @@ pub struct AsyncPublishContext {
 }
 
 impl AsyncContext for AsyncPublishContext {
-    fn new(socket: NngSocket) -> Self {
+    fn new(socket: NngSocket) -> NngResult<Self> {
         let aio = NngAio::new(socket);
-        Self {
+        let ctx = Self {
             aio,
             state: PublishState::Ready,
             sender: None,
-        }
+        };
+        Ok(ctx)
     }
     fn get_aio_callback() -> AioCallback {
         publish_callback

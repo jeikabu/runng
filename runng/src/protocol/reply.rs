@@ -32,14 +32,15 @@ impl AsyncReplyContext {
 }
 
 impl AsyncContext for AsyncReplyContext {
-    fn new(socket: NngSocket) -> Self {
-        let ctx = NngCtx::new(socket).unwrap();
-        Self {
+    fn new(socket: NngSocket) -> NngResult<Self> {
+        let ctx = NngCtx::new(socket)?;
+        let ctx = Self {
             ctx,
             state: ReplyState::Receiving,
             request_sender: None,
             reply_sender: None,
-        }
+        };
+        Ok(ctx)
     }
     fn get_aio_callback() -> AioCallback {
         reply_callback

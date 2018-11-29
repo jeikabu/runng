@@ -35,21 +35,17 @@ pub trait AsyncSocket: Socket {
     type ContextType: AsyncContext;
     fn create_async_context(self) -> NngResult<Box<Self::ContextType>>
     {
-        let ctx = Self::ContextType::new(self.take());
+        let ctx = Self::ContextType::new(self.take())?;
         let mut ctx = Box::new(ctx);
         // This mess is needed to convert Box<_> to c_void
         let arg = ctx.as_mut() as *mut _ as AioCallbackArg;
-        let res = ctx.as_mut().aio_mut().init(Self::ContextType::get_aio_callback(), arg);
-        if let Err(err) = res {
-            Err(err)
-        } else {
-            Ok(ctx)
-        }
+        ctx.as_mut().aio_mut().init(Self::ContextType::get_aio_callback(), arg)?;
+        Ok(ctx)
     }
 }
 
-pub trait AsyncContext: Aio {
-    fn new(socket: NngSocket) -> Self;
+pub trait AsyncContext: Aio + Sized {
+    fn new(socket: NngSocket) -> NngResult<Self>;
     fn get_aio_callback() -> AioCallback;
 }
 

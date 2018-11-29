@@ -25,13 +25,14 @@ pub struct AsyncRequestContext {
 }
 
 impl AsyncContext for AsyncRequestContext {
-    fn new(socket: NngSocket) -> Self {
-        let ctx = NngCtx::new(socket).unwrap();
-        Self {
+    fn new(socket: NngSocket) -> NngResult<Self> {
+        let ctx = NngCtx::new(socket)?;
+        let ctx = Self {
             ctx,
             state: RequestState::Ready,
             sender: None,
-        }
+        };
+        Ok(ctx)
     }
     fn get_aio_callback() -> AioCallback {
         request_callback

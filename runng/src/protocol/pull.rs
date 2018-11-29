@@ -32,13 +32,14 @@ impl AsyncPullContext {
 }
 
 impl AsyncContext for AsyncPullContext {
-    fn new(socket: NngSocket) -> Self {
+    fn new(socket: NngSocket) -> NngResult<Self> {
         let aio = NngAio::new(socket);
-        Self {
+        let ctx = Self {
             aio,
             state: PullState::Ready,
             sender: None,
-        }
+        };
+        Ok(ctx)
     }
     fn get_aio_callback() -> AioCallback {
         pull_callback
@@ -117,15 +118,16 @@ impl AsyncPull for AsyncSubscribeContext {
 }
 
 impl AsyncContext for AsyncSubscribeContext {
-    fn new(socket: NngSocket) -> Self {
+    fn new(socket: NngSocket) -> NngResult<Self> {
         let aio = NngAio::new(socket);
-        Self {
+        let ctx = Self {
             ctx: AsyncPullContext {
                 aio,
                 state: PullState::Ready,
                 sender: None,
             }
-        }
+        };
+        Ok(ctx)
     }
     fn get_aio_callback() -> AioCallback {
         pull_callback
