@@ -57,8 +57,10 @@
 
 pub mod aio;
 pub mod ctx;
+pub mod dialer;
 pub mod factory;
 pub mod msg;
+pub mod options;
 pub mod protocol;
 pub mod result;
 pub mod socket;
@@ -67,6 +69,7 @@ pub mod transport;
 pub use self::aio::*;
 pub use self::ctx::*;
 pub use self::factory::*;
+pub use self::options::*;
 pub use self::result::*;
 pub use self::socket::*;
 
@@ -78,10 +81,18 @@ extern crate log;
 
 use runng_sys::*;
 
+
 // Trait where type exposes a socket, but this shouldn't be part of public API
 trait RawSocket {
     fn socket(&self) -> &NngSocket;
     unsafe fn nng_socket(&self) -> nng_socket {
         self.socket().nng_socket()
     }
+}
+
+// Return string and pointer so string isn't dropped
+fn to_cstr(string: &str) -> Result<(std::ffi::CString, *const i8), std::ffi::NulError> {
+    let string = std::ffi::CString::new(string)?;
+    let ptr = string.as_bytes_with_nul().as_ptr() as *const i8;
+    Ok((string, ptr))
 }

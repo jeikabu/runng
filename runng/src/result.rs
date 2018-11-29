@@ -92,6 +92,8 @@ impl NngError {
 pub enum NngFail {
     Err(NngError),
     Unknown(i32),
+    IoError(io::Error),
+    NulError(std::ffi::NulError),
 }
 
 impl NngFail {
@@ -128,9 +130,15 @@ impl fmt::Display for NngError {
     }
 }
 
-impl From<NngFail> for io::Error {
-    fn from(err: NngFail) -> io::Error {
-        io::Error::from(io::ErrorKind::Other)
+impl From<io::Error> for NngFail {
+    fn from(err: io::Error) -> NngFail {
+        NngFail::IoError(err)
+    }
+}
+
+impl From<std::ffi::NulError> for NngFail {
+    fn from(err: std::ffi::NulError) -> NngFail {
+        NngFail::NulError(err)
     }
 }
 
