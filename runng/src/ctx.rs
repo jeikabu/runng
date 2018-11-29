@@ -1,3 +1,5 @@
+//! Protocol contexts
+
 use aio::{
     Aio,
     NngAio,
@@ -5,16 +7,20 @@ use aio::{
 use runng_sys::*;
 use super::*;
 
+/// Type which exposes a `NngCtx`.
 pub trait Ctx {
+    /// Obtain under-lying `NngCtx`.
     fn ctx(&self) -> nng_ctx;
 }
 
+/// Wraps `nng_ctx` and its associated `NngAio`.  See [nng_ctx](https://nanomsg.github.io/nng/man/v1.1.0/nng_ctx.5).
 pub struct NngCtx {
     ctx: nng_ctx,
     aio: NngAio,
 }
 
 impl NngCtx {
+    /// Creates a new context using the specified socket.  See [nng_ctx_open](https://nanomsg.github.io/nng/man/v1.1.0/nng_ctx_open.3).
     pub fn new(socket: NngSocket) -> NngResult<NngCtx> {
         let mut ctx = nng_ctx { id: 0 };
         let res = unsafe {
@@ -29,6 +35,7 @@ impl NngCtx {
         Ok(ctx)
     }
 
+    /// Calls init() method of this context's `NngAio`.
     pub fn init(&mut self, callback: AioCallback, arg: AioCallbackArg) -> NngReturn {
         self.aio.init(callback, arg)
     }

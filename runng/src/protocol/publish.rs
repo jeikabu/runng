@@ -1,3 +1,5 @@
+//! Async publish/subscribe
+
 use aio::{NngAio, AioCallbackArg};
 use futures::{
     sync::oneshot::{
@@ -16,6 +18,7 @@ enum PublishState {
     Sending,
 }
 
+/// Asynchronous context for publish socket.
 pub struct AsyncPublishContext {
     aio: NngAio,
     state: PublishState,
@@ -23,6 +26,7 @@ pub struct AsyncPublishContext {
 }
 
 impl AsyncContext for AsyncPublishContext {
+    /// Create an asynchronous context using the specified socket.
     fn new(socket: NngSocket) -> NngResult<Self> {
         let aio = NngAio::new(socket);
         let ctx = Self {
@@ -46,7 +50,9 @@ impl Aio for AsyncPublishContext {
     }
 }
 
+/// Trait for asynchronous contexts that can send a message.
 pub trait AsyncPublish {
+    /// Asynchronously send a message.
     fn send(&mut self, msg: NngMsg) -> Receiver<NngReturn>;
 }
 

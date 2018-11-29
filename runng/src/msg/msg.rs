@@ -6,13 +6,14 @@ use std::{
 };
 use super::*;
 
+/// Wraps `nng_msg`.  See [nng_msg](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg.5).
 #[derive(Debug)]
 pub struct NngMsg {
-    //msg: ptr::NonNull<nng_msg>
     msg: *mut nng_msg
 }
 
 impl NngMsg {
+    /// Create a message.  See [nng_msg_alloc](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg_alloc.3).
     pub fn new() -> NngResult<NngMsg> {
         let mut msg: *mut nng_msg = ptr::null_mut();
         let res = unsafe {
@@ -20,6 +21,7 @@ impl NngMsg {
         };
         NngFail::succeed_then(res, || NngMsg { msg })
     }
+
     pub fn new_msg(msg: *mut nng_msg) -> NngMsg {
         NngMsg { msg }
     }
@@ -29,6 +31,7 @@ impl NngMsg {
         self.msg = std::ptr::null_mut();
         res
     }
+    
     pub fn msg(&self) -> *mut nng_msg {
         self.msg
     }

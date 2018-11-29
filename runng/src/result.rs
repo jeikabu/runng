@@ -1,3 +1,4 @@
+//! Return values and error handling
 
 use runng_sys::*;
 use std::{
@@ -6,6 +7,7 @@ use std::{
     io,
 };
 
+/// Error values returned by NNG functions.
 #[derive(Debug)]
 pub enum NngError {
     EINTR        = nng_errno_enum_NNG_EINTR as isize,
@@ -44,6 +46,7 @@ pub enum NngError {
 }
 
 impl NngError {
+    /// Converts value returned by NNG method into `error::Error`.
     pub fn from_i32(value: i32) -> Option<NngError> {
         match value {
             value if value == NngError::EINTR as i32        => Some(NngError::EINTR),
@@ -92,6 +95,7 @@ pub enum NngFail {
 }
 
 impl NngFail {
+    /// Converts values returned by NNG methods into `Result<>`
     pub fn from_i32(value: i32) -> NngReturn {
         if value == 0 {
             Ok(())

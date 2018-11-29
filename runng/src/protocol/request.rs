@@ -1,3 +1,5 @@
+//! Async request/reply
+
 use aio::{NngAio, AioCallbackArg};
 use ctx::NngCtx;
 use futures::{
@@ -18,6 +20,7 @@ enum RequestState {
     Receiving,
 }
 
+/// Asynchronous context for request socket.
 pub struct AsyncRequestContext {
     ctx: NngCtx,
     state: RequestState,
@@ -48,7 +51,9 @@ impl Aio for AsyncRequestContext {
     }
 }
 
+/// Trait for asynchronous contexts that can send a request and receive a reply.
 pub trait AsyncRequest {
+    /// Asynchronously send a request and return a future for the reply.
     fn send(&mut self, msg: NngMsg) -> Receiver<NngResult<NngMsg>>;
 }
 

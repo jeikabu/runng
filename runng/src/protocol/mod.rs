@@ -1,3 +1,5 @@
+//! NNG protocols.  See [Section 7](https://nanomsg.github.io/nng/man/v1.1.0/index.html#_section_7_protocols_and_transports).
+
 pub mod pub0;
 pub mod pull0;
 pub mod push0;
@@ -31,8 +33,27 @@ use msg::NngMsg;
 use runng_sys::*;
 use super::*;
 
+/// A `Socket` that can be turned into a context for asynchronous I/O.
+/// 
+/// # Examples
+/// ```
+/// use runng::{
+///     *,
+///     protocol::AsyncSocket,
+/// };
+/// fn test() -> Result<(), NngFail> {
+///     let factory = Latest::new();
+///     let pusher = factory.pusher_open()?.listen("inproc://test")?;
+///     let mut push_ctx = pusher.create_async_context()?;
+///     Ok(())
+/// }
+/// ```
 pub trait AsyncSocket: Socket {
+
+    /// The type of aynchronous context produced
     type ContextType: AsyncContext;
+
+    /// Turns the `Socket` into an asynchronous context
     fn create_async_context(self) -> NngResult<Box<Self::ContextType>>
     {
         let ctx = Self::ContextType::new(self.take())?;
@@ -44,7 +65,9 @@ pub trait AsyncSocket: Socket {
     }
 }
 
+/// Context for asynchrounous I/O.
 pub trait AsyncContext: Aio + Sized {
+    /// Create a new asynchronous context using specified socket.
     fn new(socket: NngSocket) -> NngResult<Self>;
     fn get_aio_callback() -> AioCallback;
 }

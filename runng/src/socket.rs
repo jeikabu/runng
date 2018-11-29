@@ -1,7 +1,10 @@
+//! Socket basics
+
 use runng_sys::*;
 use std::ffi::CString;
 use super::*;
 
+/// Wraps `nng_socket`.  See [nng_socket](https://nanomsg.github.io/nng/man/v1.1.0/nng_socket.5).
 pub struct NngSocket {
     socket: nng_socket,
 }
@@ -10,6 +13,7 @@ impl NngSocket {
     pub fn new(socket: nng_socket) -> NngSocket {
         NngSocket { socket }
     }
+    /// Obtain underlying `nng_socket`
     pub unsafe fn nng_socket(&self) -> nng_socket {
         self.socket
     }
@@ -53,7 +57,9 @@ pub trait Socket: Sized {
     }
 }
 
+/// `Socket` that can accept connections ("listen") from other `Socket`s.
 pub trait Listen: Socket {
+    /// Listen for connections to specified URL.  See [nng_listen](https://nanomsg.github.io/nng/man/v1.1.0/nng_listen.3).
     fn listen(self, url: &str) -> NngResult<Self> {
         unsafe {
             let res = nng_listen(self.nng_socket(), to_cstr(url).1, std::ptr::null_mut(), 0);
@@ -62,7 +68,9 @@ pub trait Listen: Socket {
     }
 }
 
+/// `Socket` that can connect to ("dial") another `Socket`.
 pub trait Dial: Socket {
+    /// Dial socket specified by URL.  See [nng_dial](https://nanomsg.github.io/nng/man/v1.1.0/nng_dial.3)
     fn dial(self, url: &str) -> NngResult<Self> {
         unsafe {
             let res = nng_dial(self.nng_socket(), to_cstr(url).1, std::ptr::null_mut(), 0);
@@ -78,7 +86,9 @@ fn to_cstr(string: &str) -> (CString, *const i8) {
     (string, ptr)
 }
 
+/// `Socket` that can send messages.
 pub trait SendMsg: Socket {
+    /// Send a message.  See [nng_sendmsg](https://nanomsg.github.io/nng/man/v1.1.0/nng_sendmsg.3).
     fn send(&self, msg: msg::NngMsg) -> NngReturn {
         let res = unsafe {
             nng_sendmsg(self.nng_socket(), msg.take(), 0)
@@ -87,7 +97,9 @@ pub trait SendMsg: Socket {
     }
 }
 
+/// `Socket` that can receive messages.
 pub trait RecvMsg: Socket {
+    /// Receive a message.  See [nng_recvmsg](https://nanomsg.github.io/nng/man/v1.1.0/nng_recvmsg.3).
     fn recv(&self) -> NngResult<msg::NngMsg> {
         unsafe {
             let mut recv_ptr: *mut nng_msg = std::ptr::null_mut();
