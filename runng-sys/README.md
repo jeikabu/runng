@@ -1,7 +1,12 @@
-extern crate runng_sys;
 
-#[cfg(test)]
-mod tests {
+# runng-sys
+
+Rust FFI bindings to [NNG](https://github.com/nanomsg/nng).
+
+For a more ergonomic API to NNG see [runng](https://crates.io/crates/runng).
+
+```rust
+extern crate runng_sys;
 
 use runng_sys::*;
 use std::ffi::CString;
@@ -44,5 +49,4 @@ fn it_works() {
         nng_close(rep_socket);
     }
 }
-
-}
+```

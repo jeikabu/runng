@@ -16,26 +16,10 @@ pub use self::socket::*;
 extern crate futures;
 extern crate runng_sys;
 
+#[macro_use]
+extern crate log;
+
 use runng_sys::*;
-
-// public interface ISocketFactory
-//     {
-//         INngResult<IBusSocket> BusOpen();
-//         INngResult<IReqSocket> RequesterOpen();
-//         INngResult<IRepSocket> ReplierOpen();
-//         INngResult<IPubSocket> PublisherOpen();
-//         INngResult<ISubSocket> SubscriberOpen();
-//         INngResult<IPushSocket> PusherOpen();
-//         INngResult<IPullSocket> PullerOpen();
-        
-//         IListener ListenerCreate(ISocket socket, string url);
-//         IDialer DialerCreate(ISocket socket, string url);
-
-//         INngResult<TSocket> Dial<TSocket>(INngResult<TSocket> socketRes, string url) where TSocket : ISocket;
-//         INngResult<TSocket> Listen<TSocket>(INngResult<TSocket> socketRes, string url) where TSocket : ISocket;
-//     }
-
-
 
 // Trait where type exposes a socket, but this shouldn't be part of public API
 trait RawSocket {

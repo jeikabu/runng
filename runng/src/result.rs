@@ -117,6 +117,7 @@ impl NngFail {
 
 impl error::Error for NngError {
 }
+
 impl fmt::Display for NngError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self)

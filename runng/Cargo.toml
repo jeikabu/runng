@@ -1,6 +1,6 @@
 [package]
 name = "runng"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["Jake W <jeikabu@gmail.com>"]
 
 description = "High-level wrapper around nng (Nanomsg-Next-Generation) aka Nanomsg2"
@@ -8,6 +8,7 @@ keywords = ["nng", "nanomsg", "zeromq"]
 categories = ["network-programming"]
 license = "MIT"
 repository = "https://github.com/jeikabu/runng"
+readme = "README.md"
 
 [badges]
 appveyor = { repository = "jake-ruyi/runng", branch = "master", service = "github" }
@@ -18,5 +19,7 @@ codecov = { repository = "jeikabu/runng", branch = "master", service = "github" 
 runng-sys = { version = "1.1", path = "../runng-sys" }
 futures = "0.1"
 byteorder = "1.2"
+log = "0.4"
 
-[build-dependencies]
+[dev-dependencies]
+env_logger = "0.6"

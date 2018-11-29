@@ -153,7 +153,7 @@ impl NngMsg {
 impl Drop for NngMsg {
     fn drop(&mut self) {
         unsafe {
-            //println!("Dropping {:x}", self.msg() as u64);
+            debug!("Dropping {:x}", self.msg() as u64);
             nng_msg_free(self.msg());
         }
     }

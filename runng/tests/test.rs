@@ -1,3 +1,4 @@
+extern crate env_logger;
 extern crate futures;
 extern crate runng;
 extern crate runng_sys;
@@ -5,8 +6,9 @@ extern crate runng_sys;
 #[cfg(test)]
 mod tests {
 
+use env_logger::{Builder, Env};
+
 use futures::{
-    Async,
     future,
     future::{
         Future,
@@ -26,6 +28,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 static URL_ID: AtomicUsize = AtomicUsize::new(1);
 fn get_url() -> String {
+    Builder::from_env(Env::default().default_filter_or("trace")).try_init()
+        .unwrap_or_else(|err| println!("env_logger::init() failed: {}", err));
     let val = URL_ID.fetch_add(1, Ordering::Relaxed);
     String::from("inproc://test") + &val.to_string()
 }
@@ -57,7 +61,7 @@ fn aio() -> NngReturn {
     let mut req_ctx = requester.create_async_context()?;
     let req_future = req_ctx.send(msg::NngMsg::new()?);
     rep_ctx.receive()
-        .take(1).for_each(|request|{
+        .take(1).for_each(|_request|{
             let msg = msg::NngMsg::new().unwrap();
             rep_ctx.reply(msg).wait().unwrap();
             Ok(())
@@ -223,7 +227,7 @@ fn broker() -> NngReturn {
         let mut broker_push_ctx = broker_push.create_async_context()?;
         broker_pull_ctx.receive().for_each(|msg|{
             if let Ok(msg) = msg {
-                broker_push_ctx.send(msg);
+                broker_push_ctx.send(msg).wait().unwrap();
             }
             Ok(())
         }).wait().unwrap();

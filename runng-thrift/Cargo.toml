@@ -8,3 +8,4 @@ runng = { version = "0.1.1", path = "../runng" }
 thrift = { version = "1.0.0", path = "../../../thrift/lib/rs" }
 try_from = "0.2"
 ordered-float = "1.0"
+log = "0.4"

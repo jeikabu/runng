@@ -1,6 +1,9 @@
 extern crate thrift;
 extern crate runng;
 
+#[macro_use]
+extern crate log;
+
 use std::{
     io,
     io::{
