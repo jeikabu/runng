@@ -10,27 +10,10 @@ use msg::NngMsg;
 use runng_sys::*;
 use super::*;
 
-pub struct Pull0 {
-    socket: NngSocket
-}
-
-impl Pull0 {
-    pub fn open() -> NngResult<Self> {
-        nng_open(
-            |socket| unsafe { nng_pull0_open(socket) }, 
-            |socket| Pull0{ socket }
-        )
-    }
-}
-
 #[derive(Debug,PartialEq)]
 enum PullState {
     Ready,
     Receiving,
-}
-
-pub trait AsyncPull {
-    fn receive(&mut self) -> Receiver<NngResult<NngMsg>>;
 }
 
 pub struct AsyncPullContext {
@@ -46,32 +29,6 @@ impl AsyncPullContext {
             nng_recv_aio(self.aio.nng_socket(), self.aio.nng_aio());
         }
     }
-}
-
-impl AsyncPull for AsyncPullContext {
-    fn receive(&mut self) -> Receiver<NngResult<NngMsg>> {
-        let (sender, receiver) = channel::<NngResult<NngMsg>>(1024);
-        self.sender = Some(sender);
-        self.start_receive();
-        receiver
-    }
-}
-
-impl Socket for Pull0 {
-    fn socket(&self) -> &NngSocket {
-        &self.socket
-    }
-    fn take(self) -> NngSocket {
-        self.socket
-    }
-}
-
-impl Dial for Pull0 {}
-impl Listen for Pull0 {}
-impl RecvMsg for Pull0 {}
-
-impl AsyncSocket for Pull0 {
-    type ContextType = AsyncPullContext;
 }
 
 impl AsyncContext for AsyncPullContext {
@@ -94,6 +51,19 @@ impl Aio for AsyncPullContext {
     }
     fn aio_mut(&mut self) -> &mut NngAio {
         &mut self.aio
+    }
+}
+
+pub trait AsyncPull {
+    fn receive(&mut self) -> Receiver<NngResult<NngMsg>>;
+}
+
+impl AsyncPull for AsyncPullContext {
+    fn receive(&mut self) -> Receiver<NngResult<NngMsg>> {
+        let (sender, receiver) = channel::<NngResult<NngMsg>>(1024);
+        self.sender = Some(sender);
+        self.start_receive();
+        receiver
     }
 }
 
@@ -133,56 +103,8 @@ extern fn pull_callback(arg : AioCallbackArg) {
     }
 }
 
-
-
-pub struct Sub0 {
-    socket: NngSocket
-}
-
-impl Sub0 {
-    pub fn open() -> NngResult<Self> {
-        nng_open(
-            |socket| unsafe { nng_sub0_open(socket) }, 
-            |socket| Sub0{ socket }
-        )
-    }
-}
-
-impl Subscribe for Sub0 {
-    fn subscribe(&self, topic: &[u8]) -> NngReturn {
-        unsafe {
-            subscribe(self.socket.nng_socket(), topic)
-        }
-    }
-}
-
-pub trait Subscribe {
-    fn subscribe(&self, topic: &[u8]) -> NngReturn;
-    fn subscribe_str(&self, topic: &str) -> NngReturn {
-        self.subscribe(topic.as_bytes())
-    }
-}
-
-fn subscribe(socket: nng_socket, topic: &[u8]) -> NngReturn {
-    unsafe {
-        let opt = NNG_OPT_SUB_SUBSCRIBE.as_ptr() as *const ::std::os::raw::c_char;
-        let topic_ptr = topic.as_ptr() as *const ::std::os::raw::c_void;
-        let topic_size = std::mem::size_of_val(topic);
-        let res = nng_setopt(socket, opt, topic_ptr, topic_size);
-        NngFail::from_i32(res)
-    }
-}
-
 pub struct AsyncSubscribeContext {
     ctx: AsyncPullContext,
-}
-
-impl Subscribe for AsyncSubscribeContext {
-    fn subscribe(&self, topic: &[u8]) -> NngReturn {
-        unsafe {
-            subscribe(self.ctx.aio.nng_socket(), topic)
-        }
-    }
 }
 
 impl AsyncPull for AsyncSubscribeContext {
@@ -192,22 +114,6 @@ impl AsyncPull for AsyncSubscribeContext {
         self.ctx.start_receive();
         receiver
     }
-}
-
-impl Socket for Sub0 {
-    fn socket(&self) -> &NngSocket {
-        &self.socket
-    }
-    fn take(self) -> NngSocket {
-        self.socket
-    }
-}
-
-impl Dial for Sub0 {}
-impl RecvMsg for Sub0 {}
-
-impl AsyncSocket for Sub0 {
-    type ContextType = AsyncSubscribeContext;
 }
 
 impl AsyncContext for AsyncSubscribeContext {
@@ -232,5 +138,20 @@ impl Aio for AsyncSubscribeContext {
     }
     fn aio_mut(&mut self) -> &mut NngAio {
         &mut self.ctx.aio
+    }
+}
+
+pub trait Subscribe {
+    fn subscribe(&self, topic: &[u8]) -> NngReturn;
+    fn subscribe_str(&self, topic: &str) -> NngReturn {
+        self.subscribe(topic.as_bytes())
+    }
+}
+
+impl Subscribe for AsyncSubscribeContext {
+    fn subscribe(&self, topic: &[u8]) -> NngReturn {
+        unsafe {
+            subscribe(self.ctx.aio.nng_socket(), topic)
+        }
     }
 }

@@ -8,28 +8,11 @@ use msg::NngMsg;
 use runng_sys::*;
 use super::*;
 
-pub struct Rep0 {
-    socket: NngSocket
-}
-
-impl Rep0 {
-    pub fn open() -> NngResult<Self> {
-        nng_open(|socket| unsafe { nng_rep0_open(socket) }, 
-            |socket| Rep0{ socket }
-        )
-    }
-}
-
 #[derive(Debug,PartialEq)]
 enum ReplyState {
     Receiving,
     Wait,
     Sending,
-}
-
-pub trait AsyncReply {
-    fn receive(&mut self) -> mpsc::Receiver<NngResult<NngMsg>>;
-    fn reply(&mut self, NngMsg) -> oneshot::Receiver<NngReturn>;
 }
 
 pub struct AsyncReplyContext {
@@ -46,6 +29,35 @@ impl AsyncReplyContext {
             nng_ctx_recv(self.ctx.ctx(), self.ctx.aio().nng_aio());
         }
     }
+}
+
+impl AsyncContext for AsyncReplyContext {
+    fn new(socket: NngSocket) -> Self {
+        let ctx = NngCtx::new(socket).unwrap();
+        Self {
+            ctx,
+            state: ReplyState::Receiving,
+            request_sender: None,
+            reply_sender: None,
+        }
+    }
+    fn get_aio_callback() -> AioCallback {
+        reply_callback
+    }
+}
+
+impl Aio for AsyncReplyContext {
+    fn aio(&self) -> &NngAio {
+        self.ctx.aio()
+    }
+    fn aio_mut(&mut self) -> &mut NngAio {
+        self.ctx.aio_mut()
+    }
+}
+
+pub trait AsyncReply {
+    fn receive(&mut self) -> mpsc::Receiver<NngResult<NngMsg>>;
+    fn reply(&mut self, NngMsg) -> oneshot::Receiver<NngReturn>;
 }
 
 impl AsyncReply for AsyncReplyContext {
@@ -75,46 +87,6 @@ impl AsyncReply for AsyncReplyContext {
             nng_ctx_send(self.ctx.ctx(), aio);
         }
         receiver
-    }
-}
-
-impl Socket for Rep0 {
-    fn socket(&self) -> &NngSocket {
-        &self.socket
-    }
-    fn take(self) -> NngSocket {
-        self.socket
-    }
-}
-
-impl Listen for Rep0 {}
-impl RecvMsg for Rep0 {}
-
-impl AsyncSocket for Rep0 {
-    type ContextType = AsyncReplyContext;
-}
-
-impl AsyncContext for AsyncReplyContext {
-    fn new(socket: NngSocket) -> Self {
-        let ctx = NngCtx::new(socket).unwrap();
-        Self {
-            ctx,
-            state: ReplyState::Receiving,
-            request_sender: None,
-            reply_sender: None,
-        }
-    }
-    fn get_aio_callback() -> AioCallback {
-        reply_callback
-    }
-}
-
-impl Aio for AsyncReplyContext {
-    fn aio(&self) -> &NngAio {
-        self.ctx.aio()
-    }
-    fn aio_mut(&mut self) -> &mut NngAio {
-        self.ctx.aio_mut()
     }
 }
 
