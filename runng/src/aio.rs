@@ -5,6 +5,7 @@ use std::ptr;
 
 pub trait Aio {
     fn aio(&self) -> &NngAio;
+    fn aio_mut(&mut self) -> &mut NngAio;
 }
 
 pub struct NngAio {
@@ -35,6 +36,9 @@ impl NngAio {
         }
     }
     pub unsafe fn nng_aio(&self) -> *mut nng_aio {
+        if self.aio == ptr::null_mut() {
+            panic!("NngAio::init() not called");
+        }
         self.aio
     }
 }

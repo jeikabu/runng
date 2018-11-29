@@ -1,6 +1,5 @@
 use aio::{NngAio, AioCallbackArg};
 use futures::{
-    Sink,
     sync::mpsc::{
         channel,
         Receiver,
@@ -9,7 +8,6 @@ use futures::{
     };
 use msg::NngMsg;
 use runng_sys::*;
-use std::{rc::Rc};
 use super::*;
 
 pub struct Pull0 {
@@ -74,23 +72,28 @@ impl RecvMsg for Pull0 {}
 
 impl AsyncSocket for Pull0 {
     type ContextType = AsyncPullContext;
-    fn create_async_context(self) -> NngResult<Box<Self::ContextType>> {
-        let aio = NngAio::new(self.socket);
-        let ctx = Self::ContextType {
+}
+
+impl AsyncContext for AsyncPullContext {
+    fn new(socket: NngSocket) -> Self {
+        let aio = NngAio::new(socket);
+        Self {
             aio,
             state: PullState::Ready,
             sender: None,
-        };
-        
-        let mut ctx = Box::new(ctx);
-        // This mess is needed to convert Box<_> to c_void
-        let arg = ctx.as_mut() as *mut _ as AioCallbackArg;
-        let res = ctx.as_mut().aio.init(pull_callback, arg);
-        if let Err(err) = res {
-            Err(err)
-        } else {
-            Ok(ctx)
         }
+    }
+    fn get_aio_callback() -> AioCallback {
+        pull_callback
+    }
+}
+
+impl Aio for AsyncPullContext {
+    fn aio(&self) -> &NngAio {
+        &self.aio
+    }
+    fn aio_mut(&mut self) -> &mut NngAio {
+        &mut self.aio
     }
 }
 
@@ -115,32 +118,14 @@ extern fn pull_callback(arg : AioCallbackArg) {
                                 ctx.start_receive();
                             },
                         }
-                        if let Some(ref mut sender) = ctx.sender {
-                            let res = sender.try_send(Err(res));
-                            if let Err(err) = res {
-                                if err.is_disconnected() {
-                                    sender.close();
-                                } else {
-                                    debug!("Send failed: {}", err);
-                                }
-                            }
-                        }
+                        try_signal_complete(&mut ctx.sender, Err(res));
                     },
                     Ok(()) => {
                         let msg = NngMsg::new_msg(nng_aio_get_msg(aio));
                         // Make sure to reset state before signaling completion.  Otherwise
                         // have race-condition where receiver can receive None promise
                         ctx.start_receive();
-                        if let Some(ref mut sender) = ctx.sender {
-                            let res = sender.try_send(Ok(msg));
-                            if let Err(err) = res {
-                                if err.is_disconnected() {
-                                    sender.close();
-                                } else {
-                                    debug!("Send failed: {}", err);
-                                }
-                            }
-                        }
+                        try_signal_complete(&mut ctx.sender, Ok(msg));
                     }
                 }
             },
@@ -223,24 +208,29 @@ impl RecvMsg for Sub0 {}
 
 impl AsyncSocket for Sub0 {
     type ContextType = AsyncSubscribeContext;
-    fn create_async_context(self) -> NngResult<Box<Self::ContextType>> {
-        let aio = NngAio::new(self.socket);
-        let ctx = Self::ContextType {
+}
+
+impl AsyncContext for AsyncSubscribeContext {
+    fn new(socket: NngSocket) -> Self {
+        let aio = NngAio::new(socket);
+        Self {
             ctx: AsyncPullContext {
                 aio,
                 state: PullState::Ready,
                 sender: None,
             }
-        };
-        
-        let mut ctx = Box::new(ctx);
-        // This mess is needed to convert Box<_> to c_void
-        let arg = ctx.as_mut() as *mut _ as AioCallbackArg;
-        let res = ctx.as_mut().ctx.aio.init(pull_callback, arg);
-        if let Err(err) = res {
-            Err(err)
-        } else {
-            Ok(ctx)
         }
+    }
+    fn get_aio_callback() -> AioCallback {
+        pull_callback
+    }
+}
+
+impl Aio for AsyncSubscribeContext {
+    fn aio(&self) -> &NngAio {
+        &self.ctx.aio
+    }
+    fn aio_mut(&mut self) -> &mut NngAio {
+        &mut self.ctx.aio
     }
 }

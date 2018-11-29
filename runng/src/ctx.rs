@@ -5,10 +5,6 @@ use aio::{
 use runng_sys::*;
 use super::*;
 
-use std::{
-    rc::Rc,
-};
-
 pub trait Ctx {
     fn ctx(&self) -> nng_ctx;
 }
@@ -47,6 +43,9 @@ impl Ctx for NngCtx {
 impl Aio for NngCtx {
     fn aio(&self) -> &NngAio {
         &self.aio
+    }
+    fn aio_mut(&mut self) -> &mut NngAio {
+        &mut self.aio
     }
 }
 

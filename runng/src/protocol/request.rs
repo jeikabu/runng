@@ -9,7 +9,6 @@ use futures::{
 };
 use msg::NngMsg;
 use runng_sys::*;
-use std::{rc::Rc};
 use super::*;
 
 pub struct Req0 {
@@ -77,23 +76,28 @@ impl SendMsg for Req0 {}
 
 impl AsyncSocket for Req0 {
     type ContextType = AsyncRequestContext;
-    fn create_async_context(self) -> NngResult<Box<Self::ContextType>> {
-        let ctx = NngCtx::new(self.socket)?;
-        let ctx = Self::ContextType {
+}
+
+impl AsyncContext for AsyncRequestContext {
+    fn new(socket: NngSocket) -> Self {
+        let ctx = NngCtx::new(socket).unwrap();
+        Self {
             ctx,
             state: RequestState::Ready,
             sender: None,
-        };
-        
-        let mut ctx = Box::new(ctx);
-        // This mess is needed to convert Box<_> to c_void
-        let arg = ctx.as_mut() as *mut _ as AioCallbackArg;
-        let res = ctx.as_mut().ctx.init(request_callback, arg);
-        if let Err(err) = res {
-            Err(err)
-        } else {
-            Ok(ctx)
         }
+    }
+    fn get_aio_callback() -> AioCallback {
+        request_callback
+    }
+}
+
+impl Aio for AsyncRequestContext {
+    fn aio(&self) -> &NngAio {
+        self.ctx.aio()
+    }
+    fn aio_mut(&mut self) -> &mut NngAio {
+        self.ctx.aio_mut()
     }
 }
 

@@ -80,7 +80,6 @@ fn to_cstr(string: &str) -> (CString, *const i8) {
 
 pub trait SendMsg: Socket {
     fn send(&self, msg: msg::NngMsg) -> NngReturn {
-        let mut req_msg: *mut nng_msg = std::ptr::null_mut();
         let res = unsafe {
             nng_sendmsg(self.nng_socket(), msg.take(), 0)
         };

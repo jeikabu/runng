@@ -8,7 +8,6 @@ use futures::{
 };
 use msg::NngMsg;
 use runng_sys::*;
-use std::{rc::Rc};
 use super::*;
 
 pub struct Pub0 {
@@ -75,8 +74,28 @@ impl SendMsg for Pub0 {}
 
 impl AsyncSocket for Pub0 {
     type ContextType = AsyncPublishContext;
-    fn create_async_context(self) -> NngResult<Box<Self::ContextType>> {
-        create_async_context(self.socket)
+}
+
+impl AsyncContext for AsyncPublishContext {
+    fn new(socket: NngSocket) -> Self {
+        let aio = NngAio::new(socket);
+        Self {
+            aio,
+            state: PublishState::Ready,
+            sender: None,
+        }
+    }
+    fn get_aio_callback() -> AioCallback {
+        publish_callback
+    }
+}
+
+impl Aio for AsyncPublishContext {
+    fn aio(&self) -> &NngAio {
+        &self.aio
+    }
+    fn aio_mut(&mut self) -> &mut NngAio {
+        &mut self.aio
     }
 }
 
@@ -104,7 +123,6 @@ extern fn publish_callback(arg : AioCallbackArg) {
         }
     }
 }
-
 
 pub struct Push0 {
     socket: NngSocket
@@ -134,27 +152,4 @@ impl SendMsg for Push0 {}
 
 impl AsyncSocket for Push0 {
     type ContextType = AsyncPublishContext;
-    fn create_async_context(self) -> NngResult<Box<Self::ContextType>> {
-        create_async_context(self.socket)
-    }
-}
-
-
-fn create_async_context(socket: NngSocket) -> NngResult<Box<AsyncPublishContext>> {
-    let aio = NngAio::new(socket);
-    let ctx = AsyncPublishContext {
-        aio,
-        state: PublishState::Ready,
-        sender: None,
-    };
-    
-    let mut ctx = Box::new(ctx);
-    // This mess is needed to convert Box<_> to c_void
-    let arg = ctx.as_mut() as *mut _ as AioCallbackArg;
-    let res = ctx.as_mut().aio.init(publish_callback, arg);
-    if let Err(err) = res {
-        Err(err)
-    } else {
-        Ok(ctx)
-    }
 }
