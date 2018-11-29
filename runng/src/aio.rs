@@ -3,8 +3,9 @@
 use runng_sys::*;
 use super::*;
 use std::ptr;
+use std::sync::Arc;
 
-/// Type which exposes an `NngAio`.
+/// Type which exposes a `NngAio`.
 pub trait Aio {
     /// Obtain under-lying `NngAio`.
     fn aio(&self) -> &NngAio;
@@ -17,7 +18,7 @@ pub struct NngAio {
     // This isn't strictly correct from an NNG perspective.  It may be associated with:
     // - nng_context: nng_ctx_open(.., socket); nng_ctx_send(ctx, aio);
     // - nng_aio: nng_send_aio(socket, aio);
-    socket: NngSocket,
+    socket: Arc<NngSocket>,
 }
 
 pub type AioCallbackArg = *mut ::std::os::raw::c_void;
@@ -25,7 +26,7 @@ pub type AioCallback = unsafe extern "C" fn(arg1: AioCallbackArg);
 
 impl NngAio {
     /// Create new `NngAio`.  Must call `init()`.
-    pub fn new(socket: NngSocket) -> NngAio {
+    pub fn new(socket: Arc<NngSocket>) -> NngAio {
         NngAio {
             aio: ptr::null_mut(),
             socket,

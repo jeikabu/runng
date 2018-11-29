@@ -5,7 +5,7 @@ use super::*;
 
 /// Push half of push/pull ("pipeline") pattern.  See [nng_push](https://nanomsg.github.io/nng/man/v1.1.0/nng_push.7).
 pub struct Push0 {
-    socket: NngSocket
+    socket: Arc<NngSocket>
 }
 
 impl Push0 {
@@ -22,8 +22,8 @@ impl Socket for Push0 {
     fn socket(&self) -> &NngSocket {
         &self.socket
     }
-    fn take(self) -> NngSocket {
-        self.socket
+    fn clone_socket(&self) -> Arc<NngSocket> {
+        self.socket.clone()
     }
 }
 

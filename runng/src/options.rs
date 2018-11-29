@@ -1,6 +1,5 @@
 //! NNG options.  See [nng_options](https://nanomsg.github.io/nng/man/v1.1.0/nng_options.5).
 
-use std::ffi::CString;
 use super::*;
 
 pub struct NngString {

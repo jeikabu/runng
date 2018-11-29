@@ -5,6 +5,7 @@ use aio::{
     NngAio,
 };
 use runng_sys::*;
+use std::sync::Arc;
 use super::*;
 
 /// Type which exposes a `NngCtx`.
@@ -21,7 +22,7 @@ pub struct NngCtx {
 
 impl NngCtx {
     /// Creates a new context using the specified socket.  See [nng_ctx_open](https://nanomsg.github.io/nng/man/v1.1.0/nng_ctx_open.3).
-    pub fn new(socket: NngSocket) -> NngResult<NngCtx> {
+    pub fn new(socket: Arc<NngSocket>) -> NngResult<NngCtx> {
         let mut ctx = nng_ctx { id: 0 };
         let res = unsafe {
             nng_ctx_open(&mut ctx, socket.nng_socket())

@@ -12,7 +12,7 @@ impl NngDialer {
     pub(crate) fn new(socket: nng_socket, url: &str) -> NngResult<NngDialer> {
         unsafe {
             let mut dialer = nng_dialer { id: 0 };
-            let (_, url) = to_cstr(url)?;
+            let (_cstring, url) = to_cstr(url)?;
             NngFail::succeed(nng_dialer_create(&mut dialer, socket, url), NngDialer { dialer })
         }
     }

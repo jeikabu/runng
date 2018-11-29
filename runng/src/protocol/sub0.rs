@@ -1,11 +1,12 @@
 //! Publisher/subscriber pattern.
 
 use runng_sys::*;
+use std::sync::Arc;
 use super::*;
 
 /// Subscribe half of publisher/subscriber pattern.  See [nng_sub](https://nanomsg.github.io/nng/man/v1.1.0/nng_sub.7).
 pub struct Sub0 {
-    socket: NngSocket
+    socket: Arc<NngSocket>
 }
 
 impl Sub0 {
@@ -31,8 +32,8 @@ impl Socket for Sub0 {
     fn socket(&self) -> &NngSocket {
         &self.socket
     }
-    fn take(self) -> NngSocket {
-        self.socket
+    fn clone_socket(&self) -> Arc<NngSocket> {
+        self.socket.clone()
     }
 }
 

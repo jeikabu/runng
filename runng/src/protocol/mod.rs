@@ -31,6 +31,7 @@ use futures::{
 
 use msg::NngMsg;
 use runng_sys::*;
+use std::sync::Arc;
 use super::*;
 
 /// A `Socket` that can be turned into a context for asynchronous I/O.
@@ -54,9 +55,10 @@ pub trait AsyncSocket: Socket {
     type ContextType: AsyncContext;
 
     /// Turns the `Socket` into an asynchronous context
-    fn create_async_context(self) -> NngResult<Box<Self::ContextType>>
+    fn create_async_context(&self) -> NngResult<Box<Self::ContextType>>
     {
-        let ctx = Self::ContextType::new(self.take())?;
+        let socket = self.clone_socket();
+        let ctx = Self::ContextType::new(socket)?;
         let mut ctx = Box::new(ctx);
         // This mess is needed to convert Box<_> to c_void
         let arg = ctx.as_mut() as *mut _ as AioCallbackArg;
@@ -68,13 +70,13 @@ pub trait AsyncSocket: Socket {
 /// Context for asynchrounous I/O.
 pub trait AsyncContext: Aio + Sized {
     /// Create a new asynchronous context using specified socket.
-    fn new(socket: NngSocket) -> NngResult<Self>;
+    fn new(socket: Arc<NngSocket>) -> NngResult<Self>;
     fn get_aio_callback() -> AioCallback;
 }
 
 fn nng_open<T, O, S>(open_func: O, socket_create_func: S) -> NngResult<T>
     where O: Fn(&mut nng_socket) -> i32,
-        S: Fn(NngSocket) -> T
+        S: Fn(Arc<NngSocket>) -> T
 {
     let mut socket = nng_socket { id: 0 };
     let res = open_func(&mut socket);

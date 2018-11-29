@@ -1,11 +1,12 @@
 //! Request/reply pattern.
 
 use runng_sys::*;
+use std::sync::Arc;
 use super::*;
 
 /// Request half of request/reply pattern.  See [nng_req](https://nanomsg.github.io/nng/man/v1.1.0/nng_req.7).
 pub struct Req0 {
-    socket: NngSocket
+    socket: Arc<NngSocket>
 }
 
 impl Req0 {
@@ -21,8 +22,8 @@ impl Socket for Req0 {
     fn socket(&self) -> &NngSocket {
         &self.socket
     }
-    fn take(self) -> NngSocket {
-        self.socket
+    fn clone_socket(&self) -> Arc<NngSocket> {
+        self.socket.clone()
     }
 }
 

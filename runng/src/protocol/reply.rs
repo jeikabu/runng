@@ -8,6 +8,7 @@ use futures::{
 };
 use msg::NngMsg;
 use runng_sys::*;
+use std::sync::Arc;
 use super::*;
 
 #[derive(Debug,PartialEq)]
@@ -35,7 +36,7 @@ impl AsyncReplyContext {
 }
 
 impl AsyncContext for AsyncReplyContext {
-    fn new(socket: NngSocket) -> NngResult<Self> {
+    fn new(socket: Arc<NngSocket>) -> NngResult<Self> {
         let ctx = NngCtx::new(socket)?;
         let ctx = Self {
             ctx,

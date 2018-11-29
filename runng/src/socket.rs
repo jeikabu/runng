@@ -1,11 +1,11 @@
 //! Socket basics
 
 use runng_sys::*;
-use std::ffi::CString;
 use super::{
     *,
     dialer::NngDialer,
 };
+use std::sync::Arc;
 
 /// Wraps `nng_socket`.  See [nng_socket](https://nanomsg.github.io/nng/man/v1.1.0/nng_socket.5).
 pub struct NngSocket {
@@ -13,8 +13,9 @@ pub struct NngSocket {
 }
 
 impl NngSocket {
-    pub fn new(socket: nng_socket) -> NngSocket {
-        NngSocket { socket }
+    /// Create a new `NngSocket`.
+    pub fn new(socket: nng_socket) -> Arc<NngSocket> {
+        Arc::new(NngSocket { socket })
     }
     /// Obtain underlying `nng_socket`
     pub unsafe fn nng_socket(&self) -> nng_socket {
@@ -25,6 +26,7 @@ impl NngSocket {
 impl Drop for NngSocket {
     fn drop(&mut self) {
         unsafe {
+            //panic!("why");
             debug!("Socket close: {:?}", self.socket);
             let res = NngFail::from_i32(nng_close(self.socket));
             match res {
@@ -33,39 +35,39 @@ impl Drop for NngSocket {
                 Err(NngFail::Err(NngError::ECLOSED)) => {},
                 Err(res) => {
                     debug!("nng_close {:?}", res);
-                    panic!(res);
+                    panic!("nng_close {:?}", res);
                 },
             }
         }
     }
 }
 
-impl Socket for NngSocket {
-    fn socket(&self) -> &NngSocket {
-        self
-    }
-    fn take(self) -> NngSocket {
-        self
-    }
-}
+// impl Socket for NngSocket {
+//     fn socket(&self) -> &NngSocket {
+//         self
+//     }
+// }
 
-impl SendMsg for NngSocket {}
-impl RecvMsg for NngSocket {}
+// impl SendMsg for NngSocket {}
+// impl RecvMsg for NngSocket {}
 
+/// Type which exposes a `NngSocket`.
 pub trait Socket: Sized {
+    // Obtain underlying `NngSocket`.
     fn socket(&self) -> &NngSocket;
-    fn take(self) -> NngSocket;
+    fn clone_socket(&self) -> Arc<NngSocket>;
+    /// Obtain underlying `nng_socket`.
     unsafe fn nng_socket(&self) -> nng_socket {
         self.socket().nng_socket()
     }
 }
 
-/// `Socket` that can accept connections ("listen") from other `Socket`s.
+/// `Socket` that can accept connections from ("listen" to) other `Socket`s.
 pub trait Listen: Socket {
     /// Listen for connections to specified URL.  See [nng_listen](https://nanomsg.github.io/nng/man/v1.1.0/nng_listen.3).
     fn listen(self, url: &str) -> NngResult<Self> {
         unsafe {
-            let (_, ptr) = to_cstr(url)?;
+            let (_cstring, ptr) = to_cstr(url)?;
             let res = nng_listen(self.nng_socket(), ptr, std::ptr::null_mut(), 0);
             NngFail::succeed(res, self)
         }
@@ -77,7 +79,7 @@ pub trait Dial: Socket {
     /// Dial socket specified by URL.  See [nng_dial](https://nanomsg.github.io/nng/man/v1.1.0/nng_dial.3)
     fn dial(self, url: &str) -> NngResult<Self> {
         unsafe {
-            let (_, ptr) = to_cstr(url)?;
+            let (_cstring, ptr) = to_cstr(url)?;
             let res = nng_dial(self.nng_socket(), ptr, std::ptr::null_mut(), 0);
             NngFail::succeed(res, self)
         }

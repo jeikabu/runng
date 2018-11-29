@@ -11,6 +11,7 @@ use futures::{
 };
 use msg::NngMsg;
 use runng_sys::*;
+use std::sync::Arc;
 use super::*;
 
 #[derive(Debug,PartialEq)]
@@ -28,7 +29,7 @@ pub struct AsyncRequestContext {
 }
 
 impl AsyncContext for AsyncRequestContext {
-    fn new(socket: NngSocket) -> NngResult<Self> {
+    fn new(socket: Arc<NngSocket>) -> NngResult<Self> {
         let ctx = NngCtx::new(socket)?;
         let ctx = Self {
             ctx,

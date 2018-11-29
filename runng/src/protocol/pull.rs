@@ -10,6 +10,7 @@ use futures::{
     };
 use msg::NngMsg;
 use runng_sys::*;
+use std::sync::Arc;
 use super::*;
 
 #[derive(Debug,PartialEq)]
@@ -35,7 +36,7 @@ impl AsyncPullContext {
 }
 
 impl AsyncContext for AsyncPullContext {
-    fn new(socket: NngSocket) -> NngResult<Self> {
+    fn new(socket: Arc<NngSocket>) -> NngResult<Self> {
         let aio = NngAio::new(socket);
         let ctx = Self {
             aio,
@@ -125,7 +126,7 @@ impl AsyncPull for AsyncSubscribeContext {
 
 impl AsyncContext for AsyncSubscribeContext {
     /// Create an asynchronous context using the specified socket.
-    fn new(socket: NngSocket) -> NngResult<Self> {
+    fn new(socket: Arc<NngSocket>) -> NngResult<Self> {
         let aio = NngAio::new(socket);
         let ctx = Self {
             ctx: AsyncPullContext {
