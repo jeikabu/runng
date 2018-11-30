@@ -76,6 +76,7 @@ pub use self::socket::*;
 
 extern crate futures;
 extern crate runng_sys;
+extern crate runng_derive;
 
 #[macro_use]
 extern crate log;

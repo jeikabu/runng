@@ -101,6 +101,7 @@ fn listenerdialer() -> NngReturn {
             let requester = factory.requester_open()?;
             {
                 let req_dialer = requester.dialer_create(&url)?;
+                assert_eq!(url, req_dialer.getopt_string(NngOption::URL).unwrap().to_str().unwrap());
                 req_dialer.start()?;
                 requester.send(msg::NngMsg::new()?)?;
                 let _request = replier.recv()?;

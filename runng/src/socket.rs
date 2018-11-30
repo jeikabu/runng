@@ -1,6 +1,7 @@
 //! Socket basics
 
 use runng_sys::*;
+use runng_derive::{NngGetOpts, NngSetOpts};
 use super::{
     *,
     dialer::NngDialer,
@@ -9,7 +10,10 @@ use super::{
 use std::sync::Arc;
 
 /// Wraps `nng_socket`.  See [nng_socket](https://nanomsg.github.io/nng/man/v1.1.0/nng_socket.5).
+#[derive(NngGetOpts)]
+#[prefix = "nng_"]
 pub struct NngSocket {
+    #[nng_member]
     socket: nng_socket,
 }
 
@@ -113,69 +117,6 @@ pub trait RecvMsg: Socket {
             let mut recv_ptr: *mut nng_msg = std::ptr::null_mut();
             let res = nng_recvmsg(self.nng_socket(), &mut recv_ptr, 0);
             NngFail::succeed_then(res, || msg::NngMsg::new_msg(recv_ptr))
-        }
-    }
-}
-
-/// See [nng_getopt](https://nanomsg.github.io/nng/man/v1.1.0/nng_getopt.3) and [nng_setopt](https://nanomsg.github.io/nng/man/v1.1.0/nng_setopt.3)
-impl Opts for NngSocket {
-    fn getopt_bool(&self, option: NngOption) -> NngResult<bool> {
-        unsafe {
-            let mut value: bool = Default::default();
-            NngFail::succeed(nng_getopt_bool(self.socket, option.as_cptr(), &mut value), value)
-        }
-    }
-    fn getopt_int(&self, option: NngOption) -> NngResult<i32> {
-        unsafe {
-            let mut value: i32 = Default::default();
-            NngFail::succeed(nng_getopt_int(self.socket, option.as_cptr(), &mut value), value)
-        }
-    }
-    fn getopt_size(&self, option: NngOption) -> NngResult<usize> {
-        unsafe {
-            let mut value: usize = Default::default();
-            NngFail::succeed(nng_getopt_size(self.socket, option.as_cptr(), &mut value), value)
-        }
-    }
-    fn getopt_uint64(&self, option: NngOption) -> NngResult<u64> {
-        unsafe {
-            let mut value: u64 = Default::default();
-            NngFail::succeed(nng_getopt_uint64(self.socket, option.as_cptr(), &mut value), value)
-        }
-    }
-    fn getopt_string(&self, option: NngOption) -> NngResult<NngString> {
-        unsafe {
-            let mut value: *mut ::std::os::raw::c_char = std::ptr::null_mut();
-            let res = nng_getopt_string(self.socket, option.as_cptr(), &mut value);
-            NngFail::from_i32(res)?;
-            Ok(NngString::new(value))
-        }
-    }
-
-    fn setopt_bool(&mut self, option: NngOption, value: bool) -> NngReturn {
-        unsafe {
-            NngFail::from_i32(nng_setopt_bool(self.socket, option.as_cptr(), value))
-        }
-    }
-    fn setopt_int(&mut self, option: NngOption, value: i32) -> NngReturn {
-        unsafe {
-            NngFail::from_i32(nng_setopt_int(self.socket, option.as_cptr(), value))
-        }
-    }
-    fn setopt_size(&mut self, option: NngOption, value: usize) -> NngReturn {
-        unsafe {
-            NngFail::from_i32(nng_setopt_size(self.socket, option.as_cptr(), value))
-        }
-    }
-    fn setopt_uint64(&mut self, option: NngOption, value: u64) -> NngReturn {
-        unsafe {
-            NngFail::from_i32(nng_setopt_uint64(self.socket, option.as_cptr(), value))
-        }
-    }
-    fn setopt_string(&mut self, option: NngOption, value: &str) -> NngReturn {
-        unsafe {
-            let (_, value) = to_cstr(value)?;
-            NngFail::from_i32(nng_setopt_string(self.socket, option.as_cptr(), value))
         }
     }
 }

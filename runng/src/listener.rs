@@ -2,10 +2,14 @@
 
 use runng_sys::*;
 use std::sync::Arc;
+use runng_derive::{NngGetOpts, NngSetOpts};
 use super::*;
 
 /// Wraps `nng_listener`.  See [nng_listener](https://nanomsg.github.io/nng/man/v1.1.0/nng_listener.5).
+#[derive(NngGetOpts, NngSetOpts)]
+#[prefix = "nng_listener_"]
 pub struct NngListener {
+    #[nng_member]
     listener: nng_listener,
     socket: Arc<NngSocket>
 }

@@ -10,6 +10,11 @@ impl NngString {
     pub fn new(pointer: *mut ::std::os::raw::c_char) -> NngString {
         NngString { pointer }
     }
+    pub fn to_str(&self) -> Result<&str, std::str::Utf8Error> {
+        unsafe {
+            std::ffi::CStr::from_ptr(self.pointer).to_str()
+        }
+    }
 }
 
 impl Drop for NngString {
@@ -20,14 +25,17 @@ impl Drop for NngString {
     }
 }
 
-/// Trait for types which support getting and setting NNG options.
-pub trait Opts {
+/// Trait for types which support getting NNG options.
+pub trait GetOpts {
     fn getopt_bool(&self, option: NngOption) -> NngResult<bool>;
     fn getopt_int(&self, option: NngOption) -> NngResult<i32>;
     fn getopt_size(&self, option: NngOption) -> NngResult<usize>;
     fn getopt_uint64(&self, option: NngOption) -> NngResult<u64>;
     fn getopt_string(&self, option: NngOption) -> NngResult<NngString>;
+}
 
+/// Trait for types which support setting NNG options.
+pub trait SetOpts {
     fn setopt_bool(&mut self, option: NngOption, value: bool) -> NngReturn;
     fn setopt_int(&mut self, option: NngOption, value: i32) -> NngReturn;
     fn setopt_size(&mut self, option: NngOption, value: usize) -> NngReturn;
