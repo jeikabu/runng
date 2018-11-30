@@ -59,6 +59,7 @@ pub mod aio;
 pub mod ctx;
 pub mod dialer;
 pub mod factory;
+pub mod listener;
 pub mod msg;
 pub mod options;
 pub mod protocol;

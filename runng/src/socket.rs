@@ -4,6 +4,7 @@ use runng_sys::*;
 use super::{
     *,
     dialer::NngDialer,
+    listener::NngListener,
 };
 use std::sync::Arc;
 
@@ -26,7 +27,6 @@ impl NngSocket {
 impl Drop for NngSocket {
     fn drop(&mut self) {
         unsafe {
-            //panic!("why");
             debug!("Socket close: {:?}", self.socket);
             let res = NngFail::from_i32(nng_close(self.socket));
             match res {
@@ -72,6 +72,10 @@ pub trait Listen: Socket {
             NngFail::succeed(res, self)
         }
     }
+
+    fn listener_create(&self, url: &str) -> NngResult<NngListener> {
+        NngListener::new(self.clone_socket(), url)
+    }
 }
 
 /// `Socket` that can connect to ("dial") another `Socket`.
@@ -85,10 +89,8 @@ pub trait Dial: Socket {
         }
     }
 
-    fn dialer_create(self, url: &str) -> NngResult<NngDialer> {
-        unsafe {
-            NngDialer::new(self.nng_socket(), url)
-        }
+    fn dialer_create(&self, url: &str) -> NngResult<NngDialer> {
+        NngDialer::new(self.clone_socket(), url)
     }
 }
 

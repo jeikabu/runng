@@ -89,6 +89,38 @@ fn msg() -> NngReturn {
 }
 
 #[test]
+fn listenerdialer() -> NngReturn {
+    let url = get_url();
+    let factory = Latest::new();
+
+    let replier = factory.replier_open()?;
+    {
+        {
+            let listener = replier.listener_create(&url)?;
+            listener.start()?;
+            let requester = factory.requester_open()?;
+            {
+                let req_dialer = requester.dialer_create(&url)?;
+                req_dialer.start()?;
+                requester.send(msg::NngMsg::new()?)?;
+                let _request = replier.recv()?;
+                // Drop the dialer
+            }
+            // requester still works
+            requester.send(msg::NngMsg::new()?)?;
+            let _request = replier.recv()?;
+            // Drop the listener
+        }
+        // Replier still works
+        let requester = factory.requester_open()?.dial(&url)?;
+        requester.send(msg::NngMsg::new()?)?;
+        let _request = replier.recv()?;
+    }
+
+    Ok(())
+}
+
+#[test]
 fn pubsub() -> NngReturn {
     let url = get_url();
     let factory = Latest::new();
