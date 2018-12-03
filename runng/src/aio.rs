@@ -67,7 +67,7 @@ impl Drop for NngAio {
     }
 }
 
-impl RawSocket for NngAio {
+impl InternalSocket for NngAio {
     fn socket(&self) -> &NngSocket {
         &self.socket
     }

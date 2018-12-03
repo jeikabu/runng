@@ -8,7 +8,7 @@ use std::{
 };
 
 /// Error values returned by NNG functions.
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum NngError {
     EINTR        = nng_errno_enum_NNG_EINTR as isize,
     ENOMEM       = nng_errno_enum_NNG_ENOMEM as isize,

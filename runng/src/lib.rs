@@ -62,6 +62,7 @@ pub mod factory;
 pub mod listener;
 pub mod msg;
 pub mod options;
+pub mod pipe;
 pub mod protocol;
 pub mod result;
 pub mod socket;
@@ -83,9 +84,8 @@ extern crate log;
 
 use runng_sys::*;
 
-
 // Trait where type exposes a socket, but this shouldn't be part of public API
-trait RawSocket {
+trait InternalSocket {
     fn socket(&self) -> &NngSocket;
     unsafe fn nng_socket(&self) -> nng_socket {
         self.socket().nng_socket()

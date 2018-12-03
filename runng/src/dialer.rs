@@ -35,3 +35,21 @@ impl NngDialer {
         }
     }
 }
+
+/// "Unsafe" version of `NngDialer`.  Merely wraps `nng_dialer` and makes no attempt to manage the underlying resources.
+/// May be invalid, close unexpectedly, etc.
+pub struct UnsafeDialer {
+    dialer: nng_dialer,
+}
+
+impl UnsafeDialer {
+    pub fn new(dialer: nng_dialer) -> Self {
+        Self { dialer }
+    }
+
+    pub fn id(&self) -> i32 {
+        unsafe {
+            nng_dialer_id(self.dialer)
+        }
+    }
+}

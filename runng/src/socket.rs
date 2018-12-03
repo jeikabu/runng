@@ -1,7 +1,7 @@
 //! Socket basics
 
 use runng_sys::*;
-use runng_derive::{NngGetOpts, NngSetOpts};
+use runng_derive::{NngGetOpts};
 use super::{
     *,
     dialer::NngDialer,
@@ -22,9 +22,18 @@ impl NngSocket {
     pub fn new(socket: nng_socket) -> Arc<NngSocket> {
         Arc::new(NngSocket { socket })
     }
+
     /// Obtain underlying `nng_socket`
     pub unsafe fn nng_socket(&self) -> nng_socket {
         self.socket
+    }
+
+    /// Register pipe notification callback.  See [nng_pipe_notify](https://nanomsg.github.io/nng/man/v1.1.0/nng_pipe_notify.3).
+    #[cfg(feature="pipes")]
+    pub fn notify(&self, event: pipe::PipeEvent, callback: pipe::PipeNotifyCallback, argument: pipe::PipeNotifyCallbackArg) -> NngReturn {
+        unsafe {
+            NngFail::from_i32(nng_pipe_notify(self.socket, event as i32, Some(callback), argument))
+        }
     }
 }
 
@@ -117,6 +126,25 @@ pub trait RecvMsg: Socket {
             let mut recv_ptr: *mut nng_msg = std::ptr::null_mut();
             let res = nng_recvmsg(self.nng_socket(), &mut recv_ptr, 0);
             NngFail::succeed_then(res, || msg::NngMsg::new_msg(recv_ptr))
+        }
+    }
+}
+
+/// "Unsafe" version of `NngSocket`.  Merely wraps `nng_socket` and makes no attempt to manage the underlying resources.
+/// May be invalid, close unexpectedly, etc.
+pub struct UnsafeSocket {
+    socket: nng_socket,
+}
+
+impl UnsafeSocket {
+    pub fn new(socket: nng_socket) -> Self {
+        Self { socket }
+    }
+
+    /// See [nng_socket_id](https://nanomsg.github.io/nng/man/v1.1.0/nng_socket_id.3).
+    pub fn id(&self) -> i32 {
+        unsafe {
+            nng_socket_id(self.socket)
         }
     }
 }

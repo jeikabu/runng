@@ -36,3 +36,22 @@ impl NngListener {
         }
     }
 }
+
+/// "Unsafe" version of `NngListener`.  Merely wraps `nng_listener` and makes no attempt to manage the underlying resources.
+/// May be invalid, close unexpectedly, etc.
+pub struct UnsafeListener {
+    listener: nng_listener,
+}
+
+impl UnsafeListener {
+    pub(crate) fn new(listener: nng_listener) -> Self {
+        Self { listener }
+    }
+
+    /// See [nng_listener_id](https://nanomsg.github.io/nng/man/v1.1.0/nng_listener_id.3).
+    pub fn id(&self) -> i32 {
+        unsafe {
+            nng_listener_id(self.listener)
+        }
+    }
+}
