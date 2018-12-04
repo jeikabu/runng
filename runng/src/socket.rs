@@ -55,14 +55,17 @@ impl Drop for NngSocket {
     }
 }
 
-// impl Socket for NngSocket {
-//     fn socket(&self) -> &NngSocket {
-//         self
-//     }
-// }
+impl Socket for NngSocket {
+    fn socket(&self) -> &NngSocket {
+        self
+    }
+    fn clone_socket(&self) -> Arc<NngSocket> {
+        panic!()
+    }
+}
 
-// impl SendMsg for NngSocket {}
-// impl RecvMsg for NngSocket {}
+impl SendMsg for NngSocket {}
+impl RecvMsg for NngSocket {}
 
 /// Type which exposes a `NngSocket`.
 pub trait Socket: Sized {

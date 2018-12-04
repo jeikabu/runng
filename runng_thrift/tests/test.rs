@@ -15,12 +15,7 @@ mod test_service;
 mod tests {
     use super::*;
     use runng::{
-        Dial,
-        Factory,
-        Listen,
-        RecvMsg,
-        SendMsg,
-        Socket,
+        *,
         msg::NngMsg,
         protocol::Subscribe,
     };
@@ -34,19 +29,19 @@ mod tests {
     };
 
     #[test]
-    fn it_works() {
-        let factory = runng::Latest::new();
-        let publisher = factory.publisher_open().unwrap();
-        let subscriber = factory.subscriber_open().unwrap();
+    fn it_works() -> NngReturn {
         let url = "inproc://test";
-        publisher.listen(url).unwrap();
-        subscriber.dial(url).unwrap();
+        let factory = runng::Latest::new();
+        let publisher = factory.publisher_open()?.listen(url)?;
+        let subscriber = factory.subscriber_open()?.dial(url)?;
         let topic: Vec<u8> = vec![0];
         subscriber.subscribe(&topic);
-        let mut msg = NngMsg::new().unwrap();
-        msg.append_u32(0).unwrap();
-        publisher.send(msg).unwrap();
-        subscriber.recv().unwrap();
+        let mut msg = NngMsg::new()?;
+        msg.append_u32(0)?;
+        publisher.send(msg)?;
+        subscriber.recv()?;
+
+        Ok(())
     }
 
     use std::{
@@ -89,16 +84,14 @@ mod tests {
     }
 
     #[test]
-    fn basic_thrift_works() {
+    fn basic_thrift_works() -> NngReturn {
         let url = "inproc://test2";
         let factory = runng::Latest::new();
 
-        let replier = factory.replier_open().unwrap();
-        replier.listen(url).unwrap();
-        
+        let replier = factory.replier_open()?.listen(url)?;
 
         thread::spawn(move || {
-            let mut channel = TNngChannel::new(replier.take()).unwrap();
+            let mut channel = TNngChannel::new(replier.clone_socket()).unwrap();
             let (readable, writable) = channel.split().unwrap();
             let mut in_proto = TNngInputProtocol::new(readable);
             let mut out_proto = TNngOutputProtocol::new(writable);
@@ -109,10 +102,9 @@ mod tests {
             debug!("Server done!");
         });
 
-        let requester = factory.requester_open().unwrap();
-        requester.dial(url).unwrap();
+        let requester = factory.requester_open()?.dial(url)?;
 
-        let mut channel = TNngChannel::new(requester.take()).unwrap();
+        let mut channel = TNngChannel::new(requester.clone_socket()).unwrap();
         let (readable, writable) = channel.split().unwrap();
         let in_proto = TNngInputProtocol::new(readable);
         let out_proto = TNngOutputProtocol::new(writable);
@@ -120,17 +112,18 @@ mod tests {
         use test_service::TTestServiceSyncClient;
         let mut client = test_service::TestServiceSyncClient::new(in_proto, out_proto);
         client.test().unwrap();
+
+        Ok(())
     }
     
     //#[test]
-    fn thrift_works() {
+    fn thrift_works() -> NngReturn {
         let url = "inproc://test3";
         let serviceName = "blah";
         let factory = runng::Latest::new();
 
-        let replier = factory.replier_open().unwrap();
-        replier.listen(url).unwrap();
-        let mut channel = TNngChannel::new(replier.take()).unwrap();
+        let replier = factory.replier_open()?.listen(url)?;
+        let mut channel = TNngChannel::new(replier.clone_socket())?;
         let (readable, writable) = channel.split().unwrap();
         let in_proto = TNngInputProtocol::new(readable);
         let out_proto = TNngOutputProtocol::new(writable);
@@ -143,10 +136,9 @@ mod tests {
             
         });
 
-        let requester = factory.requester_open().unwrap();
-        requester.dial(url).unwrap();
+        let requester = factory.requester_open()?.dial(url)?;
 
-        let mut channel = TNngChannel::new(requester.take()).unwrap();
+        let mut channel = TNngChannel::new(requester.clone_socket()).unwrap();
         let (readable, writable) = channel.split().unwrap();
         let in_proto = TNngInputProtocol::new(readable);
         let out_proto = TNngOutputProtocol::new(writable);
@@ -155,5 +147,7 @@ mod tests {
         use test_service::TTestServiceSyncClient;
         let mut client = test_service::TestServiceSyncClient::new(in_proto, out_proto);
         client.test().unwrap();
+
+        Ok(())
     }
 }

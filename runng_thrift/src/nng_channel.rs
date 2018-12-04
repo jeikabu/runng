@@ -4,9 +4,7 @@ extern crate thrift;
 use super::*;
 
 use runng::{
-    msg::{
-        NngMsg
-    },
+    msg::NngMsg,
     socket::{
         NngSocket,
         RecvMsg,
@@ -17,9 +15,8 @@ use runng::{
 use std;
 use std::{
     io,
-    io::{
-        {Error, ErrorKind},
-    }
+    io::{Error, ErrorKind},
+    sync::Arc,
 };
 use thrift::transport::{
     TIoChannel,
@@ -29,11 +26,11 @@ use thrift::transport::{
 
 pub struct TNngChannel {
     message: NngMsg,
-    socket: NngSocket,
+    socket: Arc<NngSocket>,
 }
 
 impl TNngChannel {
-    pub fn new(socket: NngSocket) -> runng::NngResult<TNngChannel> {
+    pub fn new(socket: Arc<NngSocket>) -> runng::NngResult<TNngChannel> {
         let message = NngMsg::new()?;
         Ok(TNngChannel {
             message,
@@ -55,7 +52,7 @@ impl TIoChannel for TNngChannel {
         Self: Sized,
     {
         let clone = unsafe {
-            ResultWrapper(TNngChannel::new(NngSocket::new(self.socket.nng_socket())))?
+            result_wrapper(TNngChannel::new(NngSocket::new(self.socket.nng_socket())))?
         };
         Ok((
             ReadHalf::new(self),
@@ -67,7 +64,7 @@ impl TIoChannel for TNngChannel {
 impl Read for TNngChannel {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         //assert!(self.message.len() == 0);
-        if (self.message.len() == 0) {
+        if self.message.len() == 0 {
             let res = self.socket.recv();
             match res {
                 Ok(msg) => {
@@ -81,7 +78,6 @@ impl Read for TNngChannel {
             self.helper(buf)
         }
     }
-    
 }
 
 impl Write for TNngChannel {

@@ -9,7 +9,7 @@ use crate::{
     msg::NngMsg,
 };
 use super::*;
-use runng_derive::{NngGetOpts, NngSetOpts};
+use runng_derive::{NngGetOpts};
 
 /// Pipe events.  See [nng_pipe_notify](https://nanomsg.github.io/nng/man/v1.1.0/nng_pipe_notify.3).
 #[derive(Clone, Copy, Debug)]

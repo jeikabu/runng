@@ -16,17 +16,17 @@ use runng::pipe::*;
 use runng_sys::nng_pipe;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-static NumAddPre: AtomicUsize = AtomicUsize::new(0);
-static NumAddPost: AtomicUsize = AtomicUsize::new(0);
-static NumRemPost: AtomicUsize = AtomicUsize::new(0);
-static NumBad: AtomicUsize = AtomicUsize::new(0);
+static NUM_ADDPRE: AtomicUsize = AtomicUsize::new(0);
+static NUM_ADDPOST: AtomicUsize = AtomicUsize::new(0);
+static NUM_REMPOST: AtomicUsize = AtomicUsize::new(0);
+static NUM_BAD: AtomicUsize = AtomicUsize::new(0);
 
-extern fn notify_callback(pipe: nng_pipe, event: i32, arg1: PipeNotifyCallbackArg) {
+extern fn notify_callback(_pipe: nng_pipe, event: i32, _arg: PipeNotifyCallbackArg) {
     match PipeEvent::from_i32(event) {
-        Some(PipeEvent::AddPre) => NumAddPre.fetch_add(1, Ordering::Relaxed),
-        Some(PipeEvent::AddPost) => NumAddPost.fetch_add(1, Ordering::Relaxed),
-        Some(PipeEvent::RemPost) => NumRemPost.fetch_add(1, Ordering::Relaxed),
-        _ => NumBad.fetch_add(1, Ordering::Relaxed),
+        Some(PipeEvent::AddPre) => NUM_ADDPRE.fetch_add(1, Ordering::Relaxed),
+        Some(PipeEvent::AddPost) => NUM_ADDPOST.fetch_add(1, Ordering::Relaxed),
+        Some(PipeEvent::RemPost) => NUM_REMPOST.fetch_add(1, Ordering::Relaxed),
+        _ => NUM_BAD.fetch_add(1, Ordering::Relaxed),
     };
 }
 
@@ -42,10 +42,10 @@ fn notify() -> NngReturn {
         let _ = factory.requester_open()?.dial(&url)?;
     }
     
-    assert_eq!(NumAddPre.load(Ordering::Relaxed), 1);
-    assert_eq!(NumAddPost.load(Ordering::Relaxed), 1);
-    assert_eq!(NumRemPost.load(Ordering::Relaxed), 1);
-    assert_eq!(NumBad.load(Ordering::Relaxed), 0);
+    assert_eq!(NUM_ADDPRE.load(Ordering::Relaxed), 1);
+    assert_eq!(NUM_ADDPOST.load(Ordering::Relaxed), 1);
+    assert_eq!(NUM_REMPOST.load(Ordering::Relaxed), 1);
+    assert_eq!(NUM_BAD.load(Ordering::Relaxed), 0);
     Ok(())
 }
 
