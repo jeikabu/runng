@@ -38,6 +38,7 @@ impl Socket for Sub0 {
 }
 
 impl Dial for Sub0 {}
+impl Listen for Sub0 {}
 impl RecvMsg for Sub0 {}
 
 impl AsyncSocket for Sub0 {

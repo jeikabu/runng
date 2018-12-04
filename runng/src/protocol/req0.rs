@@ -28,7 +28,9 @@ impl Socket for Req0 {
 }
 
 impl Dial for Req0 {}
+impl Listen for Req0 {}
 impl SendMsg for Req0 {}
+impl RecvMsg for Req0 {}
 
 impl AsyncSocket for Req0 {
     type ContextType = AsyncRequestContext;
