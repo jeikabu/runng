@@ -1,5 +1,6 @@
 use super::*;
 
+/// Factory to create various NNG sockets
 pub trait Factory {
     fn requester_open(&self) -> NngResult<protocol::Req0>;
     fn replier_open(&self) -> NngResult<protocol::Rep0>;
@@ -9,11 +10,19 @@ pub trait Factory {
     fn puller_open(&self) -> NngResult<protocol::Pull0>;
 }
 
+/// The latest version of all protocols
+/// 
+/// # Examples
+/// ```
+/// use runng::Factory;
+/// let factory = runng::Latest::new();
+/// let publisher = factory.publisher_open();
+/// ```
 pub struct Latest {
 }
 
-impl Latest {
-    pub fn new() -> Latest {
+impl Default for Latest {
+    fn default() -> Latest {
         Latest {}
     }
 }

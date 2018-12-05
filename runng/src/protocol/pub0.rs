@@ -1,11 +1,16 @@
+//! Publisher/subscriber pattern.
+
 use runng_sys::*;
+use std::sync::Arc;
 use super::*;
 
+/// Publish half of publisher/subscriber pattern.  See [nng_pub](https://nanomsg.github.io/nng/man/v1.1.0/nng_pub.7).
 pub struct Pub0 {
-    socket: NngSocket
+    socket: Arc<NngSocket>
 }
 
 impl Pub0 {
+    /// Create a pub socket.  See [nng_pub_open](https://nanomsg.github.io/nng/man/v1.1.0/nng_pub_open.3).
     pub fn open() -> NngResult<Self> {
         let open_func = |socket: &mut nng_socket| unsafe { nng_pub0_open(socket) };
         let socket_create_func = |socket| Pub0{ socket };
@@ -17,8 +22,8 @@ impl Socket for Pub0 {
     fn socket(&self) -> &NngSocket {
         &self.socket
     }
-    fn take(self) -> NngSocket {
-        self.socket
+    fn clone_socket(&self) -> Arc<NngSocket> {
+        self.socket.clone()
     }
 }
 

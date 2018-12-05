@@ -1,3 +1,4 @@
+//! Return values and error handling
 
 use runng_sys::*;
 use std::{
@@ -6,44 +7,47 @@ use std::{
     io,
 };
 
-#[derive(Debug)]
+/// Error values returned by NNG functions.
+#[derive(Clone, Copy, Debug)]
+#[repr(u32)]
 pub enum NngError {
-    EINTR        = nng_errno_enum_NNG_EINTR as isize,
-    ENOMEM       = nng_errno_enum_NNG_ENOMEM as isize,
-    EINVAL       = nng_errno_enum_NNG_EINVAL as isize,
-    EBUSY        = nng_errno_enum_NNG_EBUSY as isize,
-    ETIMEDOUT    = nng_errno_enum_NNG_ETIMEDOUT as isize,
-    ECONNREFUSED = nng_errno_enum_NNG_ECONNREFUSED as isize,
-    ECLOSED      = nng_errno_enum_NNG_ECLOSED as isize,
-    EAGAIN       = nng_errno_enum_NNG_EAGAIN as isize,
-    ENOTSUP      = nng_errno_enum_NNG_ENOTSUP as isize,
-    EADDRINUSE   = nng_errno_enum_NNG_EADDRINUSE as isize,
-    ESTATE       = nng_errno_enum_NNG_ESTATE as isize,
-    ENOENT       = nng_errno_enum_NNG_ENOENT as isize,
-    EPROTO       = nng_errno_enum_NNG_EPROTO as isize,
-    EUNREACHABLE = nng_errno_enum_NNG_EUNREACHABLE as isize,
-    EADDRINVAL   = nng_errno_enum_NNG_EADDRINVAL as isize,
-    EPERM        = nng_errno_enum_NNG_EPERM as isize,
-    EMSGSIZE     = nng_errno_enum_NNG_EMSGSIZE as isize,
-    ECONNABORTED = nng_errno_enum_NNG_ECONNABORTED as isize,
-    ECONNRESET   = nng_errno_enum_NNG_ECONNRESET as isize,
-    ECANCELED    = nng_errno_enum_NNG_ECANCELED as isize,
-    ENOFILES     = nng_errno_enum_NNG_ENOFILES as isize,
-    ENOSPC       = nng_errno_enum_NNG_ENOSPC as isize,
-    EEXIST       = nng_errno_enum_NNG_EEXIST as isize,
-    EREADONLY    = nng_errno_enum_NNG_EREADONLY as isize,
-    EWRITEONLY   = nng_errno_enum_NNG_EWRITEONLY as isize,
-    ECRYPTO      = nng_errno_enum_NNG_ECRYPTO as isize,
-    EPEERAUTH    = nng_errno_enum_NNG_EPEERAUTH as isize,
-    ENOARG       = nng_errno_enum_NNG_ENOARG as isize,
-    EAMBIGUOUS   = nng_errno_enum_NNG_EAMBIGUOUS as isize,
-    EBADTYPE     = nng_errno_enum_NNG_EBADTYPE as isize,
-    EINTERNAL    = nng_errno_enum_NNG_EINTERNAL as isize,
-    ESYSERR      = nng_errno_enum_NNG_ESYSERR as isize,
-    ETRANERR     = nng_errno_enum_NNG_ETRANERR as isize,
+    EINTR        = nng_errno_enum_NNG_EINTR,
+    ENOMEM       = nng_errno_enum_NNG_ENOMEM,
+    EINVAL       = nng_errno_enum_NNG_EINVAL,
+    EBUSY        = nng_errno_enum_NNG_EBUSY,
+    ETIMEDOUT    = nng_errno_enum_NNG_ETIMEDOUT,
+    ECONNREFUSED = nng_errno_enum_NNG_ECONNREFUSED,
+    ECLOSED      = nng_errno_enum_NNG_ECLOSED,
+    EAGAIN       = nng_errno_enum_NNG_EAGAIN,
+    ENOTSUP      = nng_errno_enum_NNG_ENOTSUP,
+    EADDRINUSE   = nng_errno_enum_NNG_EADDRINUSE,
+    ESTATE       = nng_errno_enum_NNG_ESTATE,
+    ENOENT       = nng_errno_enum_NNG_ENOENT,
+    EPROTO       = nng_errno_enum_NNG_EPROTO,
+    EUNREACHABLE = nng_errno_enum_NNG_EUNREACHABLE,
+    EADDRINVAL   = nng_errno_enum_NNG_EADDRINVAL,
+    EPERM        = nng_errno_enum_NNG_EPERM,
+    EMSGSIZE     = nng_errno_enum_NNG_EMSGSIZE,
+    ECONNABORTED = nng_errno_enum_NNG_ECONNABORTED,
+    ECONNRESET   = nng_errno_enum_NNG_ECONNRESET,
+    ECANCELED    = nng_errno_enum_NNG_ECANCELED,
+    ENOFILES     = nng_errno_enum_NNG_ENOFILES,
+    ENOSPC       = nng_errno_enum_NNG_ENOSPC,
+    EEXIST       = nng_errno_enum_NNG_EEXIST,
+    EREADONLY    = nng_errno_enum_NNG_EREADONLY,
+    EWRITEONLY   = nng_errno_enum_NNG_EWRITEONLY,
+    ECRYPTO      = nng_errno_enum_NNG_ECRYPTO,
+    EPEERAUTH    = nng_errno_enum_NNG_EPEERAUTH,
+    ENOARG       = nng_errno_enum_NNG_ENOARG,
+    EAMBIGUOUS   = nng_errno_enum_NNG_EAMBIGUOUS,
+    EBADTYPE     = nng_errno_enum_NNG_EBADTYPE,
+    EINTERNAL    = nng_errno_enum_NNG_EINTERNAL,
+    ESYSERR      = nng_errno_enum_NNG_ESYSERR,
+    ETRANERR     = nng_errno_enum_NNG_ETRANERR,
 }
 
 impl NngError {
+    /// Converts value returned by NNG method into `error::Error`.
     pub fn from_i32(value: i32) -> Option<NngError> {
         match value {
             value if value == NngError::EINTR as i32        => Some(NngError::EINTR),
@@ -89,9 +93,12 @@ impl NngError {
 pub enum NngFail {
     Err(NngError),
     Unknown(i32),
+    IoError(io::Error),
+    NulError(std::ffi::NulError),
 }
 
 impl NngFail {
+    /// Converts values returned by NNG methods into `Result<>`
     pub fn from_i32(value: i32) -> NngReturn {
         if value == 0 {
             Ok(())
@@ -121,6 +128,18 @@ impl error::Error for NngError {
 impl fmt::Display for NngError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self)
+    }
+}
+
+impl From<io::Error> for NngFail {
+    fn from(err: io::Error) -> NngFail {
+        NngFail::IoError(err)
+    }
+}
+
+impl From<std::ffi::NulError> for NngFail {
+    fn from(err: std::ffi::NulError) -> NngFail {
+        NngFail::NulError(err)
     }
 }
 

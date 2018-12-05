@@ -1,3 +1,5 @@
+//! NNG protocols.  See [Section 7](https://nanomsg.github.io/nng/man/v1.1.0/index.html#_section_7_protocols_and_transports).
+
 pub mod pub0;
 pub mod pull0;
 pub mod push0;
@@ -29,33 +31,52 @@ use futures::{
 
 use msg::NngMsg;
 use runng_sys::*;
+use std::sync::Arc;
 use super::*;
 
+/// A `Socket` that can be turned into a context for asynchronous I/O.
+/// 
+/// # Examples
+/// ```
+/// use runng::{
+///     *,
+///     protocol::AsyncSocket,
+/// };
+/// fn test() -> Result<(), NngFail> {
+///     let factory = Latest::new();
+///     let pusher = factory.pusher_open()?.listen("inproc://test")?;
+///     let mut push_ctx = pusher.create_async_context()?;
+///     Ok(())
+/// }
+/// ```
 pub trait AsyncSocket: Socket {
+
+    /// The type of aynchronous context produced
     type ContextType: AsyncContext;
-    fn create_async_context(self) -> NngResult<Box<Self::ContextType>>
+
+    /// Turns the `Socket` into an asynchronous context
+    fn create_async_context(&self) -> NngResult<Box<Self::ContextType>>
     {
-        let ctx = Self::ContextType::new(self.take());
+        let socket = self.clone_socket();
+        let ctx = Self::ContextType::new(socket)?;
         let mut ctx = Box::new(ctx);
         // This mess is needed to convert Box<_> to c_void
         let arg = ctx.as_mut() as *mut _ as AioCallbackArg;
-        let res = ctx.as_mut().aio_mut().init(Self::ContextType::get_aio_callback(), arg);
-        if let Err(err) = res {
-            Err(err)
-        } else {
-            Ok(ctx)
-        }
+        ctx.as_mut().aio_mut().init(Self::ContextType::get_aio_callback(), arg)?;
+        Ok(ctx)
     }
 }
 
-pub trait AsyncContext: Aio {
-    fn new(socket: NngSocket) -> Self;
+/// Context for asynchrounous I/O.
+pub trait AsyncContext: Aio + Sized {
+    /// Create a new asynchronous context using specified socket.
+    fn new(socket: Arc<NngSocket>) -> NngResult<Self>;
     fn get_aio_callback() -> AioCallback;
 }
 
 fn nng_open<T, O, S>(open_func: O, socket_create_func: S) -> NngResult<T>
     where O: Fn(&mut nng_socket) -> i32,
-        S: Fn(NngSocket) -> T
+        S: Fn(Arc<NngSocket>) -> T
 {
     let mut socket = nng_socket { id: 0 };
     let res = open_func(&mut socket);

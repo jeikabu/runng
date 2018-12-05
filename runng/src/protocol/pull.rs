@@ -1,3 +1,5 @@
+//! Async push/pull ("pipeline")
+
 use aio::{NngAio, AioCallbackArg};
 use futures::{
     sync::mpsc::{
@@ -8,6 +10,7 @@ use futures::{
     };
 use msg::NngMsg;
 use runng_sys::*;
+use std::sync::Arc;
 use super::*;
 
 #[derive(Debug,PartialEq)]
@@ -16,6 +19,7 @@ enum PullState {
     Receiving,
 }
 
+/// Asynchronous context for pull socket.
 pub struct AsyncPullContext {
     aio: NngAio,
     state: PullState,
@@ -32,13 +36,14 @@ impl AsyncPullContext {
 }
 
 impl AsyncContext for AsyncPullContext {
-    fn new(socket: NngSocket) -> Self {
+    fn new(socket: Arc<NngSocket>) -> NngResult<Self> {
         let aio = NngAio::new(socket);
-        Self {
+        let ctx = Self {
             aio,
             state: PullState::Ready,
             sender: None,
-        }
+        };
+        Ok(ctx)
     }
     fn get_aio_callback() -> AioCallback {
         pull_callback
@@ -54,7 +59,9 @@ impl Aio for AsyncPullContext {
     }
 }
 
+/// Trait for asynchronous contexts that can receive a stream of messages.
 pub trait AsyncPull {
+    /// Asynchronously receive a stream of messages.
     fn receive(&mut self) -> Receiver<NngResult<NngMsg>>;
 }
 
@@ -103,6 +110,7 @@ extern fn pull_callback(arg : AioCallbackArg) {
     }
 }
 
+/// Asynchronous context for subscribe socket.
 pub struct AsyncSubscribeContext {
     ctx: AsyncPullContext,
 }
@@ -117,15 +125,17 @@ impl AsyncPull for AsyncSubscribeContext {
 }
 
 impl AsyncContext for AsyncSubscribeContext {
-    fn new(socket: NngSocket) -> Self {
+    /// Create an asynchronous context using the specified socket.
+    fn new(socket: Arc<NngSocket>) -> NngResult<Self> {
         let aio = NngAio::new(socket);
-        Self {
+        let ctx = Self {
             ctx: AsyncPullContext {
                 aio,
                 state: PullState::Ready,
                 sender: None,
             }
-        }
+        };
+        Ok(ctx)
     }
     fn get_aio_callback() -> AioCallback {
         pull_callback

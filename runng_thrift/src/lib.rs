@@ -24,7 +24,7 @@ enum NngThriftError {
 }
 type NngThriftResult<T> = Result<T, NngThriftError>;
 
-fn ResultWrapper<T>(result: runng::NngResult<T>) -> NngThriftResult<T> {
+fn result_wrapper<T>(result: runng::NngResult<T>) -> NngThriftResult<T> {
     match result {
         Ok(result) => Ok(result),
         Err(result) => Err(NngThriftError::Nng(result)),

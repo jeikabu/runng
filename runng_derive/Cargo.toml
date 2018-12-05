@@ -1,0 +1,16 @@
+[package]
+name = "runng_derive"
+version = "0.1.0"
+authors = ["Jake <jeikabu+github@gmail.com>"]
+
+description = "Macros for [runng](https://crates.io/crates/runng)"
+keywords = ["runng"]
+license = "MIT"
+repository = "https://github.com/jeikabu/runng"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = "0.15"
+quote = "0.6"

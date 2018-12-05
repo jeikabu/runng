@@ -1,3 +1,5 @@
+//! Async request/reply
+
 use aio::{NngAio, AioCallbackArg};
 use ctx::NngCtx;
 use futures::{
@@ -9,6 +11,7 @@ use futures::{
 };
 use msg::NngMsg;
 use runng_sys::*;
+use std::sync::Arc;
 use super::*;
 
 #[derive(Debug,PartialEq)]
@@ -18,6 +21,7 @@ enum RequestState {
     Receiving,
 }
 
+/// Asynchronous context for request socket.
 pub struct AsyncRequestContext {
     ctx: NngCtx,
     state: RequestState,
@@ -25,13 +29,14 @@ pub struct AsyncRequestContext {
 }
 
 impl AsyncContext for AsyncRequestContext {
-    fn new(socket: NngSocket) -> Self {
-        let ctx = NngCtx::new(socket).unwrap();
-        Self {
+    fn new(socket: Arc<NngSocket>) -> NngResult<Self> {
+        let ctx = NngCtx::new(socket)?;
+        let ctx = Self {
             ctx,
             state: RequestState::Ready,
             sender: None,
-        }
+        };
+        Ok(ctx)
     }
     fn get_aio_callback() -> AioCallback {
         request_callback
@@ -47,7 +52,9 @@ impl Aio for AsyncRequestContext {
     }
 }
 
+/// Trait for asynchronous contexts that can send a request and receive a reply.
 pub trait AsyncRequest {
+    /// Asynchronously send a request and return a future for the reply.
     fn send(&mut self, msg: NngMsg) -> Receiver<NngResult<NngMsg>>;
 }
 

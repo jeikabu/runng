@@ -3,10 +3,10 @@ extern crate futures;
 extern crate runng;
 extern crate runng_sys;
 
+mod common;
+
 #[cfg(test)]
 mod tests {
-
-use env_logger::{Builder, Env};
 
 use futures::{
     future,
@@ -23,67 +23,38 @@ use std::{
     thread,
     time::Duration
 };
-
+use common::get_url;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-static URL_ID: AtomicUsize = AtomicUsize::new(1);
-fn get_url() -> String {
-    Builder::from_env(Env::default().default_filter_or("trace")).try_init()
-        .unwrap_or_else(|err| println!("env_logger::init() failed: {}", err));
-    let val = URL_ID.fetch_add(1, Ordering::Relaxed);
-    String::from("inproc://test") + &val.to_string()
-}
-
 #[test]
-fn it_works() -> NngReturn {
+fn listenerdialer() -> NngReturn {
     let url = get_url();
+    let factory = Latest::default();
 
-    let factory = Latest::new();
-    let rep = factory.replier_open()?.listen(&url)?;
-    let req = factory.requester_open()?.dial(&url)?;
-    req.send(msg::NngMsg::new()?)?;
-    rep.recv()?;
-
-    Ok(())
-}
-
-#[test]
-fn aio() -> NngReturn {
-    let url = get_url();
-
-    let factory = Latest::new();
-    let mut rep_ctx = factory
-        .replier_open()?
-        .listen(&url)?
-        .create_async_context()?;
-
-    let requester = factory.requester_open()?.dial(&url)?;
-    let mut req_ctx = requester.create_async_context()?;
-    let req_future = req_ctx.send(msg::NngMsg::new()?);
-    rep_ctx.receive()
-        .take(1).for_each(|_request|{
-            let msg = msg::NngMsg::new().unwrap();
-            rep_ctx.reply(msg).wait().unwrap();
-            Ok(())
-        }).wait();
-    req_future.wait().unwrap()?;
-
-    Ok(())
-}
-
-#[test]
-fn msg() -> NngReturn {
-    let mut builder = msg::MsgBuilder::default();
-    let value: u32 = 0x01234567;
-    builder.append_u32(value);
-    let mut msg = builder.build()?;
-    assert_eq!(value, msg.trim_u32()?);
-
-    let data = vec![0, 1, 2, 3, 4, 5, 6, 7];
-    let mut msg = builder.clean().append_slice(&data).build()?;
-    let mut nngmsg = msg::NngMsg::new()?;
-    nngmsg.append(data.as_ptr(), data.len())?;
-    assert_eq!(nngmsg.body(), msg.body());
+    let replier = factory.replier_open()?;
+    {
+        {
+            let listener = replier.listener_create(&url)?;
+            listener.start()?;
+            let requester = factory.requester_open()?;
+            {
+                let req_dialer = requester.dialer_create(&url)?;
+                assert_eq!(url, req_dialer.getopt_string(NngOption::URL).unwrap().to_str().unwrap());
+                req_dialer.start()?;
+                requester.send(msg::NngMsg::new()?)?;
+                let _request = replier.recv()?;
+                // Drop the dialer
+            }
+            // requester still works
+            requester.send(msg::NngMsg::new()?)?;
+            let _request = replier.recv()?;
+            // Drop the listener
+        }
+        // Replier still works
+        let requester = factory.requester_open()?.dial(&url)?;
+        requester.send(msg::NngMsg::new()?)?;
+        let _request = replier.recv()?;
+    }
 
     Ok(())
 }
@@ -91,7 +62,7 @@ fn msg() -> NngReturn {
 #[test]
 fn pubsub() -> NngReturn {
     let url = get_url();
-    let factory = Latest::new();
+    let factory = Latest::default();
 
     let publisher = factory.publisher_open()?.listen(&url)?;
     let subscriber = factory.subscriber_open()?.dial(&url)?;
@@ -148,72 +119,13 @@ fn pubsub() -> NngReturn {
     Ok(())
 }
 
-#[test]
-fn pushpull() -> NngReturn {
-    let url = get_url();
-    let factory = Latest::new();
-
-    let pusher = factory.pusher_open()?.listen(&url)?;
-    let puller = factory.puller_open()?.dial(&url)?;
-    let count = 4;
-
-    // Pusher
-    let push_thread = thread::spawn(move || -> NngReturn {
-        let mut push_ctx = pusher.create_async_context()?;
-        // Send messages
-        for i in 0..count {
-            let msg = msg::MsgBuilder::default()
-                .append_u32(i).build()?;
-            push_ctx
-                .send(msg)
-                .wait()
-                .unwrap()?;
-        }
-        // Send a stop message
-        let stop_message = msg::NngMsg::new().unwrap();
-        push_ctx
-            .send(stop_message)
-            .wait()
-            .unwrap()?;
-        Ok(())
-    });
-
-    // Puller
-    let recv_count = Arc::new(AtomicUsize::new(0));
-    let thread_count = recv_count.clone();
-    let pull_thread = thread::spawn(move || -> NngReturn {
-        let mut pull_ctx = puller.create_async_context()?;
-        pull_ctx.receive()
-            // Process until receive stop message
-            .take_while(|res| {
-                match res {
-                    Ok(msg) => future::ok(msg.len() > 0),
-                    Err(_) => future::ok(false),
-                }
-            })
-            // Increment count of received messages
-            .for_each(|_|{
-                thread_count.fetch_add(1, Ordering::Relaxed);
-                Ok(())
-            }).wait().unwrap();
-        Ok(())
-    });
-
-    push_thread.join().unwrap();
-    pull_thread.join().unwrap();
-
-    // Received number of messages we sent
-    assert_eq!(recv_count.load(Ordering::Relaxed), count as usize);
-
-    Ok(())
-}
 
 #[test]
 fn broker() -> NngReturn {
     let url_broker_in = get_url();
     let url_broker_out = get_url();
 
-    let factory = Latest::new();
+    let factory = Latest::default();
 
     let broker_pull = factory
         .puller_open()?.listen(&url_broker_in)?;

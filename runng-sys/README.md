@@ -5,6 +5,7 @@ Rust FFI bindings to [NNG](https://github.com/nanomsg/nng).
 
 For a more ergonomic API to NNG see [runng](https://crates.io/crates/runng).
 
+## Examples
 ```rust
 extern crate runng_sys;
 
