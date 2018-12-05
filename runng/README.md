@@ -1,18 +1,45 @@
-# runng
-
-High-level wrapper around [NNG](https://github.com/nanomsg/nng).
+Rust high-level wrapper around [NNG](https://github.com/nanomsg/nng) (Nanomsg-Next-Gen)
 
 Features:  
-- Use of [nng_aio](https://nanomsg.github.io/nng/man/v1.1.0/nng_aio.5) for asynchronous I/O
-- Use of [nng_ctx](https://nanomsg.github.io/nng/man/v1.1.0/nng_ctx.5) for advanced protocol handling
+- Use [nng_aio](https://nanomsg.github.io/nng/man/v1.1.0/nng_aio.5) for asynchronous I/O
+- Use [nng_ctx](https://nanomsg.github.io/nng/man/v1.1.0/nng_ctx.5) for advanced protocol handling
 - Leverage [futures](https://docs.rs/futures) crate for ease of use with [tokio](https://tokio.rs/) and eventual support of [`async`/`await`](https://github.com/rust-lang/rust/issues/50547)
 
-## Sample
+## Examples
 
+Simple:
 ```rust
-#[test]
-fn aio() -> Result<(), NngFail> {
-    let url = String::from("inproc://test");
+use runng::*;
+fn test() -> Result<(), NngFail> {
+    const url: &str = "inproc://test";
+    let factory = Latest::new();
+    let rep = factory.replier_open()?.listen(&url)?;
+    let req = factory.requester_open()?.dial(&url)?;
+    req.send(msg::NngMsg::new()?)?;
+    rep.recv()?;
+    Ok(())
+}
+```
+
+Asynchronous I/O:
+```rust
+extern crate futures;
+extern crate runng;
+use futures::{
+    future::Future,
+    stream::Stream,
+};
+use runng::{
+    *,
+    protocol::{
+        AsyncReply,
+        AsyncRequest,
+        AsyncSocket,
+    },
+};
+
+fn aio() -> NngReturn {
+    const url: &str = "inproc://test";
 
     let factory = Latest::new();
     let mut rep_ctx = factory
@@ -24,7 +51,7 @@ fn aio() -> Result<(), NngFail> {
     let mut req_ctx = requester.create_async_context()?;
     let req_future = req_ctx.send(msg::NngMsg::new()?);
     rep_ctx.receive()
-        .take(1).for_each(|request|{
+        .take(1).for_each(|_request|{
             let msg = msg::NngMsg::new().unwrap();
             rep_ctx.reply(msg).wait().unwrap();
             Ok(())
@@ -34,3 +61,5 @@ fn aio() -> Result<(), NngFail> {
     Ok(())
 }
 ```
+
+Additional examples [in `examples/` folder](https://github.com/jeikabu/runng/tree/master/runng/examples).
