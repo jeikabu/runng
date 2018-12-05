@@ -21,6 +21,8 @@ pub struct NngAio {
     socket: Arc<NngSocket>,
 }
 
+unsafe impl Send for NngAio {}
+
 pub type AioCallbackArg = *mut ::std::os::raw::c_void;
 pub type AioCallback = unsafe extern "C" fn(arg1: AioCallbackArg);
 

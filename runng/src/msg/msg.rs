@@ -12,6 +12,8 @@ pub struct NngMsg {
     msg: *mut nng_msg
 }
 
+unsafe impl Send for NngMsg {}
+
 impl NngMsg {
     /// Create a message.  See [nng_msg_alloc](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg_alloc.3).
     pub fn new() -> NngResult<NngMsg> {

@@ -29,7 +29,7 @@ use std::{
 #[test]
 fn pushpull() -> NngReturn {
     let url = get_url();
-    let factory = Latest::new();
+    let factory = Latest::default();
 
     let pusher = factory.pusher_open()?.listen(&url)?;
     let puller = factory.puller_open()?.dial(&url)?;

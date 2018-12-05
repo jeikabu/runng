@@ -29,7 +29,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 #[test]
 fn listenerdialer() -> NngReturn {
     let url = get_url();
-    let factory = Latest::new();
+    let factory = Latest::default();
 
     let replier = factory.replier_open()?;
     {
@@ -62,7 +62,7 @@ fn listenerdialer() -> NngReturn {
 #[test]
 fn pubsub() -> NngReturn {
     let url = get_url();
-    let factory = Latest::new();
+    let factory = Latest::default();
 
     let publisher = factory.publisher_open()?.listen(&url)?;
     let subscriber = factory.subscriber_open()?.dial(&url)?;
@@ -125,7 +125,7 @@ fn broker() -> NngReturn {
     let url_broker_in = get_url();
     let url_broker_out = get_url();
 
-    let factory = Latest::new();
+    let factory = Latest::default();
 
     let broker_pull = factory
         .puller_open()?.listen(&url_broker_in)?;

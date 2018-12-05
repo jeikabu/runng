@@ -34,7 +34,7 @@ extern fn notify_callback(_pipe: nng_pipe, event: i32, _arg: PipeNotifyCallbackA
 fn notify() -> NngReturn {
     let url = get_url();
 
-    let factory = Latest::new();
+    let factory = Latest::default();
     let rep = factory.replier_open()?.listen(&url)?;
     [PipeEvent::AddPre, PipeEvent::AddPost, PipeEvent::RemPost].iter().
         for_each(|event| rep.socket().notify(*event, notify_callback, std::ptr::null_mut()).unwrap());

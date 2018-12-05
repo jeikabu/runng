@@ -21,8 +21,8 @@ pub trait Factory {
 pub struct Latest {
 }
 
-impl Latest {
-    pub fn new() -> Latest {
+impl Default for Latest {
+    fn default() -> Latest {
         Latest {}
     }
 }

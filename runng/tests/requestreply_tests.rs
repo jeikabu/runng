@@ -23,7 +23,7 @@ use common::get_url;
 fn it_works() -> NngReturn {
     let url = get_url();
 
-    let factory = Latest::new();
+    let factory = Latest::default();
     let rep = factory.replier_open()?.listen(&url)?;
     let req = factory.requester_open()?.dial(&url)?;
     req.send(msg::NngMsg::new()?)?;
@@ -36,7 +36,7 @@ fn it_works() -> NngReturn {
 fn aio() -> NngReturn {
     let url = get_url();
 
-    let factory = Latest::new();
+    let factory = Latest::default();
     let mut rep_ctx = factory
         .replier_open()?
         .listen(&url)?
