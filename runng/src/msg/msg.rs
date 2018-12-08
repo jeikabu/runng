@@ -16,7 +16,7 @@ unsafe impl Send for NngMsg {}
 
 impl NngMsg {
     /// Create a message.  See [nng_msg_alloc](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg_alloc.3).
-    pub fn new() -> NngResult<NngMsg> {
+    pub fn new() -> NngResult<Self> {
         let mut msg: *mut nng_msg = ptr::null_mut();
         let res = unsafe {
             nng_msg_alloc(&mut msg, 0)

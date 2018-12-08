@@ -91,14 +91,14 @@ extern fn publish_callback(arg : AioCallbackArg) {
             PublishState::Sending => {
                 let nng_aio = ctx.aio.nng_aio();
                 let res = NngFail::from_i32(nng_aio_result(nng_aio));
-                if let Err(_) = res {
+                if res.is_err() {
                     // Nng requires that we retrieve the message and free it
                     let _ = NngMsg::new_msg(nng_aio_get_msg(nng_aio));
                 }
                 // Reset state before signaling completion
                 ctx.state = PublishState::Ready;
                 let res = ctx.sender.take().unwrap().send(res);
-                if let Err(_) = res {
+                if res.is_err() {
                     // Unable to send result.  Receiver probably went away.  Not necessarily a problem.
                 }
             },
