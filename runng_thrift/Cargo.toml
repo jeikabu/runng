@@ -2,6 +2,7 @@
 name = "runng_thrift"
 version = "0.1.0"
 authors = ["Jake <jeikabu+github@gmail.com>"]
+edition = "2018"
 
 [dependencies]
 runng = { version = "0.1", path = "../runng" }

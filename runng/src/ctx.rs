@@ -1,12 +1,11 @@
 //! Protocol contexts
 
-use aio::{
-    Aio,
-    NngAio,
+use crate::{
+    *,
+    aio::{Aio, NngAio},
 };
 use runng_sys::*;
 use std::sync::Arc;
-use super::*;
 
 /// Type which exposes a `NngCtx`.
 pub trait Ctx {

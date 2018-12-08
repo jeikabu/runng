@@ -1,15 +1,18 @@
 //! Async request/reply
 
-use aio::{NngAio, AioCallbackArg};
-use ctx::NngCtx;
+use crate::{
+    *,
+    aio::{Aio, NngAio, AioCallbackArg},
+    ctx::NngCtx,
+    msg::NngMsg,
+    protocol::{AsyncContext, try_signal_complete},
+};
 use futures::{
     sync::oneshot,
     sync::mpsc,
 };
-use msg::NngMsg;
 use runng_sys::*;
 use std::sync::Arc;
-use super::*;
 
 #[derive(Debug,PartialEq)]
 enum ReplyState {
@@ -65,7 +68,7 @@ pub trait AsyncReply {
     /// Asynchronously receive a request.
     fn receive(&mut self) -> mpsc::Receiver<NngResult<NngMsg>>;
     /// Asynchronously reply to previously received request.
-    fn reply(&mut self, NngMsg) -> oneshot::Receiver<NngReturn>;
+    fn reply(&mut self, msg: NngMsg) -> oneshot::Receiver<NngReturn>;
 }
 
 impl AsyncReply for AsyncReplyContext {

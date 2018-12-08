@@ -6,10 +6,8 @@ extern crate try_from;
 
 #[macro_use]
 extern crate log;
-
-use runng_thrift::*;
-
 mod test_service;
+use runng_thrift::*;
 
 #[cfg(test)]
 mod tests {
@@ -31,7 +29,7 @@ mod tests {
     #[test]
     fn it_works() -> NngReturn {
         let url = "inproc://test";
-        let factory = runng::Latest::new();
+        let factory = runng::Latest::default();
         let publisher = factory.publisher_open()?.listen(url)?;
         let subscriber = factory.subscriber_open()?.dial(url)?;
         let topic: Vec<u8> = vec![0];
@@ -71,9 +69,11 @@ mod tests {
             }
         }
     }
-    use test_service::{
+    
+    use crate::test_service::{
         TestServiceSyncHandler,
         TestServiceSyncProcessor,
+        TTestServiceSyncClient,
     };
     struct Handler;
     impl TestServiceSyncHandler for Handler {
@@ -86,7 +86,7 @@ mod tests {
     #[test]
     fn basic_thrift_works() -> NngReturn {
         let url = "inproc://test2";
-        let factory = runng::Latest::new();
+        let factory = runng::Latest::default();
 
         let replier = factory.replier_open()?.listen(url)?;
 
@@ -109,7 +109,6 @@ mod tests {
         let in_proto = TNngInputProtocol::new(readable);
         let out_proto = TNngOutputProtocol::new(writable);
 
-        use test_service::TTestServiceSyncClient;
         let mut client = test_service::TestServiceSyncClient::new(in_proto, out_proto);
         client.test().unwrap();
 
@@ -120,7 +119,7 @@ mod tests {
     fn thrift_works() -> NngReturn {
         let url = "inproc://test3";
         let serviceName = "blah";
-        let factory = runng::Latest::new();
+        let factory = runng::Latest::default();
 
         let replier = factory.replier_open()?.listen(url)?;
         let mut channel = TNngChannel::new(replier.clone_socket())?;
@@ -144,7 +143,7 @@ mod tests {
         let out_proto = TNngOutputProtocol::new(writable);
         let out_proto = TMultiplexedOutputProtocol::new(serviceName, out_proto);
 
-        use test_service::TTestServiceSyncClient;
+        use crate::test_service::TTestServiceSyncClient;
         let mut client = test_service::TestServiceSyncClient::new(in_proto, out_proto);
         client.test().unwrap();
 

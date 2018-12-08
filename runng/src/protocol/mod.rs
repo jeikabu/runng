@@ -29,10 +29,12 @@ use futures::{
     sync::mpsc,
 };
 
-use msg::NngMsg;
+use crate::{
+    *,
+    msg::NngMsg,
+};
 use runng_sys::*;
 use std::sync::Arc;
-use super::*;
 
 /// A `Socket` that can be turned into a context for asynchronous I/O.
 /// 
@@ -43,7 +45,7 @@ use super::*;
 ///     protocol::AsyncSocket,
 /// };
 /// fn test() -> Result<(), NngFail> {
-///     let factory = Latest::new();
+///     let factory = Latest::default();
 ///     let pusher = factory.pusher_open()?.listen("inproc://test")?;
 ///     let mut push_ctx = pusher.create_async_context()?;
 ///     Ok(())

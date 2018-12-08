@@ -8,7 +8,7 @@ mod common;
 #[cfg(test)]
 mod tests {
 
-use common::get_url;
+use crate::common::get_url;
 use futures::{
     future,
     future::Future,

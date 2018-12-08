@@ -1,17 +1,20 @@
 //! Async push/pull ("pipeline")
 
-use aio::{NngAio, AioCallbackArg};
+use crate::{
+    *,
+    aio::{NngAio, AioCallbackArg},
+    msg::NngMsg,
+    protocol::{AsyncContext, subscribe, try_signal_complete},
+};
 use futures::{
     sync::mpsc::{
         channel,
         Receiver,
         Sender,
     }
-    };
-use msg::NngMsg;
+};
 use runng_sys::*;
 use std::sync::Arc;
-use super::*;
 
 #[derive(Debug,PartialEq)]
 enum PullState {

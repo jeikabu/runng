@@ -17,8 +17,6 @@ use thrift::{
     }
 };
 
-use super::*;
-
 pub struct TNngInputProtocol<T>
 where
     T: TReadTransport

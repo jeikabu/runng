@@ -10,21 +10,18 @@ mod tests {
 
 use futures::{
     future,
-    future::{
-        Future,
-    },
+    future::Future,
     Stream,
 };
-use runng::protocol::*;
-use runng::socket::*;
-use runng::*;
+use runng::{
+    *,
+    protocol::*,
+};
 use std::{
-    sync::Arc,
     thread,
     time::Duration
 };
-use common::get_url;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use crate::common::get_url;
 
 #[test]
 fn listenerdialer() -> NngReturn {

@@ -1,7 +1,7 @@
 extern crate byteorder;
 
 use self::byteorder::{BigEndian, WriteBytesExt};
-use msg::msg::NngMsg;
+use crate::msg::NngMsg;
 use super::*;
 
 /// Build `NngMsg` using fluent API.  See [nng_msg](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg.5).

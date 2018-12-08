@@ -16,7 +16,7 @@ use runng::{
     *,
     protocol::*,
 };
-use common::get_url;
+use crate::common::get_url;
 
 
 #[test]

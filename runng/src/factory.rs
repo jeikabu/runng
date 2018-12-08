@@ -14,8 +14,11 @@ pub trait Factory {
 /// 
 /// # Examples
 /// ```
-/// use runng::Factory;
-/// let factory = runng::Latest::new();
+/// use runng::{
+///     Factory,
+///     factory::Latest,
+/// };
+/// let factory = Latest::default();
 /// let publisher = factory.publisher_open();
 /// ```
 pub struct Latest {

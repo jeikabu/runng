@@ -10,7 +10,7 @@ mod common;
 #[cfg(test)]
 mod tests {
 
-use common::get_url;
+use crate::common::get_url;
 use runng::*;
 use runng::pipe::*;
 use runng_sys::nng_pipe;
