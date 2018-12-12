@@ -31,3 +31,8 @@ log = "0.4"
 env_logger = "0.6"
 clap = "2.32"
 tokio = "0.1"
+criterion = "0.2"
+
+[[bench]]
+name = "benchmarks"
+harness = false
