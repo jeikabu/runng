@@ -3,5 +3,5 @@ members = [
     "runng-sys",
     "runng",
     "runng_derive",
-    #"runng_thrift",
+    "runng_thrift",
 ]
