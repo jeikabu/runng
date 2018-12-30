@@ -1,8 +1,3 @@
-extern crate env_logger;
-extern crate futures;
-extern crate runng;
-extern crate runng_sys;
-
 mod common;
 
 #[cfg(test)]

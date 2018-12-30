@@ -1,8 +1,3 @@
-extern crate env_logger;
-extern crate futures;
-extern crate runng;
-extern crate runng_sys;
-
 mod common;
 
 #[cfg(test)]
@@ -16,7 +11,7 @@ use runng::{
     *,
     protocol::*,
 };
-use common::get_url;
+use crate::common::get_url;
 
 
 #[test]

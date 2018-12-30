@@ -1,5 +1,3 @@
-extern crate thrift;
-
 use thrift::{
     protocol::{
         TInputProtocol,
@@ -16,8 +14,6 @@ use thrift::{
         TWriteTransport,
     }
 };
-
-use super::*;
 
 pub struct TNngInputProtocol<T>
 where

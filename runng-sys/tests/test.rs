@@ -1,5 +1,3 @@
-extern crate runng_sys;
-
 #[cfg(test)]
 mod tests {
 

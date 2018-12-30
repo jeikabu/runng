@@ -19,7 +19,7 @@ pub struct NngSocket {
 
 impl NngSocket {
     /// Create a new `NngSocket`.
-    pub fn new(socket: nng_socket) -> Arc<NngSocket> {
+    pub fn new(socket: nng_socket) -> Arc<Self> {
         Arc::new(NngSocket { socket })
     }
 

@@ -1,9 +1,6 @@
 #![recursion_limit="128"]
 
 extern crate proc_macro;
-extern crate syn;
-#[macro_use]
-extern crate quote;
 
 use proc_macro::TokenStream;
 use syn::{
@@ -11,6 +8,7 @@ use syn::{
     Meta,
     MetaNameValue,
 };
+use quote::quote;
 
 #[proc_macro_derive(NngGetOpts, attributes(prefix, nng_member))]
 pub fn derive_nng_get_opts(tokens: TokenStream) -> TokenStream {
@@ -55,11 +53,11 @@ fn get_nng_member(ast: &syn::DeriveInput) -> Option<syn::Ident> {
 }
 
 fn derive_nng_opts<F>(tokens: TokenStream, gen_impl: F) -> TokenStream
-    where F: Fn(&syn::Ident, String, &syn::Ident) -> TokenStream
+    where F: Fn(&syn::Ident, &str, &syn::Ident) -> TokenStream
 {
     let ast: syn::DeriveInput = syn::parse(tokens).unwrap();
         // .filter(|attr| attr.path.is_ident("options"))
-    let mut member: Option<syn::Ident> = get_nng_member(&ast);
+    let member: Option<syn::Ident> = get_nng_member(&ast);
 
     let mut prefix: Option<String> = None;
     for option in ast.attrs.into_iter() {
@@ -77,19 +75,19 @@ fn derive_nng_opts<F>(tokens: TokenStream, gen_impl: F) -> TokenStream
         }
     }
     //TokenStream::from_iter(impls.into_iter())
-    gen_impl(&ast.ident, prefix.unwrap(), &member.unwrap())
+    gen_impl(&ast.ident, &prefix.unwrap(), &member.unwrap())
 }
 
-fn gen_get_impl(name: &syn::Ident, prefix: String, member: &syn::Ident) -> TokenStream {
-    let getopt_bool = prefix.clone() + "getopt_bool";
+fn gen_get_impl(name: &syn::Ident, prefix: &str, member: &syn::Ident) -> TokenStream {
+    let getopt_bool = prefix.to_string() + "getopt_bool";
     let getopt_bool = syn::Ident::new(&getopt_bool, syn::export::Span::call_site());
-    let getopt_int = prefix.clone() + "getopt_int";
+    let getopt_int = prefix.to_string() + "getopt_int";
     let getopt_int = syn::Ident::new(&getopt_int, syn::export::Span::call_site());
-    let getopt_size = prefix.clone() + "getopt_size";
+    let getopt_size = prefix.to_string() + "getopt_size";
     let getopt_size = syn::Ident::new(&getopt_size, syn::export::Span::call_site());
-    let getopt_uint64 = prefix.clone() + "getopt_uint64";
+    let getopt_uint64 = prefix.to_string() + "getopt_uint64";
     let getopt_uint64 = syn::Ident::new(&getopt_uint64, syn::export::Span::call_site());
-    let getopt_string = prefix.clone() + "getopt_string";
+    let getopt_string = prefix.to_string() + "getopt_string";
     let getopt_string = syn::Ident::new(&getopt_string, syn::export::Span::call_site());
 
     let gen = quote! {
@@ -132,16 +130,16 @@ fn gen_get_impl(name: &syn::Ident, prefix: String, member: &syn::Ident) -> Token
     gen.into()
 }
 
-fn gen_set_impl(name: &syn::Ident, prefix: String, member: &syn::Ident) -> TokenStream {
-    let setopt_bool = prefix.clone() + "setopt_bool";
+fn gen_set_impl(name: &syn::Ident, prefix: &str, member: &syn::Ident) -> TokenStream {
+    let setopt_bool = prefix.to_string() + "setopt_bool";
     let setopt_bool = syn::Ident::new(&setopt_bool, syn::export::Span::call_site());
-    let setopt_int = prefix.clone() + "setopt_int";
+    let setopt_int = prefix.to_string() + "setopt_int";
     let setopt_int = syn::Ident::new(&setopt_int, syn::export::Span::call_site());
-    let setopt_size = prefix.clone() + "setopt_size";
+    let setopt_size = prefix.to_string() + "setopt_size";
     let setopt_size = syn::Ident::new(&setopt_size, syn::export::Span::call_site());
-    let setopt_uint64 = prefix.clone() + "setopt_uint64";
+    let setopt_uint64 = prefix.to_string() + "setopt_uint64";
     let setopt_uint64 = syn::Ident::new(&setopt_uint64, syn::export::Span::call_site());
-    let setopt_string = prefix.clone() + "setopt_string";
+    let setopt_string = prefix.to_string() + "setopt_string";
     let setopt_string = syn::Ident::new(&setopt_string, syn::export::Span::call_site());
 
     let gen = quote!{

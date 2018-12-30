@@ -1,6 +1,3 @@
-extern crate bindgen;
-extern crate cmake;
-
 use cmake::Config;
 use std::{
     env,
@@ -8,9 +5,10 @@ use std::{
 };
 
 fn main() {
+    let generator = if cfg!(feature = "ninja") { "Ninja" } else { "Unix Makefiles" };
     // Run cmake to build nng
     let dst = Config::new("nng")
-        .generator("Ninja")
+        .generator(generator)
         .define("CMAKE_BUILD_TYPE", "Release")
         .define("NNG_TESTS", "OFF")
         .define("NNG_TOOLS", "OFF")

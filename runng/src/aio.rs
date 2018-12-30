@@ -51,7 +51,7 @@ impl NngAio {
     /// # Panics
     /// Will panic if `init()` was not called.
     pub unsafe fn nng_aio(&self) -> *mut nng_aio {
-        if self.aio == ptr::null_mut() {
+        if self.aio.is_null() {
             panic!("NngAio::init() not called");
         }
         self.aio
@@ -62,7 +62,7 @@ impl Drop for NngAio {
     fn drop(&mut self) {
         unsafe {
             debug!("NngAio.drop {:x}", self.aio as u64);
-            if self.aio != ptr::null_mut() {
+            if !self.aio.is_null() {
                 nng_aio_free(self.aio);
             }
         }

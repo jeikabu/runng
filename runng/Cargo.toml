@@ -1,6 +1,6 @@
 [package]
 name = "runng"
-version = "0.1.6"
+version = "0.1.7"
 authors = ["Jake W <jeikabu@gmail.com>"]
 
 description = "High-level wrapper around nng (Nanomsg-Next-Generation) aka Nanomsg2"
@@ -9,6 +9,7 @@ categories = ["network-programming"]
 license = "MIT"
 repository = "https://github.com/jeikabu/runng"
 readme = "README.md"
+edition = "2018"
 
 [badges]
 appveyor = { repository = "jake-ruyi/runng", branch = "master", service = "github" }
@@ -20,13 +21,23 @@ codecov = { repository = "jeikabu/runng", branch = "master", service = "github" 
 pipes = []
 
 [dependencies]
-runng-sys = { version = "1.1", path = "../runng-sys" }
+runng-sys = { version = "1.1.1", path = "../runng-sys" }
 runng_derive = { version = "0.1", path = "../runng_derive" }
 futures = "0.1"
 byteorder = "1.2"
 log = "0.4"
+backtrace = "0.3"
 
 [dev-dependencies]
 env_logger = "0.6"
 clap = "2.32"
 tokio = "0.1"
+criterion = "0.2"
+
+[[bench]]
+name = "reqrep_bench"
+harness = false
+
+[[bench]]
+name = "pushpull_bench"
+harness = false

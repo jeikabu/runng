@@ -13,7 +13,7 @@ Simple:
 use runng::*;
 fn test() -> Result<(), NngFail> {
     const url: &str = "inproc://test";
-    let factory = Latest::new();
+    let factory = Latest::default();
     let rep = factory.replier_open()?.listen(&url)?;
     let req = factory.requester_open()?.dial(&url)?;
     req.send(msg::NngMsg::new()?)?;
@@ -24,8 +24,6 @@ fn test() -> Result<(), NngFail> {
 
 Asynchronous I/O:
 ```rust
-extern crate futures;
-extern crate runng;
 use futures::{
     future::Future,
     stream::Stream,
@@ -42,7 +40,7 @@ use runng::{
 fn aio() -> NngReturn {
     const url: &str = "inproc://test";
 
-    let factory = Latest::new();
+    let factory = Latest::default();
     let mut rep_ctx = factory
         .replier_open()?
         .listen(&url)?
@@ -86,13 +84,7 @@ pub use self::options::*;
 pub use self::result::*;
 pub use self::socket::*;
 
-extern crate futures;
-extern crate runng_sys;
-extern crate runng_derive;
-
-#[macro_use]
-extern crate log;
-
+use log::{debug, trace};
 use runng_sys::*;
 
 // Trait where type exposes a socket, but this shouldn't be part of public API

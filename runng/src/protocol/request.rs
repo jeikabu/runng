@@ -1,7 +1,12 @@
 //! Async request/reply
 
-use aio::{NngAio, AioCallbackArg};
-use ctx::NngCtx;
+use crate::{
+    *,
+    aio::{NngAio, AioCallbackArg},
+    ctx::NngCtx,
+    msg::NngMsg,
+    protocol::AsyncContext,
+};
 use futures::{
     sync::oneshot::{
         channel,
@@ -9,10 +14,8 @@ use futures::{
         Sender,
     }
 };
-use msg::NngMsg;
 use runng_sys::*;
 use std::sync::Arc;
-use super::*;
 
 #[derive(Debug,PartialEq)]
 enum RequestState {

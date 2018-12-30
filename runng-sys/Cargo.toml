@@ -1,6 +1,6 @@
 [package]
 name = "runng-sys"
-version = "1.1.1+1"
+version = "1.1.1+4"
 authors = ["Jake W <jeikabu@gmail.com>"]
 
 description = "Bindings to nng (Nanomsg-Next-Generation) aka Nanomsg2"
@@ -9,13 +9,19 @@ categories = ["network-programming", "external-ffi-bindings", "os"]
 license = "MIT"
 repository = "https://github.com/jeikabu/runng"
 readme = "README.md"
+edition = "2018"
 
 [badges]
 appveyor = { repository = "jake-ruyi/runng", branch = "master", service = "github" }
 travis-ci = { repository = "jeikabu/runng", branch = "master" }
 
-[dependencies]
+[features]
+# Use ninja for cmake generator
+ninja = []
 
 [build-dependencies]
 cmake = "0.1"
 bindgen = "0.40"
+
+[package.metadata.docs.rs]
+all-features = false

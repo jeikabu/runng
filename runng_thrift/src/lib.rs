@@ -1,9 +1,4 @@
-extern crate thrift;
-extern crate runng;
-
-#[macro_use]
-extern crate log;
-
+use log::{trace};
 use std::{
     io,
     io::{
@@ -13,10 +8,10 @@ use std::{
 
 
 mod nng_channel;
-pub use nng_channel::*;
+pub use crate::nng_channel::*;
 
 mod nng_protocol;
-pub use nng_protocol::*;
+pub use crate::nng_protocol::*;
 
 enum NngThriftError {
     Nng(runng::NngFail),
