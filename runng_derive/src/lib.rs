@@ -1,9 +1,6 @@
 #![recursion_limit="128"]
 
 extern crate proc_macro;
-extern crate syn;
-#[macro_use]
-extern crate quote;
 
 use proc_macro::TokenStream;
 use syn::{
@@ -11,6 +8,7 @@ use syn::{
     Meta,
     MetaNameValue,
 };
+use quote::quote;
 
 #[proc_macro_derive(NngGetOpts, attributes(prefix, nng_member))]
 pub fn derive_nng_get_opts(tokens: TokenStream) -> TokenStream {

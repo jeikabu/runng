@@ -1,9 +1,4 @@
-extern crate thrift;
-extern crate runng;
-
-#[macro_use]
-extern crate log;
-
+use log::{trace};
 use std::{
     io,
     io::{

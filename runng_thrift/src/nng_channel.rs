@@ -1,6 +1,3 @@
-extern crate runng;
-extern crate thrift;
-
 use super::*;
 
 use runng::{

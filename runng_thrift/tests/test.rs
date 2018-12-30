@@ -1,12 +1,6 @@
-extern crate runng;
-extern crate runng_thrift;
-extern crate thrift;
-extern crate ordered_float;
-extern crate try_from;
-
-#[macro_use]
-extern crate log;
 mod test_service;
+
+use log::{debug};
 use runng_thrift::*;
 
 #[cfg(test)]

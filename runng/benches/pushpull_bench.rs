@@ -1,9 +1,7 @@
-#[macro_use]
-extern crate criterion;
-extern crate runng;
-
 use criterion::{
     Criterion,
+    criterion_group,
+    criterion_main,
     ParameterizedBenchmark,
     Throughput,
 };

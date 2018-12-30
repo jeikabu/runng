@@ -24,8 +24,6 @@ fn test() -> Result<(), NngFail> {
 
 Asynchronous I/O:
 ```rust
-extern crate futures;
-extern crate runng;
 use futures::{
     future::Future,
     stream::Stream,
@@ -86,13 +84,7 @@ pub use self::options::*;
 pub use self::result::*;
 pub use self::socket::*;
 
-extern crate futures;
-extern crate runng_sys;
-extern crate runng_derive;
-
-#[macro_use]
-extern crate log;
-
+use log::{debug, trace};
 use runng_sys::*;
 
 // Trait where type exposes a socket, but this shouldn't be part of public API

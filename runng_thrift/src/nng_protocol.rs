@@ -1,5 +1,3 @@
-extern crate thrift;
-
 use thrift::{
     protocol::{
         TInputProtocol,

@@ -1,6 +1,4 @@
-extern crate byteorder;
-
-use self::byteorder::{BigEndian, WriteBytesExt};
+use byteorder::{BigEndian, WriteBytesExt};
 use crate::msg::NngMsg;
 use super::*;
 

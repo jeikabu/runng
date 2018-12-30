@@ -1,14 +1,9 @@
 //! Rust nngcat.  See [nngcat](https://nanomsg.github.io/nng/man/v1.1.0/nngcat.1).
 //! `cargo run --example runngcat`
 
-extern crate clap;
-extern crate env_logger;
-#[macro_use]
-extern crate log;
-extern crate runng;
-
 use clap::{Arg, ArgGroup, ArgMatches, App};
 use env_logger::{Builder, Env};
+use log::{debug, info};
 use runng::{
     *,
     protocol::Subscribe,

@@ -8,14 +8,6 @@ cargo run --example runngcat -- --req0 --dial tcp://127.0.0.1:9823 --data hi
 ```
 */ 
 
-extern crate clap;
-extern crate env_logger;
-extern crate futures;
-#[macro_use]
-extern crate log;
-extern crate runng;
-extern crate tokio;
-
 use clap::{Arg, ArgMatches, App};
 use env_logger::{Builder, Env};
 use futures::{
@@ -23,6 +15,7 @@ use futures::{
     future::lazy,
     Stream,
 };
+use log::{info};
 use runng::{
     *,
     protocol::*,
