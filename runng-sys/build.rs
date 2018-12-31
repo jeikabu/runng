@@ -5,13 +5,19 @@ use std::{
 };
 
 fn main() {
+    // Compile-time features
     let generator = if cfg!(feature = "ninja") { "Ninja" } else { "Unix Makefiles" };
+    let stats = if cfg!(feature = "stats") { "ON" } else { "OFF" };
+    let tls = if cfg!(feature = "tls") { "ON" } else { "OFF" };
+
     // Run cmake to build nng
     let dst = Config::new("nng")
         .generator(generator)
         .define("CMAKE_BUILD_TYPE", "Release")
         .define("NNG_TESTS", "OFF")
         .define("NNG_TOOLS", "OFF")
+        .define("NNG_ENABLE_STATS", stats)
+        .define("NNG_ENABLE_TLS", tls)
         .build();
     
     // Check output of `cargo build --verbose`, should see something like:

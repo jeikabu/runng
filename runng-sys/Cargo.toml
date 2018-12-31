@@ -16,8 +16,13 @@ appveyor = { repository = "jake-ruyi/runng", branch = "master", service = "githu
 travis-ci = { repository = "jeikabu/runng", branch = "master" }
 
 [features]
+default = ["stats"]
 # Use ninja for cmake generator
 ninja = []
+# Enable NNG stats
+stats = []
+# Enable TLS (requires mbedTLS)
+tls = []
 
 [build-dependencies]
 cmake = "0.1"

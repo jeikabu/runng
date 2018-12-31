@@ -37,7 +37,8 @@ before_script:
 
 script:
   - cargo clippy
-  - cargo build
+  # Include optional packages
+  - cargo build --all
   - RUST_BACKTRACE=1 cargo test "tests::"
 
 after_success:

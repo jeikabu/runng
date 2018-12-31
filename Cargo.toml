@@ -5,3 +5,8 @@ members = [
     "runng_derive",
     "runng_thrift",
 ]
+default-members = [
+    "runng-sys",
+    "runng",
+    "runng_derive",
+]
