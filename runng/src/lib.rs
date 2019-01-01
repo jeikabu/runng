@@ -75,6 +75,7 @@ pub mod pipe;
 pub mod protocol;
 pub mod result;
 pub mod socket;
+pub mod stats;
 pub mod transport;
 
 pub use self::aio::*;
