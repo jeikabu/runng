@@ -1,6 +1,6 @@
 [package]
 name = "runng"
-version = "0.1.7"
+version = "0.1.8"
 authors = ["Jake W <jeikabu@gmail.com>"]
 
 description = "High-level wrapper around nng (Nanomsg-Next-Generation) aka Nanomsg2"
@@ -21,7 +21,7 @@ codecov = { repository = "jeikabu/runng", branch = "master", service = "github" 
 pipes = []
 
 [dependencies]
-runng-sys = { version = "1.1.1", path = "../runng-sys" }
+runng-sys = { version = "1.1.1-rc", path = "../runng-sys" }
 runng_derive = { version = "0.1", path = "../runng_derive" }
 futures = "0.1"
 byteorder = "1.2"
