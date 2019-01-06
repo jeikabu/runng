@@ -3,6 +3,18 @@ Runtime statistics
 
 Statistics are organized as a tree.  Starting at the root, nodes may have a child whose siblings are likewise children of the parent.
 
+The lifetime of the children is bound to that of the root.  This won't compile:
+```no_compile
+use log::{debug};
+use runng::{stats::{NngStat, NngStatChild, NngStatRoot}};
+let mut child: Option<NngStatChild> = None;
+{
+    let root = NngStatRoot::new().unwrap();
+    child = root.child();
+}
+debug!("Name = {}", child.unwrap().name().unwrap());
+```
+
 ## Examples
 
 ```rust
@@ -29,11 +41,12 @@ fn stats_example() -> NngReturn {
     Ok(())
 }
 ```
-
 */
 
-use runng_sys::*;
 use crate::*;
+use log::{trace};
+use runng_sys::*;
+use std::marker;
 
 /// Type of statistic.  See `NngStatChild::stat_type`.
 #[derive(Clone, Copy, Debug)]
@@ -97,54 +110,60 @@ pub trait NngStat {
             if node.is_null() {
                 None
             } else {
-                Some(NngStatChild{ node })
+                Some(NngStatChild::new(node))
             }
         }
     }
 }
 
-/// Root of tree of statistics snapshot.
-/// 
-/// ## Examples
-/// ```rust,no_run
-/// use runng::{stats::NngStat, stats::NngStatRoot};
-/// let child = NngStatRoot::new().unwrap().child();
-/// ```
-pub struct NngStatRoot {
+/* Root of tree of statistics snapshot.
+## Examples
+```rust,no_run
+use runng::{stats::NngStat, stats::NngStatRoot};
+let child = NngStatRoot::new().unwrap().child();
+```
+*/
+pub struct NngStatRoot<'root> {
     node: *mut nng_stat,
+    _phantom: marker::PhantomData<&'root nng_stat>
 }
 
-impl NngStatRoot {
+impl<'root> NngStatRoot<'root> {
     /// Get statistics snapshot.  See [nng_stats_get](https://nanomsg.github.io/nng/man/v1.1.0/nng_stats_get.3).
-    pub fn new() -> NngResult<NngStatRoot> {
+    pub fn new() -> NngResult<NngStatRoot<'root>> {
         unsafe {
             let mut node: *mut nng_stat = std::ptr::null_mut();
             let res = nng_stats_get(&mut node);
-            NngFail::succeed_then(res, || NngStatRoot{ node })
+            NngFail::succeed_then(res, || NngStatRoot{ node , _phantom: marker::PhantomData })
         }
     }
 }
 
-impl NngStat for NngStatRoot {
+impl<'root> NngStat for NngStatRoot<'root> {
     unsafe fn nng_stat(&self) -> *mut nng_stat {
         self.node
     }
 }
 
-impl Drop for NngStatRoot {
+impl<'root> Drop for NngStatRoot<'root> {
     fn drop(&mut self) {
         unsafe {
+            //trace!("Drop NngStatRoot");
             nng_stats_free(self.node)
         }
     }
 }
 
-pub struct NngStatChild {
+pub struct NngStatChild<'root> {
     node: *mut nng_stat,
+    _phantom: marker::PhantomData<&'root nng_stat>
 }
 
 /// Child of statistic node in tree of statistics.  See `NngStat::child()`.
-impl NngStatChild {
+impl<'root> NngStatChild<'root> {
+    pub fn new(node: *mut nng_stat) -> NngStatChild<'root> {
+        NngStatChild { node, _phantom: marker::PhantomData }
+    }
     /// See [nng_stat_name](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_name.3).
     pub fn name(&self) -> Result<&str, std::str::Utf8Error> {
         unsafe {
@@ -211,34 +230,45 @@ impl NngStatChild {
 
     /// Returns an iterator over sibling statistics.  See [nng_stat_next](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_next.3).
     pub fn iter(&self) -> Iter {
-        Iter { node: self.node }
+        unsafe {
+            let node = self.nng_stat();
+            Iter { node: Some(NngStatChild::new(node)) }
+        }
+    }
+
+    // The explicit `'root` lifetime is important here so the lifetime is the 
+    // top-level `NngStatRoot` rather than &self.
+    pub fn next(&self) -> Option<NngStatChild<'root>> {
+        unsafe {
+            let node = self.nng_stat();
+            let node = nng_stat_next(node);
+            if node.is_null() {
+                None
+            } else {
+                Some(NngStatChild::new(node))
+            }
+        }
     }
 }
 
-impl NngStat for NngStatChild {
+impl<'root> NngStat for NngStatChild<'root> {
     unsafe fn nng_stat(&self) -> *mut nng_stat {
         self.node
     }
 }
 
 /// Iterator over sibling statistics
-pub struct Iter {
-    node: *mut nng_stat,
+pub struct Iter<'root> {
+    node: Option<NngStatChild<'root>>,
 }
 
-impl Iterator for Iter {
-    type Item = NngStatChild;
+impl<'root> Iterator for Iter<'root> {
+    type Item = NngStatChild<'root>;
     fn next(&mut self) -> Option<Self::Item> {
-        if self.node.is_null() {
-            return None;
+        let next = self.node.take();
+        if let Some(ref node) = next {
+            self.node = node.next();
         }
-        unsafe {   
-            self.node = nng_stat_next(self.node);
-        }
-        if self.node.is_null() {
-            None
-        } else {
-            Some(NngStatChild{node: self.node})
-        }
+        next
     }
 }
