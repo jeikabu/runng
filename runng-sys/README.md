@@ -3,12 +3,19 @@
 
 Rust FFI bindings to [NNG](https://github.com/nanomsg/nng).
 
+## Usage
+
+Version of this crate tracks NNG: `<NNG_version>-rc.<crate_version>` (e.g. `1.1.1-rc.2`).
+
+To use the __latest crate__ for the most recent __stable version of NNG__ (1.1.1), in `Cargo.toml`:
+```toml
+runng-sys = "1.1.1-rc"
+```
+
 For a more ergonomic API to NNG see [runng](https://crates.io/crates/runng).
 
 ## Examples
 ```rust
-extern crate runng_sys;
-
 use runng_sys::*;
 use std::ffi::CString;
 
@@ -35,7 +42,7 @@ fn it_works() {
         let val = 0x12345678;
         assert_eq!(0, nng_msg_append_u32(req_msg, val));
         assert_eq!(0, nng_sendmsg(req_socket, req_msg, 0));
-        
+
         // Receive it
         let mut recv_msg: *mut nng_msg = std::ptr::null_mut();
         assert_eq!(0, nng_recvmsg(rep_socket, &mut recv_msg, 0));

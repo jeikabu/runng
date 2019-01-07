@@ -1,7 +1,9 @@
 /*!
-Rust high-level wrapper around [NNG](https://github.com/nanomsg/nng) (Nanomsg-Next-Gen)
+Rust high-level wrapper around [NNG](https://github.com/nanomsg/nng) (Nanomsg-Next-Gen):
 
-Features:
+> NNG, like its predecessors nanomsg (and to some extent ZeroMQ), is a lightweight, broker-less library, offering a simple API to solve common recurring messaging problems, such as publish/subscribe, RPC-style request/reply, or service discovery. The API frees the programmer from worrying about details like connection management, retries, and other common considerations, so that they can focus on the application instead of the plumbing.
+
+Features:  
 - Use [nng_aio](https://nanomsg.github.io/nng/man/v1.1.0/nng_aio.5) for asynchronous I/O
 - Use [nng_ctx](https://nanomsg.github.io/nng/man/v1.1.0/nng_ctx.5) for advanced protocol handling
 - Leverage [futures](https://docs.rs/futures) crate for ease of use with [tokio](https://tokio.rs/) and eventual support of [`async`/`await`](https://github.com/rust-lang/rust/issues/50547)
@@ -61,7 +63,8 @@ fn aio() -> NngReturn {
 }
 ```
 
-Additional examples [in `examples/` folder](https://github.com/jeikabu/runng/tree/master/runng/src).
+Additional examples [in `examples/` folder](https://github.com/jeikabu/runng/tree/master/runng/examples).
+
 */
 
 pub mod aio;

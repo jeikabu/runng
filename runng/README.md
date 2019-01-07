@@ -1,4 +1,6 @@
-Rust high-level wrapper around [NNG](https://github.com/nanomsg/nng) (Nanomsg-Next-Gen)
+Rust high-level wrapper around [NNG](https://github.com/nanomsg/nng) (Nanomsg-Next-Gen):
+
+> NNG, like its predecessors nanomsg (and to some extent ZeroMQ), is a lightweight, broker-less library, offering a simple API to solve common recurring messaging problems, such as publish/subscribe, RPC-style request/reply, or service discovery. The API frees the programmer from worrying about details like connection management, retries, and other common considerations, so that they can focus on the application instead of the plumbing.
 
 Features:  
 - Use [nng_aio](https://nanomsg.github.io/nng/man/v1.1.0/nng_aio.5) for asynchronous I/O
@@ -12,7 +14,7 @@ Simple:
 use runng::*;
 fn test() -> Result<(), NngFail> {
     const url: &str = "inproc://test";
-    let factory = Latest::new();
+    let factory = Latest::default();
     let rep = factory.replier_open()?.listen(&url)?;
     let req = factory.requester_open()?.dial(&url)?;
     req.send(msg::NngMsg::new()?)?;
@@ -23,8 +25,6 @@ fn test() -> Result<(), NngFail> {
 
 Asynchronous I/O:
 ```rust
-extern crate futures;
-extern crate runng;
 use futures::{
     future::Future,
     stream::Stream,
@@ -41,7 +41,7 @@ use runng::{
 fn aio() -> NngReturn {
     const url: &str = "inproc://test";
 
-    let factory = Latest::new();
+    let factory = Latest::default();
     let mut rep_ctx = factory
         .replier_open()?
         .listen(&url)?
