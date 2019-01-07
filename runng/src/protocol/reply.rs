@@ -1,20 +1,17 @@
 //! Async request/reply
 
 use crate::{
-    *,
-    aio::{Aio, NngAio, AioCallbackArg},
+    aio::{Aio, AioCallbackArg, NngAio},
     ctx::NngCtx,
     msg::NngMsg,
-    protocol::{AsyncContext, try_signal_complete},
+    protocol::{try_signal_complete, AsyncContext},
+    *,
 };
-use futures::{
-    sync::oneshot,
-    sync::mpsc,
-};
+use futures::{sync::mpsc, sync::oneshot};
 use runng_sys::*;
 use std::sync::Arc;
 
-#[derive(Debug,PartialEq)]
+#[derive(Debug, PartialEq)]
 enum ReplyState {
     Receiving,
     Wait,
@@ -86,7 +83,7 @@ impl AsyncReply for AsyncReplyContext {
         if self.state != ReplyState::Wait {
             panic!();
         }
-        
+
         let (sender, receiver) = oneshot::channel();
         self.reply_sender = Some(sender);
         unsafe {
@@ -101,7 +98,7 @@ impl AsyncReply for AsyncReplyContext {
     }
 }
 
-extern fn reply_callback(arg : AioCallbackArg) {
+extern "C" fn reply_callback(arg: AioCallbackArg) {
     unsafe {
         let ctx = &mut *(arg as *mut AsyncReplyContext);
         let aio_nng = ctx.ctx.aio().nng_aio();
@@ -114,15 +111,15 @@ extern fn reply_callback(arg : AioCallbackArg) {
                         match res {
                             NngFail::Err(NngError::ECLOSED) => {
                                 debug!("Closed");
-                            },
+                            }
                             _ => {
                                 trace!("Reply.Receive: {:?}", res);
                                 ctx.start_receive();
-                            },
+                            }
                         }
 
                         try_signal_complete(&mut ctx.request_sender, Err(res));
-                    },
+                    }
                     Ok(()) => {
                         let msg = NngMsg::new_msg(nng_aio_get_msg(aio_nng));
                         // Reset state before signaling completion
@@ -130,7 +127,7 @@ extern fn reply_callback(arg : AioCallbackArg) {
                         try_signal_complete(&mut ctx.request_sender, Ok(msg));
                     }
                 }
-            },
+            }
             ReplyState::Wait => panic!(),
             ReplyState::Sending => {
                 let res = NngFail::from_i32(nng_aio_result(aio_nng));
@@ -138,15 +135,14 @@ extern fn reply_callback(arg : AioCallbackArg) {
                     // Nng requires we resume ownership of the message
                     let _ = NngMsg::new_msg(nng_aio_get_msg(aio_nng));
                 }
-                
+
                 let sender = ctx.reply_sender.take().unwrap();
                 // Reset state and start receiving again before
-                // signaling completion to avoid race condition where we say we're done, but 
+                // signaling completion to avoid race condition where we say we're done, but
                 // not yet ready for receive() to be called.
                 ctx.start_receive();
                 sender.send(res).unwrap();
-            },
-            
+            }
         }
     }
 }

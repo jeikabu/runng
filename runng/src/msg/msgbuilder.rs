@@ -1,11 +1,11 @@
-use byteorder::{BigEndian, WriteBytesExt};
-use crate::msg::NngMsg;
 use super::*;
+use crate::msg::NngMsg;
+use byteorder::{BigEndian, WriteBytesExt};
 
 /// Build `NngMsg` using fluent API.  See [nng_msg](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg.5).
-/// 
+///
 /// # Examples
-/// 
+///
 /// ``` -> Result<(), NngFail>
 /// let msg = MsgBuilder::default()
 ///     .append_u32(0)

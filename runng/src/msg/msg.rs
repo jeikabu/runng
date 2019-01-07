@@ -1,15 +1,11 @@
-use runng_sys::*;
-use std::{
-    os::raw::c_void,
-    ptr,
-    slice,
-};
 use super::*;
+use runng_sys::*;
+use std::{os::raw::c_void, ptr, slice};
 
 /// Wraps `nng_msg`.  See [nng_msg](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg.5).
 #[derive(Debug)]
 pub struct NngMsg {
-    msg: *mut nng_msg
+    msg: *mut nng_msg,
 }
 
 unsafe impl Send for NngMsg {}
@@ -18,9 +14,7 @@ impl NngMsg {
     /// Create a message.  See [nng_msg_alloc](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg_alloc.3).
     pub fn new() -> NngResult<Self> {
         let mut msg: *mut nng_msg = ptr::null_mut();
-        let res = unsafe {
-            nng_msg_alloc(&mut msg, 0)
-        };
+        let res = unsafe { nng_msg_alloc(&mut msg, 0) };
         NngFail::succeed_then(res, || NngMsg { msg })
     }
 
@@ -33,7 +27,7 @@ impl NngMsg {
         self.msg = std::ptr::null_mut();
         res
     }
-    
+
     pub fn msg(&self) -> *mut nng_msg {
         self.msg
     }
@@ -45,11 +39,9 @@ impl NngMsg {
             slice::from_raw_parts(header, len)
         }
     }
-    
+
     pub fn header_len(&self) -> usize {
-        unsafe {
-            nng_msg_header_len(self.msg())
-        }
+        unsafe { nng_msg_header_len(self.msg()) }
     }
 
     pub fn body(&mut self) -> &[u8] {
@@ -61,69 +53,59 @@ impl NngMsg {
     }
 
     pub fn len(&self) -> usize {
-        unsafe {
-            nng_msg_len(self.msg())
-        }
+        unsafe { nng_msg_len(self.msg()) }
     }
 
     pub fn append(&mut self, data: *const u8, size: usize) -> NngReturn {
-        unsafe {
-            NngFail::from_i32(nng_msg_append(self.msg(), data as *const c_void, size))
-        }
+        unsafe { NngFail::from_i32(nng_msg_append(self.msg(), data as *const c_void, size)) }
     }
 
     pub fn insert(&mut self, data: *const u8, size: usize) -> NngReturn {
-        unsafe {
-            NngFail::from_i32(nng_msg_insert(self.msg(), data as *const c_void, size))
-        }
+        unsafe { NngFail::from_i32(nng_msg_insert(self.msg(), data as *const c_void, size)) }
     }
 
     pub fn trim(&mut self, size: usize) -> NngReturn {
-        unsafe {
-            NngFail::from_i32(nng_msg_trim(self.msg(), size))
-        }
+        unsafe { NngFail::from_i32(nng_msg_trim(self.msg(), size)) }
     }
 
     pub fn chop(&mut self, size: usize) -> NngReturn {
-        unsafe {
-            NngFail::from_i32(nng_msg_chop(self.msg(), size))
-        }
+        unsafe { NngFail::from_i32(nng_msg_chop(self.msg(), size)) }
     }
 
     pub fn header_append(&mut self, data: *const u8, size: usize) -> NngReturn {
         unsafe {
-            NngFail::from_i32(nng_msg_header_append(self.msg(), data as *const c_void, size))
+            NngFail::from_i32(nng_msg_header_append(
+                self.msg(),
+                data as *const c_void,
+                size,
+            ))
         }
     }
 
     pub fn header_insert(&mut self, data: *const u8, size: usize) -> NngReturn {
         unsafe {
-            NngFail::from_i32(nng_msg_header_insert(self.msg(), data as *const c_void, size))
+            NngFail::from_i32(nng_msg_header_insert(
+                self.msg(),
+                data as *const c_void,
+                size,
+            ))
         }
     }
 
     pub fn header_trim(&mut self, size: usize) -> NngReturn {
-        unsafe {
-            NngFail::from_i32(nng_msg_header_trim(self.msg(), size))
-        }
+        unsafe { NngFail::from_i32(nng_msg_header_trim(self.msg(), size)) }
     }
 
     pub fn header_chop(&mut self, size: usize) -> NngReturn {
-        unsafe {
-            NngFail::from_i32(nng_msg_header_chop(self.msg(), size))
-        }
+        unsafe { NngFail::from_i32(nng_msg_header_chop(self.msg(), size)) }
     }
 
     pub fn append_u32(&mut self, data: u32) -> NngReturn {
-        unsafe {
-            NngFail::from_i32(nng_msg_append_u32(self.msg(), data))
-        }
+        unsafe { NngFail::from_i32(nng_msg_append_u32(self.msg(), data)) }
     }
 
     pub fn insert_u32(&mut self, data: u32) -> NngReturn {
-        unsafe {
-            NngFail::from_i32(nng_msg_insert_u32(self.msg(), data))
-        }
+        unsafe { NngFail::from_i32(nng_msg_insert_u32(self.msg(), data)) }
     }
 
     pub fn trim_u32(&mut self) -> NngResult<u32> {
@@ -142,9 +124,7 @@ impl NngMsg {
 
     pub fn dup(&self) -> NngResult<NngMsg> {
         let mut msg: *mut nng_msg = ptr::null_mut();
-        let res = unsafe {
-            nng_msg_dup(&mut msg, self.msg())
-        };
+        let res = unsafe { nng_msg_dup(&mut msg, self.msg()) };
         NngFail::succeed(res, NngMsg { msg })
     }
 

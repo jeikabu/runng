@@ -1,12 +1,13 @@
 use cmake::Config;
-use std::{
-    env,
-    path::PathBuf,
-};
+use std::{env, path::PathBuf};
 
 fn main() {
     // Compile-time features
-    let generator = if cfg!(feature = "ninja") { "Ninja" } else { "Unix Makefiles" };
+    let generator = if cfg!(feature = "ninja") {
+        "Ninja"
+    } else {
+        "Unix Makefiles"
+    };
     let stats = if cfg!(feature = "stats") { "ON" } else { "OFF" };
     let tls = if cfg!(feature = "tls") { "ON" } else { "OFF" };
 
@@ -19,11 +20,14 @@ fn main() {
         .define("NNG_ENABLE_STATS", stats)
         .define("NNG_ENABLE_TLS", tls)
         .build();
-    
+
     // Check output of `cargo build --verbose`, should see something like:
     // -L native=/path/runng/target/debug/build/runng-sys-abc1234/out
     // That contains output from cmake
-    println!("cargo:rustc-link-search=native={}", dst.join("lib").display());
+    println!(
+        "cargo:rustc-link-search=native={}",
+        dst.join("lib").display()
+    );
     // Tell rustc to use nng static library
     println!("cargo:rustc-link-lib=static=nng");
 

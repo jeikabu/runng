@@ -1,23 +1,10 @@
-use criterion::{
-    Criterion,
-    criterion_group,
-    criterion_main,
-    ParameterizedBenchmark,
-    Throughput,
-};
-use futures::{
-    future,
-    future::Future,
-    Stream,
-};
-use runng::{
-    *,
-    protocol::*,
-};
+use criterion::{criterion_group, criterion_main, Criterion, ParameterizedBenchmark, Throughput};
+use futures::{future, future::Future, Stream};
+use runng::{protocol::*, *};
 use std::{
     sync::{
-        Arc,
         atomic::{AtomicUsize, Ordering},
+        Arc,
     },
     thread,
     time::Duration,
@@ -34,10 +21,8 @@ fn nng_pushpull(crit: &mut Criterion, url: &str) -> NngReturn {
         .pusher_open()?
         .listen(&url)?
         .create_async_context()?;
-    
-    let mut puller = factory.puller_open()?
-        .dial(&url)?
-        .create_async_context()?;
+
+    let mut puller = factory.puller_open()?.dial(&url)?.create_async_context()?;
 
     let recv_count = Arc::new(AtomicUsize::new(0));
     let thread_count = recv_count.clone();
@@ -56,8 +41,7 @@ fn nng_pushpull(crit: &mut Criterion, url: &str) -> NngReturn {
                 //     .append_vec(&mut vec![0; *param])
                 //     .build()?;
                 let pull_future = puller.receive().take(1).for_each(|_request| Ok(()));
-                    pull_future.wait();
-                
+                pull_future.wait();
                 Ok(())
             }
             ),

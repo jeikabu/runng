@@ -11,7 +11,7 @@ pub trait Factory {
 }
 
 /// The latest version of all protocols
-/// 
+///
 /// # Examples
 /// ```
 /// use runng::{
@@ -21,8 +21,7 @@ pub trait Factory {
 /// let factory = Latest::default();
 /// let publisher = factory.publisher_open();
 /// ```
-pub struct Latest {
-}
+pub struct Latest {}
 
 impl Default for Latest {
     fn default() -> Latest {

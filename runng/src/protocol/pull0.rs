@@ -1,20 +1,20 @@
 //! Push/pull ("pipeline") pattern.
 
-use runng_sys::*;
 use super::*;
+use runng_sys::*;
 use std::sync::Arc;
 
 /// Pull half of push/pull ("pipeline") pattern.  See [nng_pull](https://nanomsg.github.io/nng/man/v1.1.0/nng_pull.7).
 pub struct Pull0 {
-    socket: Arc<NngSocket>
+    socket: Arc<NngSocket>,
 }
 
 impl Pull0 {
     /// Create a pull socket.  See [nng_pull_open](https://nanomsg.github.io/nng/man/v1.1.0/nng_pull_open.3).
     pub fn open() -> NngResult<Self> {
         nng_open(
-            |socket| unsafe { nng_pull0_open(socket) }, 
-            |socket| Pull0{ socket }
+            |socket| unsafe { nng_pull0_open(socket) },
+            |socket| Pull0 { socket },
         )
     }
 }

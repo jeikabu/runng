@@ -1,23 +1,17 @@
 //! Async request/reply
 
 use crate::{
-    *,
-    aio::{NngAio, AioCallbackArg},
+    aio::{AioCallbackArg, NngAio},
     ctx::NngCtx,
     msg::NngMsg,
     protocol::AsyncContext,
+    *,
 };
-use futures::{
-    sync::oneshot::{
-        channel,
-        Receiver,
-        Sender,
-    }
-};
+use futures::sync::oneshot::{channel, Receiver, Sender};
 use runng_sys::*;
 use std::sync::Arc;
 
-#[derive(Debug,PartialEq)]
+#[derive(Debug, PartialEq)]
 enum RequestState {
     Ready,
     Sending,
@@ -28,7 +22,7 @@ enum RequestState {
 pub struct AsyncRequestContext {
     ctx: NngCtx,
     state: RequestState,
-    sender: Option<Sender<NngResult<NngMsg>>>
+    sender: Option<Sender<NngResult<NngMsg>>>,
 }
 
 impl AsyncContext for AsyncRequestContext {
@@ -78,12 +72,12 @@ impl AsyncRequest for AsyncRequestContext {
             nng_aio_set_msg(aio, msg);
             nng_ctx_send(ctx, aio);
         }
-        
+
         receiver
     }
 }
 
-extern fn request_callback(arg : AioCallbackArg) {
+extern "C" fn request_callback(arg: AioCallbackArg) {
     unsafe {
         let ctx = &mut *(arg as *mut AsyncRequestContext);
         let aionng = ctx.ctx.aio().nng_aio();
@@ -101,13 +95,13 @@ extern fn request_callback(arg : AioCallbackArg) {
                         ctx.state = RequestState::Ready;
                         let sender = ctx.sender.take().unwrap();
                         sender.send(Err(res)).unwrap();
-                    },
+                    }
                     Ok(()) => {
                         ctx.state = RequestState::Receiving;
                         nng_ctx_recv(ctxnng, aionng);
-                    },
+                    }
                 }
-            },
+            }
             RequestState::Receiving => {
                 let sender = ctx.sender.take().unwrap();
                 let res = NngFail::from_i32(nng_aio_result(aionng));
@@ -115,15 +109,15 @@ extern fn request_callback(arg : AioCallbackArg) {
                     Err(res) => {
                         ctx.state = RequestState::Ready;
                         sender.send(Err(res)).unwrap();
-                    },
+                    }
                     Ok(()) => {
                         let msg = NngMsg::new_msg(nng_aio_get_msg(aionng));
-                        
+
                         ctx.state = RequestState::Ready;
                         sender.send(Ok(msg)).unwrap();
-                    },
+                    }
                 }
-            },
+            }
         }
     }
 }

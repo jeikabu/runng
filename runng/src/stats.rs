@@ -44,7 +44,7 @@ fn stats_example() -> NngReturn {
 */
 
 use crate::*;
-use log::{trace};
+use log::trace;
 use runng_sys::*;
 use std::marker;
 
@@ -52,25 +52,25 @@ use std::marker;
 #[derive(Clone, Copy, Debug)]
 #[repr(u32)]
 pub enum NngStatType {
-    Scope  = nng_stat_type_enum_NNG_STAT_SCOPE,
-    Level  = nng_stat_type_enum_NNG_STAT_LEVEL,
-    Counter    = nng_stat_type_enum_NNG_STAT_COUNTER,
-    String     = nng_stat_type_enum_NNG_STAT_STRING,
-    Boolean    = nng_stat_type_enum_NNG_STAT_BOOLEAN,
-    Id     = nng_stat_type_enum_NNG_STAT_ID,
+    Scope = nng_stat_type_enum_NNG_STAT_SCOPE,
+    Level = nng_stat_type_enum_NNG_STAT_LEVEL,
+    Counter = nng_stat_type_enum_NNG_STAT_COUNTER,
+    String = nng_stat_type_enum_NNG_STAT_STRING,
+    Boolean = nng_stat_type_enum_NNG_STAT_BOOLEAN,
+    Id = nng_stat_type_enum_NNG_STAT_ID,
 }
 
 impl NngStatType {
     /// Converts value returned by [nng_stat_type](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_type.3) into `NngStatType`.
     pub fn from_i32(value: i32) -> Option<NngStatType> {
         match value {
-            value if value == NngStatType::Scope as i32    => Some(NngStatType::Scope),
-            value if value == NngStatType::Level as i32    => Some(NngStatType::Level),
-            value if value == NngStatType::Counter as i32  => Some(NngStatType::Counter),
-            value if value == NngStatType::String as i32   => Some(NngStatType::String),
-            value if value == NngStatType::Boolean as i32  => Some(NngStatType::Boolean),
-            value if value == NngStatType::Id as i32   => Some(NngStatType::Id),
-            _   => None,
+            value if value == NngStatType::Scope as i32 => Some(NngStatType::Scope),
+            value if value == NngStatType::Level as i32 => Some(NngStatType::Level),
+            value if value == NngStatType::Counter as i32 => Some(NngStatType::Counter),
+            value if value == NngStatType::String as i32 => Some(NngStatType::String),
+            value if value == NngStatType::Boolean as i32 => Some(NngStatType::Boolean),
+            value if value == NngStatType::Id as i32 => Some(NngStatType::Id),
+            _ => None,
         }
     }
 }
@@ -79,9 +79,9 @@ impl NngStatType {
 #[derive(Clone, Copy, Debug)]
 #[repr(u32)]
 pub enum NngStatUnit {
-    None   = nng_unit_enum_NNG_UNIT_NONE,
-    Bytes  = nng_unit_enum_NNG_UNIT_BYTES,
-    Messages   = nng_unit_enum_NNG_UNIT_MESSAGES,
+    None = nng_unit_enum_NNG_UNIT_NONE,
+    Bytes = nng_unit_enum_NNG_UNIT_BYTES,
+    Messages = nng_unit_enum_NNG_UNIT_MESSAGES,
     Millis = nng_unit_enum_NNG_UNIT_MILLIS,
     Events = nng_unit_enum_NNG_UNIT_EVENTS,
 }
@@ -90,12 +90,12 @@ impl NngStatUnit {
     /// Converts value returned by [nng_stat_unit](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_unit.3) into `NngStatUnit`.
     pub fn from_i32(value: i32) -> Option<NngStatUnit> {
         match value {
-            value if value == NngStatUnit::None as i32  => Some(NngStatUnit::None),
+            value if value == NngStatUnit::None as i32 => Some(NngStatUnit::None),
             value if value == NngStatUnit::Bytes as i32 => Some(NngStatUnit::Bytes),
-            value if value == NngStatUnit::Messages as i32  => Some(NngStatUnit::Messages),
-            value if value == NngStatUnit::Millis as i32    => Some(NngStatUnit::Millis),
-            value if value == NngStatUnit::Events as i32    => Some(NngStatUnit::Events),
-            _   => None,
+            value if value == NngStatUnit::Messages as i32 => Some(NngStatUnit::Messages),
+            value if value == NngStatUnit::Millis as i32 => Some(NngStatUnit::Millis),
+            value if value == NngStatUnit::Events as i32 => Some(NngStatUnit::Events),
+            _ => None,
         }
     }
 }
@@ -125,7 +125,7 @@ let child = NngStatRoot::new().unwrap().child();
 */
 pub struct NngStatRoot<'root> {
     node: *mut nng_stat,
-    _phantom: marker::PhantomData<&'root nng_stat>
+    _phantom: marker::PhantomData<&'root nng_stat>,
 }
 
 impl<'root> NngStatRoot<'root> {
@@ -134,7 +134,10 @@ impl<'root> NngStatRoot<'root> {
         unsafe {
             let mut node: *mut nng_stat = std::ptr::null_mut();
             let res = nng_stats_get(&mut node);
-            NngFail::succeed_then(res, || NngStatRoot{ node , _phantom: marker::PhantomData })
+            NngFail::succeed_then(res, || NngStatRoot {
+                node,
+                _phantom: marker::PhantomData,
+            })
         }
     }
 }
@@ -156,13 +159,16 @@ impl<'root> Drop for NngStatRoot<'root> {
 
 pub struct NngStatChild<'root> {
     node: *mut nng_stat,
-    _phantom: marker::PhantomData<&'root nng_stat>
+    _phantom: marker::PhantomData<&'root nng_stat>,
 }
 
 /// Child of statistic node in tree of statistics.  See `NngStat::child()`.
 impl<'root> NngStatChild<'root> {
     pub fn new(node: *mut nng_stat) -> NngStatChild<'root> {
-        NngStatChild { node, _phantom: marker::PhantomData }
+        NngStatChild {
+            node,
+            _phantom: marker::PhantomData,
+        }
     }
     /// See [nng_stat_name](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_name.3).
     pub fn name(&self) -> Result<&str, std::str::Utf8Error> {
@@ -190,9 +196,7 @@ impl<'root> NngStatChild<'root> {
 
     /// See [nng_stat_value](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_timestamp.3).
     pub fn value(&self) -> u64 {
-        unsafe {
-            nng_stat_value(self.nng_stat())
-        }
+        unsafe { nng_stat_value(self.nng_stat()) }
     }
 
     /// If the statistic type is of type `NNG_STAT_STRING` returns the string value.
@@ -223,20 +227,20 @@ impl<'root> NngStatChild<'root> {
 
     /// See [nng_stat_timestamp](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_timestamp.3).
     pub fn timestamp(&self) -> u64 {
-        unsafe {
-            nng_stat_timestamp(self.nng_stat())
-        }
+        unsafe { nng_stat_timestamp(self.nng_stat()) }
     }
 
     /// Returns an iterator over sibling statistics.  See [nng_stat_next](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_next.3).
     pub fn iter(&self) -> Iter {
         unsafe {
             let node = self.nng_stat();
-            Iter { node: Some(NngStatChild::new(node)) }
+            Iter {
+                node: Some(NngStatChild::new(node)),
+            }
         }
     }
 
-    // The explicit `'root` lifetime is important here so the lifetime is the 
+    // The explicit `'root` lifetime is important here so the lifetime is the
     // top-level `NngStatRoot` rather than &self.
     pub fn next(&self) -> Option<NngStatChild<'root>> {
         unsafe {

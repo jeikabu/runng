@@ -1,20 +1,15 @@
 //! Rust nngcat.  See [nngcat](https://nanomsg.github.io/nng/man/v1.1.0/nngcat.1).
 //! `cargo run --example runngcat`
 
-use clap::{Arg, ArgGroup, ArgMatches, App};
+use clap::{App, Arg, ArgGroup, ArgMatches};
 use env_logger::{Builder, Env};
 use log::{debug, info};
-use runng::{
-    *,
-    protocol::Subscribe,
-};
-use std::{
-    thread,
-    time::Duration,
-};
+use runng::{protocol::Subscribe, *};
+use std::{thread, time::Duration};
 
 fn connect<T>(socket: T, url: &str, is_dial: bool) -> NngResult<T>
-    where T: Dial + Listen
+where
+    T: Dial + Listen,
 {
     if is_dial {
         socket.dial(url)
@@ -26,12 +21,17 @@ fn connect<T>(socket: T, url: &str, is_dial: bool) -> NngResult<T>
 const PROTOCOLS: &[&str] = &["req0", "rep0", "pub0", "sub0", "push0", "pull0"];
 
 fn main() -> NngReturn {
-    Builder::from_env(Env::default().default_filter_or("debug")).try_init()
+    Builder::from_env(Env::default().default_filter_or("debug"))
+        .try_init()
         .unwrap_or_else(|err| println!("env_logger::init() failed: {}", err));
 
     let matches = get_matches();
     let is_dial = matches.is_present("dial");
-    let url = matches.value_of("dial").or_else(|| matches.value_of("listen")).unwrap().to_owned();
+    let url = matches
+        .value_of("dial")
+        .or_else(|| matches.value_of("listen"))
+        .unwrap()
+        .to_owned();
 
     let mut threads = Vec::new();
     if matches.is_present("req0") {
@@ -57,7 +57,7 @@ fn main() -> NngReturn {
                 let msg = sock.recv()?;
                 handle_received_msg(&matches, msg);
             }
-            
+
             Ok(())
         });
         threads.push(thread);
@@ -98,7 +98,7 @@ fn main() -> NngReturn {
                 let msg = msg_builder.build()?;
                 sock.send(msg)?;
             }
-            
+
             Ok(())
         });
         threads.push(thread);
@@ -107,7 +107,11 @@ fn main() -> NngReturn {
         let matches = matches.clone();
         let url = url.clone();
         let sock = protocol::Sub0::open()?;
-        let topic = matches.value_of("subscribe").or(Some("")).unwrap().to_owned();
+        let topic = matches
+            .value_of("subscribe")
+            .or(Some(""))
+            .unwrap()
+            .to_owned();
         let thread = thread::spawn(move || -> NngReturn {
             let sock = connect(sock, &url, is_dial)?;
             sock.subscribe(topic.as_bytes())?;
@@ -136,7 +140,7 @@ fn main() -> NngReturn {
                 let msg = msg_builder.build()?;
                 sock.send(msg)?;
             }
-            
+
             Ok(())
         });
         threads.push(thread);
@@ -155,8 +159,10 @@ fn main() -> NngReturn {
         threads.push(thread);
     }
 
-    threads.into_iter().for_each(|thread| thread.join().unwrap().unwrap());
-    
+    threads
+        .into_iter()
+        .for_each(|thread| thread.join().unwrap().unwrap());
+
     Ok(())
 }
 
@@ -181,47 +187,54 @@ fn handle_received_msg<'a>(matches: &ArgMatches<'a>, msg: msg::NngMsg) {
 
 fn get_matches<'a>() -> ArgMatches<'a> {
     let mut args = App::new("runngcat")
-        .arg(Arg::with_name("version")
-            .short("V")
-            .long("version")
-            .help("Print the version and exit")
+        .arg(
+            Arg::with_name("version")
+                .short("V")
+                .long("version")
+                .help("Print the version and exit"),
         )
-        .arg(Arg::with_name("verbose")
-            .short("v")
-            .long("verbose")
-            .help("Select verbose operation")
+        .arg(
+            Arg::with_name("verbose")
+                .short("v")
+                .long("verbose")
+                .help("Select verbose operation"),
         )
-        .arg(Arg::with_name("silent")
-            .short("q")
-            .long("silent")
-            .help("Select silent operation")
+        .arg(
+            Arg::with_name("silent")
+                .short("q")
+                .long("silent")
+                .help("Select silent operation"),
         )
-        .arg(Arg::with_name("subscribe")
-            .long("subscribe")
-            .takes_value(true)
-            .value_name("TOPIC")
-            .help("Subscribe to TOPIC")
+        .arg(
+            Arg::with_name("subscribe")
+                .long("subscribe")
+                .takes_value(true)
+                .value_name("TOPIC")
+                .help("Subscribe to TOPIC"),
         )
-        .arg(Arg::with_name("count")
-            .long("count")
-            .takes_value(true)
-            .value_name("COUNT")
-            .help("Limit the number of iterations when looping to COUNT iterations")
+        .arg(
+            Arg::with_name("count")
+                .long("count")
+                .takes_value(true)
+                .value_name("COUNT")
+                .help("Limit the number of iterations when looping to COUNT iterations"),
         )
         // Peer selection options
         .arg(
             Arg::with_name("dial")
-            .long("dial")
-            .takes_value(true)
-            .value_name("URL")
-            .help("Connect to the peer at the address specified by URL")
+                .long("dial")
+                .takes_value(true)
+                .value_name("URL")
+                .help("Connect to the peer at the address specified by URL"),
         )
         .arg(
             Arg::with_name("listen")
-            .long("listen")
-            .takes_value(true)
-            .value_name("URL")
-            .help("Bind to, and accept connections from peers, at the address specified by URL")
+                .long("listen")
+                .takes_value(true)
+                .value_name("URL")
+                .help(
+                    "Bind to, and accept connections from peers, at the address specified by URL",
+                ),
         )
         // .arg(
         //     Arg::with_name("connect-ipc")
@@ -253,57 +266,52 @@ fn get_matches<'a>() -> ArgMatches<'a> {
         // )
         .group(
             ArgGroup::with_name("peer")
-            .args(&["dial", "listen"])
-            .multiple(false)
-            .required(true)
+                .args(&["dial", "listen"])
+                .multiple(false)
+                .required(true),
         )
         // Receive options
-        .arg(
-            Arg::with_name("raw")
-            .long("raw")
-        )
+        .arg(Arg::with_name("raw").long("raw"))
         .arg(
             Arg::with_name("receive-timeout")
-            .long("receive-timeout")
-            .takes_value(true)
-            .value_name("SEC")
+                .long("receive-timeout")
+                .takes_value(true)
+                .value_name("SEC"),
         )
         // Transmit options
         .arg(
             Arg::with_name("data")
-            .long("data")
-            .short("D")
-            .takes_value(true)
-            .value_name("DATA")
-            .help("Use DATA for the body of outgoing messages")
+                .long("data")
+                .short("D")
+                .takes_value(true)
+                .value_name("DATA")
+                .help("Use DATA for the body of outgoing messages"),
         )
         .arg(
             Arg::with_name("interval")
-            .long("interval")
-            .short("i")
-            .takes_value(true)
-            .value_name("SEC")
+                .long("interval")
+                .short("i")
+                .takes_value(true)
+                .value_name("SEC"),
         )
         .arg(
             Arg::with_name("delay")
-            .long("delay")
-            .short("d")
-            .takes_value(true)
-            .value_name("SEC")
-            .help("Wait SEC seconds before sending the first outgoing message")
+                .long("delay")
+                .short("d")
+                .takes_value(true)
+                .value_name("SEC")
+                .help("Wait SEC seconds before sending the first outgoing message"),
         );
 
-        // Protocol selection options
-        for protocol in PROTOCOLS {
-            args = args.arg(
-                Arg::with_name(protocol)
-                    .long(protocol)
-            );
-        }
-        args.group(ArgGroup::with_name("protocols")
+    // Protocol selection options
+    for protocol in PROTOCOLS {
+        args = args.arg(Arg::with_name(protocol).long(protocol));
+    }
+    args.group(
+        ArgGroup::with_name("protocols")
             .args(&PROTOCOLS)
             .multiple(true)
-            .required(true)
-        )
-        .get_matches()
+            .required(true),
+    )
+    .get_matches()
 }

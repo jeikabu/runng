@@ -1,32 +1,23 @@
 use thrift::{
     protocol::{
-        TInputProtocol,
-        TOutputProtocol,
-        TMessageIdentifier,
-        TStructIdentifier,
-        TFieldIdentifier,
-        TSetIdentifier,
-        TListIdentifier,
-        TMapIdentifier,
+        TFieldIdentifier, TInputProtocol, TListIdentifier, TMapIdentifier, TMessageIdentifier,
+        TOutputProtocol, TSetIdentifier, TStructIdentifier,
     },
-    transport::{
-        TReadTransport,
-        TWriteTransport,
-    }
+    transport::{TReadTransport, TWriteTransport},
 };
 
 pub struct TNngInputProtocol<T>
 where
-    T: TReadTransport
+    T: TReadTransport,
 {
     protocol: thrift::protocol::TBinaryInputProtocol<T>,
 }
 
 impl<T> TNngInputProtocol<T>
 where
-    T: TReadTransport
+    T: TReadTransport,
 {
-    pub fn new (transport: T) -> TNngInputProtocol<T> {
+    pub fn new(transport: T) -> TNngInputProtocol<T> {
         TNngInputProtocol {
             protocol: thrift::protocol::TBinaryInputProtocol::new(transport, true),
         }
@@ -35,7 +26,7 @@ where
 
 impl<T> TInputProtocol for TNngInputProtocol<T>
 where
-    T: TReadTransport
+    T: TReadTransport,
 {
     fn read_message_begin(&mut self) -> thrift::Result<TMessageIdentifier> {
         self.protocol.read_message_begin()
@@ -124,14 +115,14 @@ where
 
 pub struct TNngOutputProtocol<T>
 where
-    T: TWriteTransport
+    T: TWriteTransport,
 {
     protocol: thrift::protocol::TBinaryOutputProtocol<T>,
 }
 
 impl<T> TNngOutputProtocol<T>
 where
-    T: TWriteTransport
+    T: TWriteTransport,
 {
     pub fn new(transport: T) -> TNngOutputProtocol<T> {
         TNngOutputProtocol {
@@ -142,9 +133,8 @@ where
 
 impl<T> TOutputProtocol for TNngOutputProtocol<T>
 where
-    T: TWriteTransport
+    T: TWriteTransport,
 {
-
     fn write_message_begin(&mut self, identifier: &TMessageIdentifier) -> thrift::Result<()> {
         self.protocol.write_message_begin(identifier)
     }

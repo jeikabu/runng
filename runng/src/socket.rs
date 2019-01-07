@@ -1,12 +1,8 @@
 //! Socket basics
 
+use super::{dialer::NngDialer, listener::NngListener, *};
+use runng_derive::NngGetOpts;
 use runng_sys::*;
-use runng_derive::{NngGetOpts};
-use super::{
-    *,
-    dialer::NngDialer,
-    listener::NngListener,
-};
 use std::sync::Arc;
 
 /// Wraps `nng_socket`.  See [nng_socket](https://nanomsg.github.io/nng/man/v1.1.0/nng_socket.5).
@@ -29,10 +25,20 @@ impl NngSocket {
     }
 
     /// Register pipe notification callback.  See [nng_pipe_notify](https://nanomsg.github.io/nng/man/v1.1.0/nng_pipe_notify.3).
-    #[cfg(feature="pipes")]
-    pub fn notify(&self, event: pipe::PipeEvent, callback: pipe::PipeNotifyCallback, argument: pipe::PipeNotifyCallbackArg) -> NngReturn {
+    #[cfg(feature = "pipes")]
+    pub fn notify(
+        &self,
+        event: pipe::PipeEvent,
+        callback: pipe::PipeNotifyCallback,
+        argument: pipe::PipeNotifyCallbackArg,
+    ) -> NngReturn {
         unsafe {
-            NngFail::from_i32(nng_pipe_notify(self.socket, event as i32, Some(callback), argument))
+            NngFail::from_i32(nng_pipe_notify(
+                self.socket,
+                event as i32,
+                Some(callback),
+                argument,
+            ))
         }
     }
 }
@@ -43,13 +49,13 @@ impl Drop for NngSocket {
             debug!("Socket close: {:?}", self.socket);
             let res = NngFail::from_i32(nng_close(self.socket));
             match res {
-                Ok(()) => {},
+                Ok(()) => {}
                 // Can't panic here.  Thrift's TIoChannel::split() clones the socket handle so we may get ECLOSED
-                Err(NngFail::Err(NngError::ECLOSED)) => {},
+                Err(NngFail::Err(NngError::ECLOSED)) => {}
                 Err(res) => {
                     debug!("nng_close {:?}", res);
                     panic!("nng_close {:?}", res);
-                },
+                }
             }
         }
     }
@@ -114,9 +120,7 @@ pub trait Dial: Socket {
 pub trait SendMsg: Socket {
     /// Send a message.  See [nng_sendmsg](https://nanomsg.github.io/nng/man/v1.1.0/nng_sendmsg.3).
     fn send(&self, msg: msg::NngMsg) -> NngReturn {
-        let res = unsafe {
-            nng_sendmsg(self.nng_socket(), msg.take(), 0)
-        };
+        let res = unsafe { nng_sendmsg(self.nng_socket(), msg.take(), 0) };
         NngFail::from_i32(res)
     }
 }
@@ -146,8 +150,6 @@ impl UnsafeSocket {
 
     /// See [nng_socket_id](https://nanomsg.github.io/nng/man/v1.1.0/nng_socket_id.3).
     pub fn id(&self) -> i32 {
-        unsafe {
-            nng_socket_id(self.socket)
-        }
+        unsafe { nng_socket_id(self.socket) }
     }
 }
