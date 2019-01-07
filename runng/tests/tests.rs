@@ -3,6 +3,12 @@ mod common;
 #[cfg(test)]
 mod tests {
 
+    mod msg_tests;
+    mod pipe_tests;
+    mod pushpull_tests;
+    mod requestreply_tests;
+    mod stats_tests;
+
     use crate::common::get_url;
     use futures::{future, future::Future, Stream};
     use runng::{protocol::*, *};
