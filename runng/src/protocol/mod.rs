@@ -24,20 +24,14 @@ pub use self::pull::*;
 pub use self::reply::*;
 pub use self::request::*;
 
-use futures::{
-    Sink,
-    sync::mpsc,
-};
+use futures::{sync::mpsc, Sink};
 
-use crate::{
-    *,
-    msg::NngMsg,
-};
+use crate::{msg::NngMsg, *};
 use runng_sys::*;
 use std::sync::Arc;
 
 /// A `Socket` that can be turned into a context for asynchronous I/O.
-/// 
+///
 /// # Examples
 /// ```
 /// use runng::{
@@ -52,19 +46,19 @@ use std::sync::Arc;
 /// }
 /// ```
 pub trait AsyncSocket: Socket {
-
     /// The type of aynchronous context produced
     type ContextType: AsyncContext;
 
     /// Turns the `Socket` into an asynchronous context
-    fn create_async_context(&self) -> NngResult<Box<Self::ContextType>>
-    {
+    fn create_async_context(&self) -> NngResult<Box<Self::ContextType>> {
         let socket = self.clone_socket();
         let ctx = Self::ContextType::new(socket)?;
         let mut ctx = Box::new(ctx);
         // This mess is needed to convert Box<_> to c_void
         let arg = ctx.as_mut() as *mut _ as AioCallbackArg;
-        ctx.as_mut().aio_mut().init(Self::ContextType::get_aio_callback(), arg)?;
+        ctx.as_mut()
+            .aio_mut()
+            .init(Self::ContextType::get_aio_callback(), arg)?;
         Ok(ctx)
     }
 }
@@ -77,8 +71,9 @@ pub trait AsyncContext: Aio + Sized {
 }
 
 fn nng_open<T, O, S>(open_func: O, socket_create_func: S) -> NngResult<T>
-    where O: Fn(&mut nng_socket) -> i32,
-        S: Fn(Arc<NngSocket>) -> T
+where
+    O: Fn(&mut nng_socket) -> i32,
+    S: Fn(Arc<NngSocket>) -> T,
 {
     let mut socket = nng_socket { id: 0 };
     let res = open_func(&mut socket);
@@ -88,7 +83,10 @@ fn nng_open<T, O, S>(open_func: O, socket_create_func: S) -> NngResult<T>
     })
 }
 
-fn try_signal_complete(sender: &mut Option<mpsc::Sender<NngResult<NngMsg>>>, message: NngResult<NngMsg>) {
+fn try_signal_complete(
+    sender: &mut Option<mpsc::Sender<NngResult<NngMsg>>>,
+    message: NngResult<NngMsg>,
+) {
     if let Some(ref mut sender) = sender {
         let res = sender.try_send(message);
         if let Err(err) = res {

@@ -1,22 +1,16 @@
 //! Async push/pull ("pipeline")
 
 use crate::{
-    *,
-    aio::{NngAio, AioCallbackArg},
+    aio::{AioCallbackArg, NngAio},
     msg::NngMsg,
-    protocol::{AsyncContext, subscribe, try_signal_complete},
+    protocol::{subscribe, try_signal_complete, AsyncContext},
+    *,
 };
-use futures::{
-    sync::mpsc::{
-        channel,
-        Receiver,
-        Sender,
-    }
-};
+use futures::sync::mpsc::{channel, Receiver, Sender};
 use runng_sys::*;
 use std::sync::Arc;
 
-#[derive(Debug,PartialEq)]
+#[derive(Debug, PartialEq)]
 enum PullState {
     Ready,
     Receiving,
@@ -77,10 +71,10 @@ impl AsyncPull for AsyncPullContext {
     }
 }
 
-extern fn pull_callback(arg : AioCallbackArg) {
+extern "C" fn pull_callback(arg: AioCallbackArg) {
     unsafe {
         let ctx = &mut *(arg as *mut AsyncPullContext);
-        
+
         trace!("callback Subscribe:{:?}", ctx.state);
         match ctx.state {
             PullState::Ready => panic!(),
@@ -92,14 +86,14 @@ extern fn pull_callback(arg : AioCallbackArg) {
                         match res {
                             NngFail::Err(NngError::ECLOSED) => {
                                 debug!("Closed");
-                            },
+                            }
                             _ => {
                                 trace!("Reply.Receive: {:?}", res);
                                 ctx.start_receive();
-                            },
+                            }
                         }
                         try_signal_complete(&mut ctx.sender, Err(res));
-                    },
+                    }
                     Ok(()) => {
                         let msg = NngMsg::new_msg(nng_aio_get_msg(aio));
                         // Make sure to reset state before signaling completion.  Otherwise
@@ -108,7 +102,7 @@ extern fn pull_callback(arg : AioCallbackArg) {
                         try_signal_complete(&mut ctx.sender, Ok(msg));
                     }
                 }
-            },
+            }
         }
     }
 }
@@ -136,7 +130,7 @@ impl AsyncContext for AsyncSubscribeContext {
                 aio,
                 state: PullState::Ready,
                 sender: None,
-            }
+            },
         };
         Ok(ctx)
     }
@@ -163,8 +157,6 @@ pub trait Subscribe {
 
 impl Subscribe for AsyncSubscribeContext {
     fn subscribe(&self, topic: &[u8]) -> NngReturn {
-        unsafe {
-            subscribe(self.ctx.aio.nng_socket(), topic)
-        }
+        unsafe { subscribe(self.ctx.aio.nng_socket(), topic) }
     }
 }

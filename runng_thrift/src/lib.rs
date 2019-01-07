@@ -1,11 +1,5 @@
-use log::{trace};
-use std::{
-    io,
-    io::{
-        prelude::*,
-    }
-};
-
+use log::trace;
+use std::{io, io::prelude::*};
 
 mod nng_channel;
 pub use crate::nng_channel::*;

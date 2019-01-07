@@ -2,11 +2,7 @@ use super::*;
 
 use runng::{
     msg::NngMsg,
-    socket::{
-        NngSocket,
-        RecvMsg,
-        SendMsg,
-    },
+    socket::{NngSocket, RecvMsg, SendMsg},
 };
 
 use std;
@@ -15,11 +11,7 @@ use std::{
     io::{Error, ErrorKind},
     sync::Arc,
 };
-use thrift::transport::{
-    TIoChannel,
-    ReadHalf,
-    WriteHalf,
-};
+use thrift::transport::{ReadHalf, TIoChannel, WriteHalf};
 
 pub struct TNngChannel {
     message: NngMsg,
@@ -29,10 +21,7 @@ pub struct TNngChannel {
 impl TNngChannel {
     pub fn new(socket: Arc<NngSocket>) -> runng::NngResult<TNngChannel> {
         let message = NngMsg::new()?;
-        Ok(TNngChannel {
-            message,
-            socket,
-        })
+        Ok(TNngChannel { message, socket })
     }
 
     fn helper(&mut self, buf: &mut [u8]) -> io::Result<usize> {
@@ -48,13 +37,9 @@ impl TIoChannel for TNngChannel {
     where
         Self: Sized,
     {
-        let clone = unsafe {
-            result_wrapper(TNngChannel::new(NngSocket::new(self.socket.nng_socket())))?
-        };
-        Ok((
-            ReadHalf::new(self),
-            WriteHalf::new(clone)
-        ))
+        let clone =
+            unsafe { result_wrapper(TNngChannel::new(NngSocket::new(self.socket.nng_socket())))? };
+        Ok((ReadHalf::new(self), WriteHalf::new(clone)))
     }
 }
 
@@ -68,8 +53,8 @@ impl Read for TNngChannel {
                     trace!("Recv: {}", msg.len());
                     self.message = msg;
                     self.helper(buf)
-                },
-                Err(_) => Err(Error::from(ErrorKind::Other))
+                }
+                Err(_) => Err(Error::from(ErrorKind::Other)),
             }
         } else {
             self.helper(buf)

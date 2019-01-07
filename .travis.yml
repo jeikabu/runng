@@ -33,12 +33,15 @@ before_install:
   - source ./scripts/install.sh
 
 before_script:
-  - rustup component add clippy-preview
+  - rustup component add clippy
+  - rustup component add rustfmt
 
 script:
+  # Check source code formatting
+  - cargo fmt --all -- --check
   - cargo clippy
-  # Include optional packages
-  - cargo build --all
+  # Build everything (including optional packages)
+  - cargo build --all --all-targets
   - RUST_BACKTRACE=1 cargo test "tests::"
 
 after_success:

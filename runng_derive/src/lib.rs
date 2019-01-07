@@ -1,14 +1,10 @@
-#![recursion_limit="128"]
+#![recursion_limit = "128"]
 
 extern crate proc_macro;
 
 use proc_macro::TokenStream;
-use syn::{
-    Lit,
-    Meta,
-    MetaNameValue,
-};
 use quote::quote;
+use syn::{Lit, Meta, MetaNameValue};
 
 #[proc_macro_derive(NngGetOpts, attributes(prefix, nng_member))]
 pub fn derive_nng_get_opts(tokens: TokenStream) -> TokenStream {
@@ -36,27 +32,30 @@ fn get_nng_member(ast: &syn::DeriveInput) -> Option<syn::Ident> {
                             match meta {
                                 // Matches attribute with single word like `#[nng_member]` (as opposed to `#[derive(NngGetOps)]` or `#[nng_member = "socket"]`)
                                 Meta::Word(ref ident) if ident == "nng_member" =>
-                                    // Return name of field with `#[nng_member]` attribute
-                                    return field.ident.clone(),
+                                // Return name of field with `#[nng_member]` attribute
+                                {
+                                    return field.ident.clone()
+                                }
                                 _ => (),
                             }
                         }
                     }
-                },
+                }
                 _ => (),
             }
-        },
+        }
         _ => panic!("Must be a struct"),
     }
-    
+
     None
 }
 
 fn derive_nng_opts<F>(tokens: TokenStream, gen_impl: F) -> TokenStream
-    where F: Fn(&syn::Ident, &str, &syn::Ident) -> TokenStream
+where
+    F: Fn(&syn::Ident, &str, &syn::Ident) -> TokenStream,
 {
     let ast: syn::DeriveInput = syn::parse(tokens).unwrap();
-        // .filter(|attr| attr.path.is_ident("options"))
+    // .filter(|attr| attr.path.is_ident("options"))
     let member: Option<syn::Ident> = get_nng_member(&ast);
 
     let mut prefix: Option<String> = None;
@@ -64,14 +63,16 @@ fn derive_nng_opts<F>(tokens: TokenStream, gen_impl: F) -> TokenStream
         let option = option.parse_meta().unwrap();
         match option {
             // Match `#[ident = lit]` attributes.  Match guard makes it `#[prefix = lit]`
-            Meta::NameValue(MetaNameValue{ref ident, ref lit, ..}) if ident == "prefix" => {
+            Meta::NameValue(MetaNameValue {
+                ref ident, ref lit, ..
+            }) if ident == "prefix" => {
                 if let Lit::Str(lit) = lit {
                     prefix = Some(lit.value());
                 } else {
                     panic!("Oops");
                 }
-            },
-            _ => {}, // Documentation comments `///` have meta.name()
+            }
+            _ => {} // Documentation comments `///` have meta.name()
         }
     }
     //TokenStream::from_iter(impls.into_iter())
@@ -142,7 +143,7 @@ fn gen_set_impl(name: &syn::Ident, prefix: &str, member: &syn::Ident) -> TokenSt
     let setopt_string = prefix.to_string() + "setopt_string";
     let setopt_string = syn::Ident::new(&setopt_string, syn::export::Span::call_site());
 
-    let gen = quote!{
+    let gen = quote! {
         impl SetOpts for #name {
             fn setopt_bool(&mut self, option: NngOption, value: bool) -> NngReturn {
                 unsafe {

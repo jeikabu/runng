@@ -1,24 +1,13 @@
 mod test_service;
 
-use log::{debug};
+use log::debug;
 use runng_thrift::*;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use runng::{
-        *,
-        msg::NngMsg,
-        protocol::Subscribe,
-    };
-    use thrift::{
-        protocol::{
-            TMultiplexedOutputProtocol,
-        },
-        server::{
-            TMultiplexedProcessor,
-        }
-    };
+    use runng::{msg::NngMsg, protocol::Subscribe, *};
+    use thrift::{protocol::TMultiplexedOutputProtocol, server::TMultiplexedProcessor};
 
     #[test]
     fn it_works() -> NngReturn {
@@ -36,21 +25,14 @@ mod tests {
         Ok(())
     }
 
-    use std::{
-        thread,
-        sync::Arc,
-    };
-    use thrift::{
-        server::{TProcessor},
-        transport::{TIoChannel},
-    }
-    ;
+    use std::{sync::Arc, thread};
+    use thrift::{server::TProcessor, transport::TIoChannel};
     #[derive(Debug)]
     pub struct TServer<PRC>
     where
-        PRC: TProcessor + Send + Sync,// + 'static,
+        PRC: TProcessor + Send + Sync, // + 'static,
     {
-        processor: Arc<PRC>
+        processor: Arc<PRC>,
     }
 
     impl<PRC> TServer<PRC>
@@ -59,15 +41,13 @@ mod tests {
     {
         pub fn new(processor: PRC) -> TServer<PRC> {
             TServer {
-                processor: Arc::new(processor)
+                processor: Arc::new(processor),
             }
         }
     }
-    
+
     use crate::test_service::{
-        TestServiceSyncHandler,
-        TestServiceSyncProcessor,
-        TTestServiceSyncClient,
+        TTestServiceSyncClient, TestServiceSyncHandler, TestServiceSyncProcessor,
     };
     struct Handler;
     impl TestServiceSyncHandler for Handler {
@@ -89,7 +69,7 @@ mod tests {
             let (readable, writable) = channel.split().unwrap();
             let mut in_proto = TNngInputProtocol::new(readable);
             let mut out_proto = TNngOutputProtocol::new(writable);
-            let handler = Handler{};
+            let handler = Handler {};
             let processor = TestServiceSyncProcessor::new(handler);
 
             processor.process(&mut in_proto, &mut out_proto).unwrap();
@@ -108,7 +88,7 @@ mod tests {
 
         Ok(())
     }
-    
+
     //#[test]
     fn thrift_works() -> NngReturn {
         let url = "inproc://test3";
@@ -121,13 +101,11 @@ mod tests {
         let in_proto = TNngInputProtocol::new(readable);
         let out_proto = TNngOutputProtocol::new(writable);
         let mut muxer = TMultiplexedProcessor::new();
-        let handler = Handler{};
+        let handler = Handler {};
         let processor = TestServiceSyncProcessor::new(handler);
         muxer.register(serviceName, Box::new(processor), false);
 
-        thread::spawn(move || {
-            
-        });
+        thread::spawn(move || {});
 
         let requester = factory.requester_open()?.dial(url)?;
 

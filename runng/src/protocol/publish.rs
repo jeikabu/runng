@@ -1,22 +1,16 @@
 //! Async publish/subscribe
 
 use crate::{
-    *,
-    aio::{NngAio, AioCallbackArg},
+    aio::{AioCallbackArg, NngAio},
     msg::NngMsg,
     protocol::AsyncContext,
+    *,
 };
-use futures::{
-    sync::oneshot::{
-        channel,
-        Receiver,
-        Sender,
-    }
-};
+use futures::sync::oneshot::{channel, Receiver, Sender};
 use runng_sys::*;
 use std::sync::Arc;
 
-#[derive(Debug,PartialEq)]
+#[derive(Debug, PartialEq)]
 enum PublishState {
     Ready,
     Sending,
@@ -26,7 +20,7 @@ enum PublishState {
 pub struct AsyncPublishContext {
     aio: NngAio,
     state: PublishState,
-    sender: Option<Sender<NngReturn>>
+    sender: Option<Sender<NngReturn>>,
 }
 
 impl AsyncContext for AsyncPublishContext {
@@ -76,15 +70,15 @@ impl AsyncPublish for AsyncPublishContext {
             nng_aio_set_msg(nng_aio, msg);
             nng_send_aio(self.aio.nng_socket(), nng_aio);
         }
-        
+
         receiver
     }
 }
 
-extern fn publish_callback(arg : AioCallbackArg) {
+extern "C" fn publish_callback(arg: AioCallbackArg) {
     unsafe {
         let ctx = &mut *(arg as *mut AsyncPublishContext);
-        
+
         trace!("callback Publish:{:?}", ctx.state);
         match ctx.state {
             PublishState::Ready => panic!(),
@@ -101,7 +95,7 @@ extern fn publish_callback(arg : AioCallbackArg) {
                 if res.is_err() {
                     // Unable to send result.  Receiver probably went away.  Not necessarily a problem.
                 }
-            },
+            }
         }
     }
 }
