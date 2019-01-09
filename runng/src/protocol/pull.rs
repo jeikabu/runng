@@ -71,36 +71,34 @@ impl AsyncPull for AsyncPullContext {
     }
 }
 
-extern "C" fn pull_callback(arg: AioCallbackArg) {
-    unsafe {
-        let ctx = &mut *(arg as *mut AsyncPullContext);
+unsafe extern "C" fn pull_callback(arg: AioCallbackArg) {
+    let ctx = &mut *(arg as *mut AsyncPullContext);
 
-        trace!("callback Subscribe:{:?}", ctx.state);
-        match ctx.state {
-            PullState::Ready => panic!(),
-            PullState::Receiving => {
-                let aio = ctx.aio.nng_aio();
-                let res = NngFail::from_i32(nng_aio_result(aio));
-                match res {
-                    Err(res) => {
-                        match res {
-                            NngFail::Err(NngError::ECLOSED) => {
-                                debug!("Closed");
-                            }
-                            _ => {
-                                trace!("Reply.Receive: {:?}", res);
-                                ctx.start_receive();
-                            }
+    trace!("callback Subscribe:{:?}", ctx.state);
+    match ctx.state {
+        PullState::Ready => panic!(),
+        PullState::Receiving => {
+            let aio = ctx.aio.nng_aio();
+            let res = NngFail::from_i32(nng_aio_result(aio));
+            match res {
+                Err(res) => {
+                    match res {
+                        NngFail::Err(NngError::ECLOSED) => {
+                            debug!("Closed");
                         }
-                        try_signal_complete(&mut ctx.sender, Err(res));
+                        _ => {
+                            trace!("Reply.Receive: {:?}", res);
+                            ctx.start_receive();
+                        }
                     }
-                    Ok(()) => {
-                        let msg = NngMsg::new_msg(nng_aio_get_msg(aio));
-                        // Make sure to reset state before signaling completion.  Otherwise
-                        // have race-condition where receiver can receive None promise
-                        ctx.start_receive();
-                        try_signal_complete(&mut ctx.sender, Ok(msg));
-                    }
+                    try_signal_complete(&mut ctx.sender, Err(res));
+                }
+                Ok(()) => {
+                    let msg = NngMsg::new_msg(nng_aio_get_msg(aio));
+                    // Make sure to reset state before signaling completion.  Otherwise
+                    // have race-condition where receiver can receive None promise
+                    ctx.start_receive();
+                    try_signal_complete(&mut ctx.sender, Ok(msg));
                 }
             }
         }

@@ -77,45 +77,43 @@ impl AsyncRequest for AsyncRequestContext {
     }
 }
 
-extern "C" fn request_callback(arg: AioCallbackArg) {
-    unsafe {
-        let ctx = &mut *(arg as *mut AsyncRequestContext);
-        let aionng = ctx.ctx.aio().nng_aio();
-        let ctxnng = ctx.ctx.ctx();
-        trace!("callback Request:{:?}", ctx.state);
-        match ctx.state {
-            RequestState::Ready => panic!(),
-            RequestState::Sending => {
-                let res = NngFail::from_i32(nng_aio_result(aionng));
-                match res {
-                    Err(res) => {
-                        // Nng requries we resume ownership of the message
-                        let _ = NngMsg::new_msg(nng_aio_get_msg(aionng));
+unsafe extern "C" fn request_callback(arg: AioCallbackArg) {
+    let ctx = &mut *(arg as *mut AsyncRequestContext);
+    let aionng = ctx.ctx.aio().nng_aio();
+    let ctxnng = ctx.ctx.ctx();
+    trace!("callback Request:{:?}", ctx.state);
+    match ctx.state {
+        RequestState::Ready => panic!(),
+        RequestState::Sending => {
+            let res = NngFail::from_i32(nng_aio_result(aionng));
+            match res {
+                Err(res) => {
+                    // Nng requries we resume ownership of the message
+                    let _ = NngMsg::new_msg(nng_aio_get_msg(aionng));
 
-                        ctx.state = RequestState::Ready;
-                        let sender = ctx.sender.take().unwrap();
-                        sender.send(Err(res)).unwrap();
-                    }
-                    Ok(()) => {
-                        ctx.state = RequestState::Receiving;
-                        nng_ctx_recv(ctxnng, aionng);
-                    }
+                    ctx.state = RequestState::Ready;
+                    let sender = ctx.sender.take().unwrap();
+                    sender.send(Err(res)).unwrap();
+                }
+                Ok(()) => {
+                    ctx.state = RequestState::Receiving;
+                    nng_ctx_recv(ctxnng, aionng);
                 }
             }
-            RequestState::Receiving => {
-                let sender = ctx.sender.take().unwrap();
-                let res = NngFail::from_i32(nng_aio_result(aionng));
-                match res {
-                    Err(res) => {
-                        ctx.state = RequestState::Ready;
-                        sender.send(Err(res)).unwrap();
-                    }
-                    Ok(()) => {
-                        let msg = NngMsg::new_msg(nng_aio_get_msg(aionng));
+        }
+        RequestState::Receiving => {
+            let sender = ctx.sender.take().unwrap();
+            let res = NngFail::from_i32(nng_aio_result(aionng));
+            match res {
+                Err(res) => {
+                    ctx.state = RequestState::Ready;
+                    sender.send(Err(res)).unwrap();
+                }
+                Ok(()) => {
+                    let msg = NngMsg::new_msg(nng_aio_get_msg(aionng));
 
-                        ctx.state = RequestState::Ready;
-                        sender.send(Ok(msg)).unwrap();
-                    }
+                    ctx.state = RequestState::Ready;
+                    sender.send(Ok(msg)).unwrap();
                 }
             }
         }

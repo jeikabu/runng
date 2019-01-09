@@ -75,26 +75,24 @@ impl AsyncPublish for AsyncPublishContext {
     }
 }
 
-extern "C" fn publish_callback(arg: AioCallbackArg) {
-    unsafe {
-        let ctx = &mut *(arg as *mut AsyncPublishContext);
+unsafe extern "C" fn publish_callback(arg: AioCallbackArg) {
+    let ctx = &mut *(arg as *mut AsyncPublishContext);
 
-        trace!("callback Publish:{:?}", ctx.state);
-        match ctx.state {
-            PublishState::Ready => panic!(),
-            PublishState::Sending => {
-                let nng_aio = ctx.aio.nng_aio();
-                let res = NngFail::from_i32(nng_aio_result(nng_aio));
-                if res.is_err() {
-                    // Nng requires that we retrieve the message and free it
-                    let _ = NngMsg::new_msg(nng_aio_get_msg(nng_aio));
-                }
-                // Reset state before signaling completion
-                ctx.state = PublishState::Ready;
-                let res = ctx.sender.take().unwrap().send(res);
-                if res.is_err() {
-                    // Unable to send result.  Receiver probably went away.  Not necessarily a problem.
-                }
+    trace!("callback Publish:{:?}", ctx.state);
+    match ctx.state {
+        PublishState::Ready => panic!(),
+        PublishState::Sending => {
+            let nng_aio = ctx.aio.nng_aio();
+            let res = NngFail::from_i32(nng_aio_result(nng_aio));
+            if res.is_err() {
+                // Nng requires that we retrieve the message and free it
+                let _ = NngMsg::new_msg(nng_aio_get_msg(nng_aio));
+            }
+            // Reset state before signaling completion
+            ctx.state = PublishState::Ready;
+            let res = ctx.sender.take().unwrap().send(res);
+            if res.is_err() {
+                // Unable to send result.  Receiver probably went away.  Not necessarily a problem.
             }
         }
     }
