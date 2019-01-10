@@ -1,5 +1,5 @@
-use super::*;
 use crate::msg::NngMsg;
+use crate::*;
 use byteorder::{BigEndian, WriteBytesExt};
 
 /// Build `NngMsg` using fluent API.  See [nng_msg](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg.5).
@@ -39,7 +39,7 @@ impl MsgBuilder {
 
     /// Create a `NngMsg` using contents of this builder.
     pub fn build(&self) -> NngResult<NngMsg> {
-        let mut msg = NngMsg::new()?;
+        let mut msg = NngMsg::create()?;
         let len = self.header.len();
         if len > 0 {
             msg.header_append(self.header.as_ptr(), len)?;

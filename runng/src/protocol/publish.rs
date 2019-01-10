@@ -24,11 +24,14 @@ struct PublishContextAioArg {
 }
 
 impl PublishContextAioArg {
-    pub fn new (socket: Arc<NngSocket>) -> NngResult<Box<Self>> {
+    pub fn create(socket: Arc<NngSocket>) -> NngResult<Box<Self>> {
         let aio = NngAio::new(socket);
-        let arg = Self { aio, state: PublishState::Ready, sender: None };
-        let arg = NngAio::register_aio(arg, publish_callback);
-        arg
+        let arg = Self {
+            aio,
+            state: PublishState::Ready,
+            sender: None,
+        };
+        NngAio::register_aio(arg, publish_callback)
     }
 
     pub fn send(&mut self, msg: NngMsg, sender: Sender<NngReturn>) {
@@ -67,13 +70,11 @@ pub struct AsyncPublishContext {
 
 impl AsyncContext for AsyncPublishContext {
     /// Create an asynchronous context using the specified socket.
-    fn new(socket: Arc<NngSocket>) -> NngResult<Self> {
-        let aio_arg = PublishContextAioArg::new(socket)?;
-        Ok(Self {aio_arg})
+    fn create(socket: Arc<NngSocket>) -> NngResult<Self> {
+        let aio_arg = PublishContextAioArg::create(socket)?;
+        Ok(Self { aio_arg })
     }
 }
-
-
 
 /// Trait for asynchronous contexts that can send a message.
 pub trait AsyncPublish {
@@ -85,7 +86,7 @@ impl AsyncPublish for AsyncPublishContext {
     fn send(&mut self, msg: NngMsg) -> Receiver<NngReturn> {
         let (sender, receiver) = channel::<NngReturn>();
         self.aio_arg.send(msg, sender);
-        
+
         receiver
     }
 }

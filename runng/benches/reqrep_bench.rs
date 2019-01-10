@@ -21,13 +21,14 @@ fn nng_reqrep(crit: &mut Criterion, url: &str) -> NngReturn {
         .replier_open()?
         .listen(&url)?
         .create_async_context()?;
-    thread::spawn(move || {
-        let rep_future = rep_ctx.receive().for_each(|_request| {
-            let msg = msg::NngMsg::new().unwrap();
-            rep_ctx.reply(msg).wait().unwrap();
+    thread::spawn(move || -> NngReturn {
+        let rep_future = rep_ctx.receive().unwrap().for_each(|_request| {
+            let msg = msg::NngMsg::create().unwrap();
+            rep_ctx.reply(msg).wait().unwrap().unwrap();
             Ok(())
         });
-        rep_future.wait();
+        rep_future.wait()?;
+        Ok(())
     });
 
     let mut requester = factory

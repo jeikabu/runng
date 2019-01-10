@@ -4,7 +4,10 @@ use runng_thrift::*;
 use crate::test_service;
 use runng::{msg::NngMsg, protocol::Subscribe, *};
 use std::{sync::Arc, thread};
-use thrift::{protocol::TMultiplexedOutputProtocol, server::TMultiplexedProcessor, server::TProcessor, transport::TIoChannel};
+use thrift::{
+    protocol::TMultiplexedOutputProtocol, server::TMultiplexedProcessor, server::TProcessor,
+    transport::TIoChannel,
+};
 
 #[derive(Debug)]
 pub struct TServer<PRC>
@@ -71,7 +74,7 @@ fn basic_thrift_works() -> NngReturn {
 //#[test]
 fn thrift_works() -> NngReturn {
     let url = "inproc://test3";
-    let serviceName = "blah";
+    let service_name = "blah";
     let factory = runng::Latest::default();
 
     let replier = factory.replier_open()?.listen(url)?;
@@ -82,7 +85,7 @@ fn thrift_works() -> NngReturn {
     let mut muxer = TMultiplexedProcessor::new();
     let handler = Handler {};
     let processor = TestServiceSyncProcessor::new(handler);
-    muxer.register(serviceName, Box::new(processor), false);
+    muxer.register(service_name, Box::new(processor), false);
 
     thread::spawn(move || {});
 
@@ -92,7 +95,7 @@ fn thrift_works() -> NngReturn {
     let (readable, writable) = channel.split().unwrap();
     let in_proto = TNngInputProtocol::new(readable);
     let out_proto = TNngOutputProtocol::new(writable);
-    let out_proto = TMultiplexedOutputProtocol::new(serviceName, out_proto);
+    let out_proto = TMultiplexedOutputProtocol::new(service_name, out_proto);
 
     use crate::test_service::TTestServiceSyncClient;
     let mut client = test_service::TestServiceSyncClient::new(in_proto, out_proto);

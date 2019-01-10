@@ -20,7 +20,7 @@ pub struct TNngChannel {
 
 impl TNngChannel {
     pub fn new(socket: Arc<NngSocket>) -> runng::NngResult<TNngChannel> {
-        let message = NngMsg::new()?;
+        let message = NngMsg::create()?;
         Ok(TNngChannel { message, socket })
     }
 
@@ -37,8 +37,11 @@ impl TIoChannel for TNngChannel {
     where
         Self: Sized,
     {
-        let clone =
-            unsafe { result_wrapper(TNngChannel::new(NngSocket::new(self.socket.nng_socket())))? };
+        let clone = unsafe {
+            result_wrapper(TNngChannel::new(NngSocket::create(
+                self.socket.nng_socket(),
+            )))?
+        };
         Ok((ReadHalf::new(self), WriteHalf::new(clone)))
     }
 }
@@ -75,7 +78,7 @@ impl Write for TNngChannel {
     }
     fn flush(&mut self) -> io::Result<()> {
         trace!("Flush {}", self.message.len());
-        let mut msg = NngMsg::new()?;
+        let mut msg = NngMsg::create()?;
         std::mem::swap(&mut self.message, &mut msg);
         self.socket.send(msg)?;
         Ok(())

@@ -47,7 +47,8 @@ impl NngAio {
     }
 
     pub(crate) fn register_aio<T>(arg: T, callback: AioCallback) -> NngResult<Box<T>>
-        where T: Aio,
+    where
+        T: Aio,
     {
         let mut arg = Box::new(arg);
         // This mess is needed to convert Box<_> to c_void

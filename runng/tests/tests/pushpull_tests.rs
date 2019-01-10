@@ -8,7 +8,6 @@ use std::{
     },
     thread,
 };
-use log::debug;
 
 #[test]
 fn pushpull() -> NngReturn {
@@ -28,7 +27,7 @@ fn pushpull() -> NngReturn {
             push_ctx.send(msg).wait().unwrap()?;
         }
         // Send a stop message
-        let stop_message = msg::NngMsg::new().unwrap();
+        let stop_message = msg::NngMsg::create().unwrap();
         push_ctx.send(stop_message).wait().unwrap()?;
         Ok(())
     });
@@ -39,10 +38,11 @@ fn pushpull() -> NngReturn {
     let pull_thread = thread::spawn(move || -> NngReturn {
         let mut pull_ctx = puller.create_async_context()?;
         pull_ctx
-            .receive().unwrap()
+            .receive()
+            .unwrap()
             // Process until receive stop message
             .take_while(|res| match res {
-                Ok(msg) => future::ok(msg.len() > 0),
+                Ok(msg) => future::ok(!msg.is_empty()),
                 Err(_) => future::ok(false),
             })
             // Increment count of received messages
@@ -55,8 +55,8 @@ fn pushpull() -> NngReturn {
         Ok(())
     });
 
-    push_thread.join().unwrap();
-    pull_thread.join().unwrap();
+    push_thread.join().unwrap()?;
+    pull_thread.join().unwrap()?;
 
     // Received number of messages we sent
     assert_eq!(recv_count.load(Ordering::Relaxed), count as usize);
@@ -77,7 +77,7 @@ fn pushpull() -> NngReturn {
 //         let mut push_ctx = pusher.create_async_context()?;
 //         // Send messages
 //         loop {
-//             let msg = msg::NngMsg::new()?;
+//             let msg = msg::NngMsg::create()?;
 //             push_ctx.send(msg).wait().unwrap()?;
 //         }
 //         Ok(())

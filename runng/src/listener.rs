@@ -16,7 +16,7 @@ pub struct NngListener {
 
 impl NngListener {
     /// See [nng_listener_create](https://nanomsg.github.io/nng/man/v1.1.0/nng_listener_create.3).
-    pub(crate) fn new(socket: Arc<NngSocket>, url: &str) -> NngResult<Self> {
+    pub(crate) fn create(socket: Arc<NngSocket>, url: &str) -> NngResult<Self> {
         unsafe {
             let mut listener = nng_listener { id: 0 };
             let (_cstring, url) = to_cstr(url)?;

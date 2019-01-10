@@ -26,7 +26,7 @@ fn main() -> NngReturn {
         replier.receive().unwrap().for_each(move |msg| {
             if let Ok(msg) = msg {
                 info!("Echo {:?}", msg);
-                replier.reply(msg).wait().unwrap();
+                replier.reply(msg).wait().unwrap().unwrap();
             }
 
             Ok(())

@@ -1,10 +1,9 @@
-use super::*;
+use crate::*;
 use runng_sys::*;
 use std::{os::raw::c_void, ptr, slice};
 
 #[derive(Debug)]
-struct DroppableMsg
-{
+struct DroppableMsg {
     msg: *mut nng_msg,
 }
 
@@ -30,14 +29,14 @@ pub struct NngMsg {
 
 impl NngMsg {
     /// Create a message.  See [nng_msg_alloc](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg_alloc.3).
-    pub fn new() -> NngResult<Self> {
+    pub fn create() -> NngResult<Self> {
         let mut msg: *mut nng_msg = ptr::null_mut();
         let res = unsafe { nng_msg_alloc(&mut msg, 0) };
         NngFail::succeed_then(res, || NngMsg::new_msg(msg))
     }
 
     pub fn new_msg(msg: *mut nng_msg) -> NngMsg {
-        let msg = DroppableMsg{msg};
+        let msg = DroppableMsg { msg };
         NngMsg { msg }
     }
 
@@ -73,6 +72,10 @@ impl NngMsg {
 
     pub fn len(&self) -> usize {
         unsafe { nng_msg_len(self.msg()) }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        unsafe { nng_msg_len(self.msg()) == 0 }
     }
 
     pub fn append(&mut self, data: *const u8, size: usize) -> NngReturn {

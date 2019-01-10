@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion, ParameterizedBenchmark, Throughput};
-use futures::{future, future::Future, Stream};
+use futures::{future::Future, Stream};
 use runng::{protocol::*, *};
 use std::{
     sync::{
@@ -28,27 +28,27 @@ fn nng_pushpull(crit: &mut Criterion, url: &str) -> NngReturn {
     let thread_count = recv_count.clone();
     let thread = thread::spawn(move || {
         while thread_count.load(Ordering::Relaxed) == 0 {
-            let push_future = pusher.send(msg::NngMsg::new().unwrap());
+            let push_future = pusher.send(msg::NngMsg::create().unwrap());
             push_future.wait().unwrap().unwrap();
         }
     });
 
     let benchmark = ParameterizedBenchmark::new(
         format!("pushpull({})", url),
-        move |bencher, param| bencher.iter(
+        move |bencher, _param| bencher.iter(
             || -> NngReturn {
                 // let msg = msg::MsgBuilder::default()
                 //     .append_vec(&mut vec![0; *param])
                 //     .build()?;
-                let pull_future = puller.receive().take(1).for_each(|_request| Ok(()));
-                pull_future.wait();
+                let pull_future = puller.receive().unwrap().take(1).for_each(|_request| Ok(()));
+                pull_future.wait()?;
                 Ok(())
             }
             ),
         parameters)
         .sample_size(2)
         .warm_up_time(Duration::from_millis(5))
-        .throughput(|param| Throughput::Elements(1))
+        .throughput(|_param| Throughput::Elements(1))
         .measurement_time(Duration::from_secs(1))
         // .with_function("function 2", |bencher, param| bencher.iter( || {
         //     true
@@ -61,7 +61,7 @@ fn nng_pushpull(crit: &mut Criterion, url: &str) -> NngReturn {
 }
 
 fn bench(crit: &mut Criterion) {
-    nng_pushpull(crit, "inproc://test");
+    nng_pushpull(crit, "inproc://test").unwrap();
     // nng_pushpull(crit, "ipc://test");
     // nng_pushpull(crit, "tcp://127.0.0.1:10287");
 }

@@ -3,7 +3,7 @@
 
 use clap::{App, Arg, ArgGroup, ArgMatches};
 use env_logger::{Builder, Env};
-use log::{debug, info};
+use log::info;
 use runng::{protocol::Subscribe, *};
 use std::{thread, time::Duration};
 
@@ -181,7 +181,7 @@ fn handle_delay<'a>(matches: &ArgMatches<'a>) {
     }
 }
 
-fn handle_received_msg<'a>(matches: &ArgMatches<'a>, msg: msg::NngMsg) {
+fn handle_received_msg<'a>(_matches: &ArgMatches<'a>, msg: msg::NngMsg) {
     info!("Received {:?}", msg);
 }
 

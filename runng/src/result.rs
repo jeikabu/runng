@@ -44,6 +44,7 @@ pub enum NngError {
 
 impl NngError {
     /// Converts value returned by NNG method into `error::Error`.
+    #[allow(clippy::cyclomatic_complexity)]
     pub fn from_i32(value: i32) -> Option<NngError> {
         match value {
             value if value == NngError::EINTR as i32 => Some(NngError::EINTR),
@@ -91,6 +92,7 @@ pub enum NngFail {
     Unknown(i32),
     IoError(io::Error),
     NulError(std::ffi::NulError),
+    Unit,
 }
 
 impl NngFail {
@@ -138,8 +140,14 @@ impl From<std::ffi::NulError> for NngFail {
     }
 }
 
+impl From<()> for NngFail {
+    fn from(_: ()) -> NngFail {
+        NngFail::Unit
+    }
+}
+
 impl From<NngFail> for io::Error {
-    fn from(err: NngFail) -> io::Error {
+    fn from(_err: NngFail) -> io::Error {
         io::Error::from(io::ErrorKind::Other)
     }
 }

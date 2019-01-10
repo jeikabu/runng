@@ -25,11 +25,14 @@ struct RequestContextAioArg {
 }
 
 impl RequestContextAioArg {
-    pub fn new(socket: Arc<NngSocket>) -> NngResult<Box<Self>> {
-        let ctx = NngCtx::new(socket)?;
-        let arg = Self { ctx, state: RequestState::Ready, sender: None };
-        let arg = NngAio::register_aio(arg, request_callback);
-        arg
+    pub fn create(socket: Arc<NngSocket>) -> NngResult<Box<Self>> {
+        let ctx = NngCtx::create(socket)?;
+        let arg = Self {
+            ctx,
+            state: RequestState::Ready,
+            sender: None,
+        };
+        NngAio::register_aio(arg, request_callback)
     }
     pub fn send(&mut self, msg: NngMsg, sender: Sender<NngResult<NngMsg>>) {
         if self.state != RequestState::Ready {
@@ -64,8 +67,8 @@ pub struct AsyncRequestContext {
 }
 
 impl AsyncContext for AsyncRequestContext {
-    fn new(socket: Arc<NngSocket>) -> NngResult<Self> {
-        let aio_arg = RequestContextAioArg::new(socket)?;
+    fn create(socket: Arc<NngSocket>) -> NngResult<Self> {
+        let aio_arg = RequestContextAioArg::create(socket)?;
         let ctx = Self { aio_arg };
         Ok(ctx)
     }

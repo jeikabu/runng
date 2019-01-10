@@ -16,7 +16,7 @@ pub struct NngDialer {
 
 impl NngDialer {
     /// See [nng_dialer_create](https://nanomsg.github.io/nng/man/v1.1.0/nng_dialer_create.3).
-    pub(crate) fn new(socket: Arc<NngSocket>, url: &str) -> NngResult<Self> {
+    pub(crate) fn create(socket: Arc<NngSocket>, url: &str) -> NngResult<Self> {
         unsafe {
             let mut dialer = nng_dialer { id: 0 };
             let (_cstring, url) = to_cstr(url)?;

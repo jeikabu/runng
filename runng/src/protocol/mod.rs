@@ -52,7 +52,7 @@ pub trait AsyncSocket: Socket {
     /// Turns the `Socket` into an asynchronous context
     fn create_async_context(&self) -> NngResult<Self::ContextType> {
         let socket = self.clone_socket();
-        let ctx = Self::ContextType::new(socket)?;
+        let ctx = Self::ContextType::create(socket)?;
         Ok(ctx)
     }
 }
@@ -60,7 +60,7 @@ pub trait AsyncSocket: Socket {
 /// Context for asynchrounous I/O.
 pub trait AsyncContext: Sized {
     /// Create a new asynchronous context using specified socket.
-    fn new(socket: Arc<NngSocket>) -> NngResult<Self>;
+    fn create(socket: Arc<NngSocket>) -> NngResult<Self>;
 }
 
 fn nng_open<T, O, S>(open_func: O, socket_create_func: S) -> NngResult<T>
@@ -71,20 +71,17 @@ where
     let mut socket = nng_socket { id: 0 };
     let res = open_func(&mut socket);
     NngFail::succeed_then(res, || {
-        let socket = NngSocket::new(socket);
+        let socket = NngSocket::create(socket);
         socket_create_func(socket)
     })
 }
 
-fn try_signal_complete(
-    sender: &mut mpsc::Sender<NngResult<NngMsg>>,
-    message: NngResult<NngMsg>,
-) {
+fn try_signal_complete(sender: &mut mpsc::Sender<NngResult<NngMsg>>, message: NngResult<NngMsg>) {
     let res = sender.try_send(message);
     if let Err(err) = res {
         if err.is_disconnected() {
             debug!("disconnected");
-            sender.close();
+            sender.close().unwrap();
         } else {
             debug!("Send failed: {}", err);
         }

@@ -15,7 +15,7 @@ pub struct NngSocket {
 
 impl NngSocket {
     /// Create a new `NngSocket`.
-    pub fn new(socket: nng_socket) -> Arc<Self> {
+    pub fn create(socket: nng_socket) -> Arc<Self> {
         Arc::new(NngSocket { socket })
     }
 
@@ -96,7 +96,7 @@ pub trait Listen: Socket {
     }
 
     fn listener_create(&self, url: &str) -> NngResult<NngListener> {
-        NngListener::new(self.clone_socket(), url)
+        NngListener::create(self.clone_socket(), url)
     }
 }
 
@@ -112,7 +112,7 @@ pub trait Dial: Socket {
     }
 
     fn dialer_create(&self, url: &str) -> NngResult<NngDialer> {
-        NngDialer::new(self.clone_socket(), url)
+        NngDialer::create(self.clone_socket(), url)
     }
 }
 

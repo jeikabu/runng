@@ -8,8 +8,8 @@ use crate::{
     *,
 };
 use futures::sync::{
-    oneshot,
     mpsc::{channel, Receiver, Sender},
+    oneshot,
 };
 use runng_sys::*;
 use std::sync::Arc;
@@ -29,11 +29,18 @@ struct ReplyContextAioArg {
 }
 
 impl ReplyContextAioArg {
-    pub fn new (socket: Arc<NngSocket>, request_sender: Sender<NngResult<NngMsg>>) -> NngResult<Box<Self>> {
-        let ctx = NngCtx::new(socket)?;
-        let arg = Self { ctx, state: ReplyState::Receiving, request_sender, reply_sender: None };
-        let arg = NngAio::register_aio(arg, reply_callback);
-        arg
+    pub fn create(
+        socket: Arc<NngSocket>,
+        request_sender: Sender<NngResult<NngMsg>>,
+    ) -> NngResult<Box<Self>> {
+        let ctx = NngCtx::create(socket)?;
+        let arg = Self {
+            ctx,
+            state: ReplyState::Receiving,
+            request_sender,
+            reply_sender: None,
+        };
+        NngAio::register_aio(arg, reply_callback)
     }
 
     fn start_receive(&mut self) {
@@ -79,9 +86,9 @@ pub struct AsyncReplyContext {
 }
 
 impl AsyncContext for AsyncReplyContext {
-    fn new(socket: Arc<NngSocket>) -> NngResult<Self> {
+    fn create(socket: Arc<NngSocket>) -> NngResult<Self> {
         let (sender, receiver) = channel(1024);
-        let aio_arg = ReplyContextAioArg::new(socket, sender)?;
+        let aio_arg = ReplyContextAioArg::create(socket, sender)?;
         let receiver = Some(receiver);
         let ctx = Self { aio_arg, receiver };
         Ok(ctx)

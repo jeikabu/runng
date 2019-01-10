@@ -36,18 +36,18 @@ mod tests {
                             .unwrap()
                     );
                     req_dialer.start()?;
-                    requester.send(msg::NngMsg::new()?)?;
+                    requester.send(msg::NngMsg::create()?)?;
                     let _request = replier.recv()?;
                     // Drop the dialer
                 }
                 // requester still works
-                requester.send(msg::NngMsg::new()?)?;
+                requester.send(msg::NngMsg::create()?)?;
                 let _request = replier.recv()?;
                 // Drop the listener
             }
             // Replier still works
             let requester = factory.requester_open()?.dial(&url)?;
-            requester.send(msg::NngMsg::new()?)?;
+            requester.send(msg::NngMsg::create()?)?;
             let _request = replier.recv()?;
         }
 
@@ -70,7 +70,8 @@ mod tests {
             sub_ctx.subscribe(topic.as_slice())?;
 
             sub_ctx
-                .receive().unwrap()
+                .receive()
+                .unwrap()
                 // Process until receive stop message
                 .take_while(|res| {
                     const SIZE_OF_TOPIC: usize = std::mem::size_of::<u32>();
@@ -134,10 +135,11 @@ mod tests {
             let mut broker_pull_ctx = broker_pull.create_async_context()?;
             let mut broker_push_ctx = broker_push.create_async_context()?;
             broker_pull_ctx
-                .receive().unwrap()
+                .receive()
+                .unwrap()
                 .for_each(|msg| {
                     if let Ok(msg) = msg {
-                        broker_push_ctx.send(msg).wait().unwrap();
+                        broker_push_ctx.send(msg).wait().unwrap().unwrap();
                     }
                     Ok(())
                 })
@@ -157,7 +159,8 @@ mod tests {
             let topic: Vec<u8> = vec![0; 4];
             sub_ctx.subscribe(topic.as_slice())?;
             sub_ctx
-                .receive().unwrap()
+                .receive()
+                .unwrap()
                 // Process until receive stop message
                 .take_while(|res| {
                     const SIZE_OF_TOPIC: usize = std::mem::size_of::<u32>();
@@ -181,14 +184,14 @@ mod tests {
         thread::spawn(move || -> NngReturn {
             let mut pub_ctx = publisher.create_async_context()?;
             for _ in 0..10 {
-                let mut msg = msg::NngMsg::new()?;
+                let mut msg = msg::NngMsg::create()?;
                 msg.append_u32(0)?; // topic
                 msg.append_u32(1)?;
                 pub_ctx.send(msg).wait().unwrap()?;
                 thread::sleep(Duration::from_millis(200));
             }
             // Send stop message
-            let mut msg = msg::NngMsg::new()?;
+            let mut msg = msg::NngMsg::create()?;
             msg.append_u32(0)?; // topic
             pub_ctx.send(msg).wait().unwrap()?;
 

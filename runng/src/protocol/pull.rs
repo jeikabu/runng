@@ -8,10 +8,7 @@ use crate::{
 };
 use futures::sync::mpsc::{channel, Receiver, Sender};
 use runng_sys::*;
-use std::{
-    ptr,
-    sync::{Arc}
-};
+use std::sync::Arc;
 
 #[derive(Debug, PartialEq)]
 enum PullState {
@@ -26,11 +23,17 @@ struct PullContextAioArg {
 }
 
 impl PullContextAioArg {
-    pub fn new (socket: Arc<NngSocket>, sender: Sender<NngResult<NngMsg>>) -> NngResult<Box<Self>> {
+    pub fn create(
+        socket: Arc<NngSocket>,
+        sender: Sender<NngResult<NngMsg>>,
+    ) -> NngResult<Box<Self>> {
         let aio = NngAio::new(socket);
-        let arg = Self { aio, state: PullState::Ready, sender };
-        let arg = NngAio::register_aio(arg, pull_callback);
-        arg
+        let arg = Self {
+            aio,
+            state: PullState::Ready,
+            sender,
+        };
+        NngAio::register_aio(arg, pull_callback)
     }
 
     fn start_receive(&mut self) {
@@ -57,9 +60,9 @@ pub struct AsyncPullContext {
 }
 
 impl AsyncContext for AsyncPullContext {
-    fn new(socket: Arc<NngSocket>) -> NngResult<Self> {
+    fn create(socket: Arc<NngSocket>) -> NngResult<Self> {
         let (sender, receiver) = channel::<NngResult<NngMsg>>(1024);
-        let aio_arg = PullContextAioArg::new(socket, sender)?;
+        let aio_arg = PullContextAioArg::create(socket, sender)?;
         let receiver = Some(receiver);
         Ok(Self { aio_arg, receiver })
     }
@@ -130,8 +133,8 @@ impl AsyncPull for AsyncSubscribeContext {
 
 impl AsyncContext for AsyncSubscribeContext {
     /// Create an asynchronous context using the specified socket.
-    fn new(socket: Arc<NngSocket>) -> NngResult<Self> {
-        let ctx = AsyncPullContext::new(socket)?;
+    fn create(socket: Arc<NngSocket>) -> NngResult<Self> {
+        let ctx = AsyncPullContext::create(socket)?;
         let ctx = Self { ctx };
         Ok(ctx)
     }

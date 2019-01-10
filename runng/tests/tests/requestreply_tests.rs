@@ -11,7 +11,7 @@ fn example_basic() -> NngReturn {
     let factory = Latest::default();
     let rep = factory.replier_open()?.listen(&url)?;
     let req = factory.requester_open()?.dial(&url)?;
-    req.send(msg::NngMsg::new()?)?;
+    req.send(msg::NngMsg::create()?)?;
     rep.recv()?;
 
     Ok(())
@@ -30,16 +30,17 @@ fn example_async() -> NngReturn {
 
     let requester = factory.requester_open()?.dial(&url)?;
     let mut req_ctx = requester.create_async_context()?;
-    let req_future = req_ctx.send(msg::NngMsg::new()?);
+    let req_future = req_ctx.send(msg::NngMsg::create()?);
     rep_ctx
-        .receive().unwrap()
+        .receive()
+        .unwrap()
         .take(1)
         .for_each(|_request| {
-            let msg = msg::NngMsg::new().unwrap();
-            rep_ctx.reply(msg).wait().unwrap();
+            let msg = msg::NngMsg::create().unwrap();
+            rep_ctx.reply(msg).wait().unwrap().unwrap();
             Ok(())
         })
-        .wait();
+        .wait()?;
     req_future.wait().unwrap()?;
 
     Ok(())

@@ -44,7 +44,6 @@ fn stats_example() -> NngReturn {
 */
 
 use crate::*;
-use log::trace;
 use runng_sys::*;
 use std::marker;
 
@@ -130,7 +129,7 @@ pub struct NngStatRoot<'root> {
 
 impl<'root> NngStatRoot<'root> {
     /// Get statistics snapshot.  See [nng_stats_get](https://nanomsg.github.io/nng/man/v1.1.0/nng_stats_get.3).
-    pub fn new() -> NngResult<NngStatRoot<'root>> {
+    pub fn create() -> NngResult<NngStatRoot<'root>> {
         unsafe {
             let mut node: *mut nng_stat = std::ptr::null_mut();
             let res = nng_stats_get(&mut node);
