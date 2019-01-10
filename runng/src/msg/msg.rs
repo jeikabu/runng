@@ -2,34 +2,53 @@ use super::*;
 use runng_sys::*;
 use std::{os::raw::c_void, ptr, slice};
 
-/// Wraps `nng_msg`.  See [nng_msg](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg.5).
 #[derive(Debug)]
-pub struct NngMsg {
+struct DroppableMsg
+{
     msg: *mut nng_msg,
 }
 
-unsafe impl Send for NngMsg {}
+unsafe impl Send for DroppableMsg {}
+unsafe impl Sync for DroppableMsg {}
+
+impl Drop for DroppableMsg {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.msg.is_null() {
+                trace!("Dropping {:x}", self.msg as u64);
+                nng_msg_free(self.msg);
+            }
+        }
+    }
+}
+
+/// Wraps `nng_msg`.  See [nng_msg](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg.5).
+#[derive(Debug)]
+pub struct NngMsg {
+    msg: DroppableMsg,
+}
 
 impl NngMsg {
     /// Create a message.  See [nng_msg_alloc](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg_alloc.3).
     pub fn new() -> NngResult<Self> {
         let mut msg: *mut nng_msg = ptr::null_mut();
         let res = unsafe { nng_msg_alloc(&mut msg, 0) };
-        NngFail::succeed_then(res, || NngMsg { msg })
+        NngFail::succeed_then(res, || NngMsg::new_msg(msg))
     }
 
     pub fn new_msg(msg: *mut nng_msg) -> NngMsg {
+        let msg = DroppableMsg{msg};
         NngMsg { msg }
     }
 
     pub fn take(mut self) -> *mut nng_msg {
-        let res = self.msg;
-        self.msg = std::ptr::null_mut();
-        res
+        let msg = self.msg.msg;
+        self.msg.msg = ptr::null_mut();
+        msg
     }
 
-    pub fn msg(&self) -> *mut nng_msg {
-        self.msg
+    pub unsafe fn msg(&self) -> *mut nng_msg {
+        self.msg.msg
     }
 
     pub fn header(&mut self) -> &[u8] {
@@ -125,21 +144,12 @@ impl NngMsg {
     pub fn dup(&self) -> NngResult<NngMsg> {
         let mut msg: *mut nng_msg = ptr::null_mut();
         let res = unsafe { nng_msg_dup(&mut msg, self.msg()) };
-        NngFail::succeed(res, NngMsg { msg })
+        NngFail::succeed_then(res, || NngMsg::new_msg(msg))
     }
 
     pub fn clear(&mut self) {
         unsafe {
             nng_msg_clear(self.msg());
-        }
-    }
-}
-
-impl Drop for NngMsg {
-    fn drop(&mut self) {
-        unsafe {
-            debug!("Dropping {:x}", self.msg() as u64);
-            nng_msg_free(self.msg());
         }
     }
 }

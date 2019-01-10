@@ -50,24 +50,17 @@ pub trait AsyncSocket: Socket {
     type ContextType: AsyncContext;
 
     /// Turns the `Socket` into an asynchronous context
-    fn create_async_context(&self) -> NngResult<Box<Self::ContextType>> {
+    fn create_async_context(&self) -> NngResult<Self::ContextType> {
         let socket = self.clone_socket();
         let ctx = Self::ContextType::new(socket)?;
-        let mut ctx = Box::new(ctx);
-        // This mess is needed to convert Box<_> to c_void
-        let arg = ctx.as_mut() as *mut _ as AioCallbackArg;
-        ctx.as_mut()
-            .aio_mut()
-            .init(Self::ContextType::get_aio_callback(), arg)?;
         Ok(ctx)
     }
 }
 
 /// Context for asynchrounous I/O.
-pub trait AsyncContext: Aio + Sized {
+pub trait AsyncContext: Sized {
     /// Create a new asynchronous context using specified socket.
     fn new(socket: Arc<NngSocket>) -> NngResult<Self>;
-    fn get_aio_callback() -> AioCallback;
 }
 
 fn nng_open<T, O, S>(open_func: O, socket_create_func: S) -> NngResult<T>
@@ -84,17 +77,16 @@ where
 }
 
 fn try_signal_complete(
-    sender: &mut Option<mpsc::Sender<NngResult<NngMsg>>>,
+    sender: &mut mpsc::Sender<NngResult<NngMsg>>,
     message: NngResult<NngMsg>,
 ) {
-    if let Some(ref mut sender) = sender {
-        let res = sender.try_send(message);
-        if let Err(err) = res {
-            if err.is_disconnected() {
-                sender.close();
-            } else {
-                debug!("Send failed: {}", err);
-            }
+    let res = sender.try_send(message);
+    if let Err(err) = res {
+        if err.is_disconnected() {
+            debug!("disconnected");
+            sender.close();
+        } else {
+            debug!("Send failed: {}", err);
         }
     }
 }

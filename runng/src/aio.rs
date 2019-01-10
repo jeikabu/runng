@@ -46,6 +46,16 @@ impl NngAio {
         }
     }
 
+    pub(crate) fn register_aio<T>(arg: T, callback: AioCallback) -> NngResult<Box<T>>
+        where T: Aio,
+    {
+        let mut arg = Box::new(arg);
+        // This mess is needed to convert Box<_> to c_void
+        let arg_ptr = arg.as_mut() as *mut _ as AioCallbackArg;
+        arg.aio_mut().init(callback, arg_ptr)?;
+        Ok(arg)
+    }
+
     /// Obtain underlying `nng_aio`.
     ///
     /// # Panics
@@ -61,8 +71,8 @@ impl NngAio {
 impl Drop for NngAio {
     fn drop(&mut self) {
         unsafe {
-            debug!("NngAio.drop {:x}", self.aio as u64);
             if !self.aio.is_null() {
+                trace!("NngAio.drop {:x}", self.aio as u64);
                 nng_aio_free(self.aio);
             }
         }

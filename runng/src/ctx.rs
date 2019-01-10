@@ -4,6 +4,7 @@ use crate::{
     aio::{Aio, NngAio},
     *,
 };
+use log::trace;
 use runng_sys::*;
 use std::sync::Arc;
 
@@ -30,10 +31,11 @@ impl NngCtx {
         Ok(ctx)
     }
 
-    /// Calls init() method of this context's `NngAio`.
-    pub fn init(&mut self, callback: AioCallback, arg: AioCallbackArg) -> NngReturn {
-        self.aio.init(callback, arg)
-    }
+    // Calls init() method of this context's `NngAio`
+    // pub fn init(&mut self, callback: AioCallback, arg: AioCallbackArg) -> NngReturn {
+    //     self.aio.init(callback, arg)
+    // }
+
 }
 
 impl Ctx for NngCtx {
@@ -54,8 +56,10 @@ impl Aio for NngCtx {
 impl Drop for NngCtx {
     fn drop(&mut self) {
         unsafe {
-            //debug!("NngCtx.drop {:x}", self.ctx as u64);
-            nng_ctx_close(self.ctx);
+            if self.ctx.id != 0 {
+                trace!("NngCtx.drop {:x}", self.ctx.id);
+                nng_ctx_close(self.ctx);
+            }
         }
     }
 }

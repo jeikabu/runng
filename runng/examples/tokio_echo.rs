@@ -23,7 +23,7 @@ fn main() -> NngReturn {
 
     tokio::run(lazy(move || {
         let mut replier = create_echo(&matches).unwrap();
-        replier.receive().for_each(move |msg| {
+        replier.receive().unwrap().for_each(move |msg| {
             if let Ok(msg) = msg {
                 info!("Echo {:?}", msg);
                 replier.reply(msg).wait().unwrap();
@@ -46,7 +46,7 @@ fn get_matches<'a>() -> ArgMatches<'a> {
         .get_matches()
 }
 
-fn create_echo<'a>(matches: &ArgMatches<'a>) -> NngResult<Box<AsyncReplyContext>> {
+fn create_echo<'a>(matches: &ArgMatches<'a>) -> NngResult<AsyncReplyContext> {
     let url = matches.value_of("listen").unwrap();
     let factory = Latest::default();
     let replier = factory

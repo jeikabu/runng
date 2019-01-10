@@ -18,49 +18,23 @@ enum RequestState {
     Receiving,
 }
 
-/// Asynchronous context for request socket.
-pub struct AsyncRequestContext {
+struct RequestContextAioArg {
     ctx: NngCtx,
     state: RequestState,
     sender: Option<Sender<NngResult<NngMsg>>>,
 }
 
-impl AsyncContext for AsyncRequestContext {
-    fn new(socket: Arc<NngSocket>) -> NngResult<Self> {
+impl RequestContextAioArg {
+    pub fn new(socket: Arc<NngSocket>) -> NngResult<Box<Self>> {
         let ctx = NngCtx::new(socket)?;
-        let ctx = Self {
-            ctx,
-            state: RequestState::Ready,
-            sender: None,
-        };
-        Ok(ctx)
+        let arg = Self { ctx, state: RequestState::Ready, sender: None };
+        let arg = NngAio::register_aio(arg, request_callback);
+        arg
     }
-    fn get_aio_callback() -> AioCallback {
-        request_callback
-    }
-}
-
-impl Aio for AsyncRequestContext {
-    fn aio(&self) -> &NngAio {
-        self.ctx.aio()
-    }
-    fn aio_mut(&mut self) -> &mut NngAio {
-        self.ctx.aio_mut()
-    }
-}
-
-/// Trait for asynchronous contexts that can send a request and receive a reply.
-pub trait AsyncRequest {
-    /// Asynchronously send a request and return a future for the reply.
-    fn send(&mut self, msg: NngMsg) -> Receiver<NngResult<NngMsg>>;
-}
-
-impl AsyncRequest for AsyncRequestContext {
-    fn send(&mut self, msg: NngMsg) -> Receiver<NngResult<NngMsg>> {
+    pub fn send(&mut self, msg: NngMsg, sender: Sender<NngResult<NngMsg>>) {
         if self.state != RequestState::Ready {
             panic!();
         }
-        let (sender, receiver) = channel::<NngResult<NngMsg>>();
         self.sender = Some(sender);
         unsafe {
             let aio = self.ctx.aio().nng_aio();
@@ -72,13 +46,47 @@ impl AsyncRequest for AsyncRequestContext {
             nng_aio_set_msg(aio, msg);
             nng_ctx_send(ctx, aio);
         }
+    }
+}
 
+impl Aio for RequestContextAioArg {
+    fn aio(&self) -> &NngAio {
+        self.ctx.aio()
+    }
+    fn aio_mut(&mut self) -> &mut NngAio {
+        self.ctx.aio_mut()
+    }
+}
+
+/// Asynchronous context for request socket.
+pub struct AsyncRequestContext {
+    aio_arg: Box<RequestContextAioArg>,
+}
+
+impl AsyncContext for AsyncRequestContext {
+    fn new(socket: Arc<NngSocket>) -> NngResult<Self> {
+        let aio_arg = RequestContextAioArg::new(socket)?;
+        let ctx = Self { aio_arg };
+        Ok(ctx)
+    }
+}
+
+/// Trait for asynchronous contexts that can send a request and receive a reply.
+pub trait AsyncRequest {
+    /// Asynchronously send a request and return a future for the reply.
+    fn send(&mut self, msg: NngMsg) -> Receiver<NngResult<NngMsg>>;
+}
+
+impl AsyncRequest for AsyncRequestContext {
+    fn send(&mut self, msg: NngMsg) -> Receiver<NngResult<NngMsg>> {
+        let (sender, receiver) = channel::<NngResult<NngMsg>>();
+        self.aio_arg.send(msg, sender);
         receiver
     }
 }
 
 unsafe extern "C" fn request_callback(arg: AioCallbackArg) {
-    let ctx = &mut *(arg as *mut AsyncRequestContext);
+    let ctx = &mut *(arg as *mut RequestContextAioArg);
     let aionng = ctx.ctx.aio().nng_aio();
     let ctxnng = ctx.ctx.ctx();
     trace!("callback Request:{:?}", ctx.state);

@@ -3,26 +3,9 @@ use runng_thrift::*;
 
 use crate::test_service;
 use runng::{msg::NngMsg, protocol::Subscribe, *};
-use thrift::{protocol::TMultiplexedOutputProtocol, server::TMultiplexedProcessor};
-
-#[test]
-fn it_works() -> NngReturn {
-    let url = "inproc://test";
-    let factory = runng::Latest::default();
-    let publisher = factory.publisher_open()?.listen(url)?;
-    let subscriber = factory.subscriber_open()?.dial(url)?;
-    let topic: Vec<u8> = vec![0];
-    subscriber.subscribe(&topic);
-    let mut msg = NngMsg::new()?;
-    msg.append_u32(0)?;
-    publisher.send(msg)?;
-    subscriber.recv()?;
-
-    Ok(())
-}
-
 use std::{sync::Arc, thread};
-use thrift::{server::TProcessor, transport::TIoChannel};
+use thrift::{protocol::TMultiplexedOutputProtocol, server::TMultiplexedProcessor, server::TProcessor, transport::TIoChannel};
+
 #[derive(Debug)]
 pub struct TServer<PRC>
 where

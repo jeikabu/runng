@@ -1,9 +1,11 @@
 use crate::common::get_url;
 use futures::{future::Future, Stream};
+use log::info;
 use runng::{protocol::*, *};
 
 #[test]
-fn it_works() -> NngReturn {
+fn example_basic() -> NngReturn {
+    info!("basic");
     let url = get_url();
 
     let factory = Latest::default();
@@ -16,7 +18,8 @@ fn it_works() -> NngReturn {
 }
 
 #[test]
-fn aio() -> NngReturn {
+fn example_async() -> NngReturn {
+    info!("async");
     let url = get_url();
 
     let factory = Latest::default();
@@ -29,7 +32,7 @@ fn aio() -> NngReturn {
     let mut req_ctx = requester.create_async_context()?;
     let req_future = req_ctx.send(msg::NngMsg::new()?);
     rep_ctx
-        .receive()
+        .receive().unwrap()
         .take(1)
         .for_each(|_request| {
             let msg = msg::NngMsg::new().unwrap();

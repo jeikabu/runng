@@ -70,7 +70,7 @@ mod tests {
             sub_ctx.subscribe(topic.as_slice())?;
 
             sub_ctx
-                .receive()
+                .receive().unwrap()
                 // Process until receive stop message
                 .take_while(|res| {
                     const SIZE_OF_TOPIC: usize = std::mem::size_of::<u32>();
@@ -134,7 +134,7 @@ mod tests {
             let mut broker_pull_ctx = broker_pull.create_async_context()?;
             let mut broker_push_ctx = broker_push.create_async_context()?;
             broker_pull_ctx
-                .receive()
+                .receive().unwrap()
                 .for_each(|msg| {
                     if let Ok(msg) = msg {
                         broker_push_ctx.send(msg).wait().unwrap();
@@ -157,7 +157,7 @@ mod tests {
             let topic: Vec<u8> = vec![0; 4];
             sub_ctx.subscribe(topic.as_slice())?;
             sub_ctx
-                .receive()
+                .receive().unwrap()
                 // Process until receive stop message
                 .take_while(|res| {
                     const SIZE_OF_TOPIC: usize = std::mem::size_of::<u32>();
