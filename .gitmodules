@@ -1,0 +1,3 @@
+[submodule "runng-sys/nng"]
+	path = runng-sys/nng
+	url = https://github.com/nanomsg/nng.git

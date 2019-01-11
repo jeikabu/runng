@@ -1,0 +1,48 @@
+language: rust
+rust:
+  - stable
+
+cache:
+  cargo: true
+  directories:
+    # Cache kcov binary created in after_success.sh
+    - $HOME/kcov-build/
+
+os:
+  - linux
+  - osx
+
+# Need travis full VM otherwise kcov fails
+sudo: required
+addons:
+  apt:
+    packages:
+      # To build nng
+      - cmake
+      - ninja-build
+      # To build kcov
+      - libcurl4-openssl-dev
+      - libelf-dev
+      - libdw-dev
+      - gcc
+      - binutils-dev
+      - libiberty-dev
+
+before_install:
+  # Using `source` so can update PATH environment variable
+  - source ./scripts/install.sh
+
+before_script:
+  - rustup component add clippy
+  - rustup component add rustfmt
+
+script:
+  # Check source code formatting
+  - cargo fmt --all -- --check
+  - cargo clippy
+  # Build everything (including optional packages)
+  - cargo build --all --all-targets
+  - RUST_BACKTRACE=1 cargo test "tests::"
+
+after_success:
+  - ./scripts/after_success.sh
