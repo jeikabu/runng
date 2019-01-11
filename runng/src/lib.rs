@@ -51,7 +51,7 @@ fn aio() -> NngReturn {
     let requester = factory.requester_open()?.dial(&url)?;
     let mut req_ctx = requester.create_async_context()?;
     let req_future = req_ctx.send(msg::NngMsg::create()?);
-    rep_ctx.receive()
+    rep_ctx.receive().unwrap()
         .take(1).for_each(|_request|{
             let msg = msg::NngMsg::create().unwrap();
             rep_ctx.reply(msg).wait().unwrap();
