@@ -39,6 +39,8 @@ install:
   - choco install ninja
   - rustc -vV
   - cargo -vV
+  # Checkout submodules
+  - git submodule update --init --recursive
 
 # Skip build step since `cargo test` does it
 build: false
