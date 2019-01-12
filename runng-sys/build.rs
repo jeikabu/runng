@@ -5,8 +5,14 @@ fn main() {
     // Compile-time features
     let generator = if cfg!(feature = "ninja") {
         "Ninja"
+    } else if cfg!(feature = "vs2017") {
+        "Visual Studio 15 2017 Win64"
     } else {
-        "Unix Makefiles"
+        if cfg!(target_family = "unix") {
+            "Unix Makefiles"
+        } else {
+            "Ninja"
+        }
     };
     let stats = if cfg!(feature = "stats") { "ON" } else { "OFF" };
     let tls = if cfg!(feature = "tls") { "ON" } else { "OFF" };
