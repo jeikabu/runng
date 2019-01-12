@@ -17,8 +17,9 @@ travis-ci = { repository = "jeikabu/runng", branch = "master" }
 
 [features]
 default = ["stats"]
-# Use ninja for cmake generator
-ninja = []
+# Cmake generators
+ninja = [] # Ninja
+vs2017 = [] # Visual Studio 15 2017 Win64
 # Enable NNG stats
 stats = []
 # Enable TLS (requires mbedTLS)

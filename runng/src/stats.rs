@@ -49,14 +49,14 @@ use std::marker;
 
 /// Type of statistic.  See `NngStatChild::stat_type`.
 #[derive(Clone, Copy, Debug)]
-#[repr(u32)]
+#[repr(i32)]
 pub enum NngStatType {
-    Scope = nng_stat_type_enum_NNG_STAT_SCOPE,
-    Level = nng_stat_type_enum_NNG_STAT_LEVEL,
-    Counter = nng_stat_type_enum_NNG_STAT_COUNTER,
-    String = nng_stat_type_enum_NNG_STAT_STRING,
-    Boolean = nng_stat_type_enum_NNG_STAT_BOOLEAN,
-    Id = nng_stat_type_enum_NNG_STAT_ID,
+    Scope = nng_stat_type_enum_NNG_STAT_SCOPE as i32,
+    Level = nng_stat_type_enum_NNG_STAT_LEVEL as i32,
+    Counter = nng_stat_type_enum_NNG_STAT_COUNTER as i32,
+    String = nng_stat_type_enum_NNG_STAT_STRING as i32,
+    Boolean = nng_stat_type_enum_NNG_STAT_BOOLEAN as i32,
+    Id = nng_stat_type_enum_NNG_STAT_ID as i32,
 }
 
 impl NngStatType {
@@ -76,13 +76,13 @@ impl NngStatType {
 
 /// Unit of quantity measured by statistic.  See `NngStatChild::unit()`.
 #[derive(Clone, Copy, Debug)]
-#[repr(u32)]
+#[repr(i32)]
 pub enum NngStatUnit {
-    None = nng_unit_enum_NNG_UNIT_NONE,
-    Bytes = nng_unit_enum_NNG_UNIT_BYTES,
-    Messages = nng_unit_enum_NNG_UNIT_MESSAGES,
-    Millis = nng_unit_enum_NNG_UNIT_MILLIS,
-    Events = nng_unit_enum_NNG_UNIT_EVENTS,
+    None = nng_unit_enum_NNG_UNIT_NONE as i32,
+    Bytes = nng_unit_enum_NNG_UNIT_BYTES as i32,
+    Messages = nng_unit_enum_NNG_UNIT_MESSAGES as i32,
+    Millis = nng_unit_enum_NNG_UNIT_MILLIS as i32,
+    Events = nng_unit_enum_NNG_UNIT_EVENTS as i32,
 }
 
 impl NngStatUnit {

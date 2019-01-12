@@ -27,8 +27,10 @@ runng-sys = "1.1.1-rc"
 
 ## Build
 
-1. `git submodule init` and `git submodule update`
-1. Add [cmake](https://cmake.org) to `PATH` (defaults to "Unix Makefiles" generator)
+1. Update submodules: `git submodule update --init --recursive`
+1. Add [cmake](https://cmake.org) to `PATH`
+    - On Linux/macOS: default generator is "Unix Makefiles"
+    - On Windows: default generator is [ninja](https://ninja-build.org/) and must also be in `PATH`
 1. `cargo build`
 
 Once [cargo issue #4942 is resolved](https://github.com/rust-lang/cargo/issues/4942) will also be able to build with `ninja` feature ([recommended by NNG](https://github.com/nanomsg/nng#requirements)).  Currently, can:
