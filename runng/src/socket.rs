@@ -1,27 +1,24 @@
 //! Socket basics
 
 use super::{dialer::NngDialer, listener::NngListener, *};
-use runng_derive::NngGetOpts;
 use runng_sys::*;
 use std::sync::Arc;
 
 /// Wraps `nng_socket`.  See [nng_socket](https://nanomsg.github.io/nng/man/v1.1.0/nng_socket.5).
-#[derive(NngGetOpts)]
-#[prefix = "nng_"]
 pub struct NngSocket {
-    #[nng_member]
-    socket: nng_socket,
+    socket: Arc<InnerSocket>,
 }
 
 impl NngSocket {
     /// Create a new `NngSocket`.
-    pub fn create(socket: nng_socket) -> Arc<Self> {
-        Arc::new(NngSocket { socket })
+    pub fn new(socket: nng_socket) -> Self {
+        let socket = Arc::new(InnerSocket { socket });
+        NngSocket { socket }
     }
 
     /// Obtain underlying `nng_socket`
     pub unsafe fn nng_socket(&self) -> nng_socket {
-        self.socket
+        self.socket.socket
     }
 
     /// Register pipe notification callback.  See [nng_pipe_notify](https://nanomsg.github.io/nng/man/v1.1.0/nng_pipe_notify.3).
@@ -34,7 +31,7 @@ impl NngSocket {
     ) -> NngReturn {
         unsafe {
             NngFail::from_i32(nng_pipe_notify(
-                self.socket,
+                self.nng_socket(),
                 event as i32,
                 Some(callback),
                 argument,
@@ -43,20 +40,80 @@ impl NngSocket {
     }
 }
 
-impl Drop for NngSocket {
-    fn drop(&mut self) {
+impl GetOpts for NngSocket {
+    fn getopt_bool(&self, option: NngOption) -> NngResult<bool> {
         unsafe {
-            debug!("Socket close: {:?}", self.socket);
-            let res = NngFail::from_i32(nng_close(self.socket));
-            match res {
-                Ok(()) => {}
-                // Can't panic here.  Thrift's TIoChannel::split() clones the socket handle so we may get ECLOSED
-                Err(NngFail::Err(NngError::ECLOSED)) => {}
-                Err(res) => {
-                    debug!("nng_close {:?}", res);
-                    panic!("nng_close {:?}", res);
-                }
-            }
+            let mut value: bool = Default::default();
+            NngFail::succeed(
+                nng_getopt_bool(self.nng_socket(), option.as_cptr(), &mut value),
+                value,
+            )
+        }
+    }
+    fn getopt_int(&self, option: NngOption) -> NngResult<i32> {
+        unsafe {
+            let mut value: i32 = Default::default();
+            NngFail::succeed(
+                nng_getopt_int(self.nng_socket(), option.as_cptr(), &mut value),
+                value,
+            )
+        }
+    }
+    fn getopt_size(&self, option: NngOption) -> NngResult<usize> {
+        unsafe {
+            let mut value: usize = Default::default();
+            NngFail::succeed(
+                nng_getopt_size(self.nng_socket(), option.as_cptr(), &mut value),
+                value,
+            )
+        }
+    }
+    fn getopt_uint64(&self, option: NngOption) -> NngResult<u64> {
+        unsafe {
+            let mut value: u64 = Default::default();
+            NngFail::succeed(
+                nng_getopt_uint64(self.nng_socket(), option.as_cptr(), &mut value),
+                value,
+            )
+        }
+    }
+    fn getopt_string(&self, option: NngOption) -> NngResult<NngString> {
+        unsafe {
+            let mut value: *mut ::std::os::raw::c_char = std::ptr::null_mut();
+            let res = nng_getopt_string(self.nng_socket(), option.as_cptr(), &mut value);
+            NngFail::from_i32(res)?;
+            Ok(NngString::new(value))
+        }
+    }
+}
+
+impl SetOpts for NngSocket {
+    fn setopt_bool(&mut self, option: NngOption, value: bool) -> NngReturn {
+        unsafe { NngFail::from_i32(nng_setopt_bool(self.nng_socket(), option.as_cptr(), value)) }
+    }
+    fn setopt_int(&mut self, option: NngOption, value: i32) -> NngReturn {
+        unsafe { NngFail::from_i32(nng_setopt_int(self.nng_socket(), option.as_cptr(), value)) }
+    }
+    fn setopt_size(&mut self, option: NngOption, value: usize) -> NngReturn {
+        unsafe { NngFail::from_i32(nng_setopt_size(self.nng_socket(), option.as_cptr(), value)) }
+    }
+    fn setopt_uint64(&mut self, option: NngOption, value: u64) -> NngReturn {
+        unsafe {
+            NngFail::from_i32(nng_setopt_uint64(
+                self.nng_socket(),
+                option.as_cptr(),
+                value,
+            ))
+        }
+    }
+    fn setopt_string(&mut self, option: NngOption, value: &str) -> NngReturn {
+        unsafe {
+            let (_, value) = to_cstr(value)?;
+            NngFail::from_i32(nng_setopt_string(
+                self.nng_socket(),
+                option.as_cptr(),
+                value,
+            ))
         }
     }
 }
@@ -65,19 +122,26 @@ impl Socket for NngSocket {
     fn socket(&self) -> &NngSocket {
         self
     }
-    fn clone_socket(&self) -> Arc<NngSocket> {
-        panic!()
+    fn socket_mut(&mut self) -> &mut NngSocket {
+        self
     }
 }
 
 impl SendMsg for NngSocket {}
 impl RecvMsg for NngSocket {}
 
+impl Clone for NngSocket {
+    fn clone(&self) -> Self {
+        let socket = self.socket.clone();
+        Self { socket }
+    }
+}
+
 /// Type which exposes a `NngSocket`.
 pub trait Socket: Sized {
     // Obtain underlying `NngSocket`.
     fn socket(&self) -> &NngSocket;
-    fn clone_socket(&self) -> Arc<NngSocket>;
+    fn socket_mut(&mut self) -> &mut NngSocket;
     /// Obtain underlying `nng_socket`.
     unsafe fn nng_socket(&self) -> nng_socket {
         self.socket().nng_socket()
@@ -96,7 +160,7 @@ pub trait Listen: Socket {
     }
 
     fn listener_create(&self, url: &str) -> NngResult<NngListener> {
-        NngListener::create(self.clone_socket(), url)
+        NngListener::create(self.socket().clone(), url)
     }
 }
 
@@ -112,7 +176,7 @@ pub trait Dial: Socket {
     }
 
     fn dialer_create(&self, url: &str) -> NngResult<NngDialer> {
-        NngDialer::create(self.clone_socket(), url)
+        NngDialer::create(self.socket().clone(), url)
     }
 }
 
@@ -151,5 +215,27 @@ impl UnsafeSocket {
     /// See [nng_socket_id](https://nanomsg.github.io/nng/man/v1.1.0/nng_socket_id.3).
     pub fn id(&self) -> i32 {
         unsafe { nng_socket_id(self.socket) }
+    }
+}
+
+struct InnerSocket {
+    socket: nng_socket,
+}
+
+impl Drop for InnerSocket {
+    fn drop(&mut self) {
+        unsafe {
+            debug!("Socket close: {:?}", self.socket);
+            let res = NngFail::from_i32(nng_close(self.socket));
+            match res {
+                Ok(()) => {}
+                // Can't panic here.  Thrift's TIoChannel::split() clones the socket handle so we may get ECLOSED
+                Err(NngFail::Err(NngError::ECLOSED)) => {}
+                Err(res) => {
+                    debug!("nng_close {:?}", res);
+                    panic!("nng_close {:?}", res);
+                }
+            }
+        }
     }
 }

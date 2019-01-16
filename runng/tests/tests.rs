@@ -4,9 +4,10 @@ mod common;
 mod tests {
 
     mod msg_tests;
+    mod pair_tests;
     mod pipe_tests;
     mod pushpull_tests;
-    mod requestreply_tests;
+    mod reqrep_tests;
     mod stats_tests;
 
     use crate::common::get_url;

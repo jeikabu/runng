@@ -17,6 +17,7 @@ travis-ci = { repository = "jeikabu/runng", branch = "master" }
 codecov = { repository = "jeikabu/runng", branch = "master", service = "github" }
 
 [features]
+default = ["pipes", "stats"]
 # NngPipe/nng_pipe
 pipes = []
 stats = []

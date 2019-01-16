@@ -2,11 +2,10 @@
 
 use super::*;
 use runng_sys::*;
-use std::sync::Arc;
 
 /// Publish half of publisher/subscriber pattern.  See [nng_pub](https://nanomsg.github.io/nng/man/v1.1.0/nng_pub.7).
 pub struct Pub0 {
-    socket: Arc<NngSocket>,
+    socket: NngSocket,
 }
 
 impl Pub0 {
@@ -22,8 +21,8 @@ impl Socket for Pub0 {
     fn socket(&self) -> &NngSocket {
         &self.socket
     }
-    fn clone_socket(&self) -> Arc<NngSocket> {
-        self.socket.clone()
+    fn socket_mut(&mut self) -> &mut NngSocket {
+        &mut self.socket
     }
 }
 
@@ -32,5 +31,5 @@ impl Listen for Pub0 {}
 impl SendMsg for Pub0 {}
 
 impl AsyncSocket for Pub0 {
-    type ContextType = AsyncPublishContext;
+    type ContextType = AsyncPushContext;
 }

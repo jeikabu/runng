@@ -1,4 +1,4 @@
-use crate::common::get_url;
+use crate::common::{create_stop_message, get_url, not_stop_message};
 use futures::{future, future::Future, Stream};
 use runng::{protocol::*, *};
 use std::{
@@ -27,8 +27,7 @@ fn pushpull() -> NngReturn {
             push_ctx.send(msg).wait().unwrap()?;
         }
         // Send a stop message
-        let stop_message = msg::NngMsg::create().unwrap();
-        push_ctx.send(stop_message).wait().unwrap()?;
+        push_ctx.send(create_stop_message()).wait().unwrap()?;
         Ok(())
     });
 
@@ -41,10 +40,7 @@ fn pushpull() -> NngReturn {
             .receive()
             .unwrap()
             // Process until receive stop message
-            .take_while(|res| match res {
-                Ok(msg) => future::ok(!msg.is_empty()),
-                Err(_) => future::ok(false),
-            })
+            .take_while(not_stop_message)
             // Increment count of received messages
             .for_each(|_| {
                 thread_count.fetch_add(1, Ordering::Relaxed);

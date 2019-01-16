@@ -12,7 +12,6 @@ use futures::sync::{
     oneshot,
 };
 use runng_sys::*;
-use std::sync::Arc;
 
 #[derive(Debug, PartialEq)]
 enum ReplyState {
@@ -30,7 +29,7 @@ struct ReplyContextAioArg {
 
 impl ReplyContextAioArg {
     pub fn create(
-        socket: Arc<NngSocket>,
+        socket: NngSocket,
         request_sender: Sender<NngResult<NngMsg>>,
     ) -> NngResult<Box<Self>> {
         let ctx = NngCtx::create(socket)?;
@@ -86,7 +85,7 @@ pub struct AsyncReplyContext {
 }
 
 impl AsyncContext for AsyncReplyContext {
-    fn create(socket: Arc<NngSocket>) -> NngResult<Self> {
+    fn create(socket: NngSocket) -> NngResult<Self> {
         let (sender, receiver) = channel(1024);
         let aio_arg = ReplyContextAioArg::create(socket, sender)?;
         let receiver = Some(receiver);

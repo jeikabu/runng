@@ -1,5 +1,7 @@
 //! NNG protocols.  See [Section 7](https://nanomsg.github.io/nng/man/v1.1.0/index.html#_section_7_protocols_and_transports).
 
+pub mod pair0;
+pub mod pair1;
 pub mod pub0;
 pub mod pull0;
 pub mod push0;
@@ -7,11 +9,8 @@ pub mod rep0;
 pub mod req0;
 pub mod sub0;
 
-pub mod publish;
-pub mod pull;
-pub mod reply;
-pub mod request;
-
+pub use self::pair0::*;
+pub use self::pair1::*;
 pub use self::pub0::*;
 pub use self::pull0::*;
 pub use self::push0::*;
@@ -19,6 +18,13 @@ pub use self::rep0::*;
 pub use self::req0::*;
 pub use self::sub0::*;
 
+pub mod pair;
+pub mod publish;
+pub mod pull;
+pub mod reply;
+pub mod request;
+
+pub use self::pair::*;
 pub use self::publish::*;
 pub use self::pull::*;
 pub use self::reply::*;
@@ -28,7 +34,6 @@ use futures::{sync::mpsc, Sink};
 
 use crate::{msg::NngMsg, *};
 use runng_sys::*;
-use std::sync::Arc;
 
 /// A `Socket` that can be turned into a context for asynchronous I/O.
 ///
@@ -51,7 +56,7 @@ pub trait AsyncSocket: Socket {
 
     /// Turns the `Socket` into an asynchronous context
     fn create_async_context(&self) -> NngResult<Self::ContextType> {
-        let socket = self.clone_socket();
+        let socket = self.socket().clone();
         let ctx = Self::ContextType::create(socket)?;
         Ok(ctx)
     }
@@ -60,18 +65,25 @@ pub trait AsyncSocket: Socket {
 /// Context for asynchrounous I/O.
 pub trait AsyncContext: Sized {
     /// Create a new asynchronous context using specified socket.
-    fn create(socket: Arc<NngSocket>) -> NngResult<Self>;
+    fn create(socket: NngSocket) -> NngResult<Self>;
+}
+
+pub trait Subscribe {
+    fn subscribe(&self, topic: &[u8]) -> NngReturn;
+    fn subscribe_str(&self, topic: &str) -> NngReturn {
+        self.subscribe(topic.as_bytes())
+    }
 }
 
 fn nng_open<T, O, S>(open_func: O, socket_create_func: S) -> NngResult<T>
 where
     O: Fn(&mut nng_socket) -> i32,
-    S: Fn(Arc<NngSocket>) -> T,
+    S: Fn(NngSocket) -> T,
 {
     let mut socket = nng_socket { id: 0 };
     let res = open_func(&mut socket);
     NngFail::succeed_then(res, || {
-        let socket = NngSocket::create(socket);
+        let socket = NngSocket::new(socket);
         socket_create_func(socket)
     })
 }

@@ -8,8 +8,8 @@ use crate::{
     *,
 };
 use futures::sync::oneshot::{channel, Receiver, Sender};
+use log::{debug, info};
 use runng_sys::*;
-use std::sync::Arc;
 
 #[derive(Debug, PartialEq)]
 enum RequestState {
@@ -25,7 +25,7 @@ struct RequestContextAioArg {
 }
 
 impl RequestContextAioArg {
-    pub fn create(socket: Arc<NngSocket>) -> NngResult<Box<Self>> {
+    pub fn create(socket: NngSocket) -> NngResult<Box<Self>> {
         let ctx = NngCtx::create(socket)?;
         let arg = Self {
             ctx,
@@ -67,7 +67,7 @@ pub struct AsyncRequestContext {
 }
 
 impl AsyncContext for AsyncRequestContext {
-    fn create(socket: Arc<NngSocket>) -> NngResult<Self> {
+    fn create(socket: NngSocket) -> NngResult<Self> {
         let aio_arg = RequestContextAioArg::create(socket)?;
         let ctx = Self { aio_arg };
         Ok(ctx)
@@ -118,13 +118,19 @@ unsafe extern "C" fn request_callback(arg: AioCallbackArg) {
             match res {
                 Err(res) => {
                     ctx.state = RequestState::Ready;
-                    sender.send(Err(res)).unwrap();
+                    let res = sender.send(Err(res));
+                    if let Err(res) = res {
+                        debug!("Receive failed to send error: {:?}", res);
+                    }
                 }
                 Ok(()) => {
                     let msg = NngMsg::new_msg(nng_aio_get_msg(aionng));
 
                     ctx.state = RequestState::Ready;
-                    sender.send(Ok(msg)).unwrap();
+                    let res = sender.send(Ok(msg));
+                    if let Err(msg) = res {
+                        info!("Dropping request: {:?}", msg);
+                    }
                 }
             }
         }

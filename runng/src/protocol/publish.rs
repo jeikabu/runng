@@ -6,41 +6,40 @@ use crate::{
     protocol::AsyncContext,
     *,
 };
-use futures::sync::oneshot::{channel, Receiver, Sender};
+use futures::sync::oneshot;
 use log::debug;
 use runng_sys::*;
-use std::sync::Arc;
 
 #[derive(Debug, PartialEq)]
-enum PublishState {
+enum PushState {
     Ready,
     Sending,
 }
 
-struct PublishContextAioArg {
+pub(crate) struct PushContextAioArg {
     aio: NngAio,
-    state: PublishState,
-    sender: Option<Sender<NngReturn>>,
+    state: PushState,
+    sender: Option<oneshot::Sender<NngReturn>>,
 }
 
-impl PublishContextAioArg {
-    pub fn create(socket: Arc<NngSocket>) -> NngResult<Box<Self>> {
+impl PushContextAioArg {
+    pub fn create(socket: NngSocket) -> NngResult<Box<Self>> {
         let aio = NngAio::new(socket);
         let arg = Self {
             aio,
-            state: PublishState::Ready,
+            state: PushState::Ready,
             sender: None,
         };
         NngAio::register_aio(arg, publish_callback)
     }
 
-    pub fn send(&mut self, msg: NngMsg, sender: Sender<NngReturn>) {
-        if self.state != PublishState::Ready {
+    pub fn send(&mut self, msg: NngMsg, sender: oneshot::Sender<NngReturn>) {
+        if self.state != PushState::Ready {
             panic!();
         }
         self.sender = Some(sender);
         unsafe {
-            self.state = PublishState::Sending;
+            self.state = PushState::Sending;
 
             // Nng takes ownership of the message
             let msg = msg.take();
@@ -54,7 +53,7 @@ impl PublishContextAioArg {
     }
 }
 
-impl Aio for PublishContextAioArg {
+impl Aio for PushContextAioArg {
     fn aio(&self) -> &NngAio {
         &self.aio
     }
@@ -64,27 +63,27 @@ impl Aio for PublishContextAioArg {
 }
 
 /// Asynchronous context for publish socket.
-pub struct AsyncPublishContext {
-    aio_arg: Box<PublishContextAioArg>,
+pub struct AsyncPushContext {
+    aio_arg: Box<PushContextAioArg>,
 }
 
-impl AsyncContext for AsyncPublishContext {
+impl AsyncContext for AsyncPushContext {
     /// Create an asynchronous context using the specified socket.
-    fn create(socket: Arc<NngSocket>) -> NngResult<Self> {
-        let aio_arg = PublishContextAioArg::create(socket)?;
+    fn create(socket: NngSocket) -> NngResult<Self> {
+        let aio_arg = PushContextAioArg::create(socket)?;
         Ok(Self { aio_arg })
     }
 }
 
 /// Trait for asynchronous contexts that can send a message.
-pub trait AsyncPublish {
+pub trait AsyncPush {
     /// Asynchronously send a message.
-    fn send(&mut self, msg: NngMsg) -> Receiver<NngReturn>;
+    fn send(&mut self, msg: NngMsg) -> oneshot::Receiver<NngReturn>;
 }
 
-impl AsyncPublish for AsyncPublishContext {
-    fn send(&mut self, msg: NngMsg) -> Receiver<NngReturn> {
-        let (sender, receiver) = channel::<NngReturn>();
+impl AsyncPush for AsyncPushContext {
+    fn send(&mut self, msg: NngMsg) -> oneshot::Receiver<NngReturn> {
+        let (sender, receiver) = oneshot::channel::<NngReturn>();
         self.aio_arg.send(msg, sender);
 
         receiver
@@ -92,21 +91,21 @@ impl AsyncPublish for AsyncPublishContext {
 }
 
 unsafe extern "C" fn publish_callback(arg: AioCallbackArg) {
-    let ctx = &mut *(arg as *mut PublishContextAioArg);
+    let ctx = &mut *(arg as *mut PushContextAioArg);
 
-    trace!("callback Publish:{:?}", ctx.state);
+    trace!("callback Push:{:?}", ctx.state);
     match ctx.state {
-        PublishState::Ready => panic!(),
-        PublishState::Sending => {
+        PushState::Ready => panic!(),
+        PushState::Sending => {
             let nng_aio = ctx.aio.nng_aio();
             let res = NngFail::from_i32(nng_aio_result(nng_aio));
             if let Err(ref err) = res {
-                debug!("Publish failed: {:?}", err);
+                debug!("Push failed: {:?}", err);
                 // Nng requires that we retrieve the message and free it
                 let _ = NngMsg::new_msg(nng_aio_get_msg(nng_aio));
             }
             // Reset state before signaling completion
-            ctx.state = PublishState::Ready;
+            ctx.state = PushState::Ready;
             let res = ctx.sender.take().unwrap().send(res);
             if let Err(ref err) = res {
                 // Unable to send result.  Receiver probably went away.  Not necessarily a problem.

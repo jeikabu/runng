@@ -1,4 +1,4 @@
-#![cfg(feature = "pipes")]
+//#![cfg(feature = "pipes")]
 
 use crate::common::get_url;
 use runng::pipe::*;

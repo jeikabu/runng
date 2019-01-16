@@ -46,7 +46,7 @@ pub struct NngPipe {
 
 impl NngPipe {
     /// Get pipe associated with a message, if one exists.  See [nng_msg_get_pipe](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg_get_pipe.3).
-    pub(crate) fn new(message: NngMsg) -> Option<NngPipe> {
+    pub(crate) fn create(message: &NngMsg) -> Option<Self> {
         unsafe {
             let pipe = nng_msg_get_pipe(message.msg());
             if (pipe.id as i32) < 0 {
@@ -60,6 +60,11 @@ impl NngPipe {
     /// See [nng_pipe_id](https://nanomsg.github.io/nng/man/v1.1.0/nng_pipe_id.3).
     pub fn id(&self) -> i32 {
         unsafe { nng_pipe_id(self.pipe) }
+    }
+
+    /// Obtain underlying `nng_pipe`
+    pub unsafe fn nng_pipe(&self) -> nng_pipe {
+        self.pipe
     }
 
     /// Get socket that owns the pipe.  See [nng_pipe_socket](https://nanomsg.github.io/nng/man/v1.1.0/nng_pipe_socket.3).

@@ -1,5 +1,6 @@
 //! Return values and error handling
 
+use futures::sync::oneshot;
 use runng_sys::*;
 use std::{error, fmt, io};
 
@@ -93,6 +94,8 @@ pub enum NngFail {
     IoError(io::Error),
     NulError(std::ffi::NulError),
     Unit,
+    Canceled,
+    NoneError,
 }
 
 impl NngFail {
@@ -143,6 +146,12 @@ impl From<std::ffi::NulError> for NngFail {
 impl From<()> for NngFail {
     fn from(_: ()) -> NngFail {
         NngFail::Unit
+    }
+}
+
+impl From<oneshot::Canceled> for NngFail {
+    fn from(_: oneshot::Canceled) -> NngFail {
+        NngFail::Canceled
     }
 }
 

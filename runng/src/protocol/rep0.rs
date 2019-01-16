@@ -2,11 +2,10 @@
 
 use super::*;
 use runng_sys::*;
-use std::sync::Arc;
 
 /// Reply half of request/reply pattern.  See [nng_rep](https://nanomsg.github.io/nng/man/v1.1.0/nng_rep.7).
 pub struct Rep0 {
-    socket: Arc<NngSocket>,
+    socket: NngSocket,
 }
 
 impl Rep0 {
@@ -23,8 +22,8 @@ impl Socket for Rep0 {
     fn socket(&self) -> &NngSocket {
         &self.socket
     }
-    fn clone_socket(&self) -> Arc<NngSocket> {
-        self.socket.clone()
+    fn socket_mut(&mut self) -> &mut NngSocket {
+        &mut self.socket
     }
 }
 
