@@ -1,6 +1,6 @@
 //#![cfg(feature = "pipes")]
 
-use crate::common::get_url;
+use crate::common::{get_url, sleep_fast};
 use runng::pipe::*;
 use runng::*;
 use runng_sys::nng_pipe;
@@ -35,6 +35,8 @@ fn notify() -> NngReturn {
         });
     {
         let _ = factory.requester_open()?.dial(&url)?;
+        // Give all notifications a chance to be delivered (especially Linux Travis CI)
+        sleep_fast();
     }
 
     assert_eq!(NUM_ADDPRE.load(Ordering::Relaxed), 1);
