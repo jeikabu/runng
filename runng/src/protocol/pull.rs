@@ -85,7 +85,7 @@ impl AsyncPull for AsyncPullContext {
 
 unsafe extern "C" fn pull_callback(arg: AioCallbackArg) {
     let ctx = &mut *(arg as *mut PullContextAioArg);
-    trace!("callback Subscribe:{:?}", ctx.state);
+    trace!("pull_callback::{:?}", ctx.state);
     match ctx.state {
         PullState::Ready => panic!(),
         PullState::Receiving => {
@@ -95,20 +95,20 @@ unsafe extern "C" fn pull_callback(arg: AioCallbackArg) {
             match res {
                 Err(res) => {
                     match res {
-                        NngFail::Err(NngError::ECLOSED) => {
-                            debug!("Closed");
+                        // nng_aio_close() calls nng_aio_stop which nng_aio_abort(NNG_ECANCELED) and waits.
+                        // If we call start_receive() it will fail with ECANCELED and we infinite loop...
+                        NngFail::Err(NngError::ECLOSED) | NngFail::Err(NngError::ECANCELED) => {
+                            debug!("pull_callback {:?}", res);
                         }
                         _ => {
-                            trace!("Reply.Receive: {:?} {:?}", res, aio);
+                            trace!("pull_callback::Err({:?})", res);
                             ctx.start_receive();
                         }
                     }
                     try_signal_complete(&mut ctx.sender, Err(res));
                 }
                 Ok(()) => {
-                    let msg = nng_aio_get_msg(aio);
-                    //debug!("recv {:?} {:?} {:?}", aio_res, msg, aio);
-                    let msg = NngMsg::new_msg(msg);
+                    let msg = NngMsg::new_msg(nng_aio_get_msg(aio));
                     // Make sure to reset state before signaling completion.  Otherwise
                     // have race-condition where receiver can receive None promise
                     ctx.start_receive();

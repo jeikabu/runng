@@ -23,18 +23,19 @@ pipes = []
 stats = []
 
 [dependencies]
-runng-sys = { version = "1.1.1-rc", path = "../runng-sys" }
-runng_derive = { version = "0.1", path = "../runng_derive" }
-futures = "0.1"
-byteorder = "1.2"
-log = "0.4"
 backtrace = "0.3"
+byteorder = "1.2"
+futures = "0.1"
+log = "0.4"
+runng_derive = { version = "0.1", path = "../runng_derive" }
+runng-sys = { version = "1.1.1-rc", path = "../runng-sys" }
 
 [dev-dependencies]
-env_logger = "0.6"
 clap = "2.32"
-tokio = "0.1"
 criterion = "0.2"
+env_logger = "0.6"
+futures-timer = "0.1"
+tokio = "0.1"
 
 [[bench]]
 name = "reqrep_bench"

@@ -12,11 +12,6 @@ pub struct AsyncPairContext {
     receiver: Option<mpsc::Receiver<NngResult<NngMsg>>>,
 }
 
-// struct SendRequest {
-//     sender: oneshot::Sender<NngReturn>,
-//     msg: NngMsg,
-// }
-
 impl AsyncContext for AsyncPairContext {
     fn create(socket: NngSocket) -> NngResult<Self> {
         let push_aio_arg = PushContextAioArg::create(socket.clone())?;

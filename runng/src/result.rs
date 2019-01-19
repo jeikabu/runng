@@ -5,7 +5,7 @@ use runng_sys::*;
 use std::{error, fmt, io};
 
 /// Error values returned by NNG functions.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[repr(i32)]
 pub enum NngError {
     EINTR = nng_errno_enum_NNG_EINTR as i32,

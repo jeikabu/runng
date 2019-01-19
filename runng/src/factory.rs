@@ -5,7 +5,6 @@ use super::*;
 /// # Examples
 /// ```
 /// use runng::{
-///     Factory,
 ///     factory::Latest,
 /// };
 /// let factory = Latest::default();

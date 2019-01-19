@@ -121,18 +121,18 @@ impl AsyncReply for AsyncReplyContext {
 unsafe extern "C" fn reply_callback(arg: AioCallbackArg) {
     let ctx = &mut *(arg as *mut ReplyContextAioArg);
     let aio_nng = ctx.ctx.aio().nng_aio();
-    trace!("callback Reply:{:?}", ctx.state);
+    trace!("reply_callback::{:?}", ctx.state);
     match ctx.state {
         ReplyState::Receiving => {
             let res = NngFail::from_i32(nng_aio_result(aio_nng));
             match res {
                 Err(res) => {
                     match res {
-                        NngFail::Err(NngError::ECLOSED) => {
-                            debug!("Closed");
+                        NngFail::Err(NngError::ECLOSED) | NngFail::Err(NngError::ECANCELED) => {
+                            debug!("reply_callback {:?}", res);
                         }
                         _ => {
-                            trace!("Reply.Receive: {:?}", res);
+                            trace!("reply_callback::Err({:?})", res);
                             ctx.start_receive();
                         }
                     }

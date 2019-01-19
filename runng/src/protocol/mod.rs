@@ -92,10 +92,11 @@ fn try_signal_complete(sender: &mut mpsc::Sender<NngResult<NngMsg>>, message: Nn
     let res = sender.try_send(message);
     if let Err(err) = res {
         if err.is_disconnected() {
-            debug!("disconnected");
+            let message = err.into_inner();
+            debug!("mpsc::disconnected {:?}", message);
             sender.close().unwrap();
         } else {
-            debug!("Send failed: {}", err);
+            debug!("mpsc::send failed {}", err);
         }
     }
 }

@@ -59,6 +59,15 @@ impl GetOpts for NngSocket {
             )
         }
     }
+    fn getopt_ms(&self, option: NngOption) -> NngResult<i32> {
+        unsafe {
+            let mut value: i32 = Default::default();
+            NngFail::succeed(
+                nng_getopt_ms(self.nng_socket(), option.as_cptr(), &mut value),
+                value,
+            )
+        }
+    }
     fn getopt_size(&self, option: NngOption) -> NngResult<usize> {
         unsafe {
             let mut value: usize = Default::default();
@@ -93,6 +102,9 @@ impl SetOpts for NngSocket {
     }
     fn setopt_int(&mut self, option: NngOption, value: i32) -> NngReturn {
         unsafe { NngFail::from_i32(nng_setopt_int(self.nng_socket(), option.as_cptr(), value)) }
+    }
+    fn setopt_ms(&mut self, option: NngOption, value: nng_duration) -> NngReturn {
+        unsafe { NngFail::from_i32(nng_setopt_ms(self.nng_socket(), option.as_cptr(), value)) }
     }
     fn setopt_size(&mut self, option: NngOption, value: usize) -> NngReturn {
         unsafe { NngFail::from_i32(nng_setopt_size(self.nng_socket(), option.as_cptr(), value)) }

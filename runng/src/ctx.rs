@@ -29,11 +29,6 @@ impl NngCtx {
         let ctx = NngCtx { ctx, aio };
         Ok(ctx)
     }
-
-    // Calls init() method of this context's `NngAio`
-    // pub fn init(&mut self, callback: AioCallback, arg: AioCallbackArg) -> NngReturn {
-    //     self.aio.init(callback, arg)
-    // }
 }
 
 impl Ctx for NngCtx {

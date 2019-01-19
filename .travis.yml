@@ -3,7 +3,7 @@ rust:
   - stable
 
 cache:
-  cargo: true
+  #cargo: true
   directories:
     # Cache kcov binary created in after_success.sh
     - $HOME/kcov-build/
@@ -39,7 +39,7 @@ before_script:
 script:
   # Check source code formatting
   - cargo fmt --all -- --check
-  - cargo clippy
+  #- cargo clippy
   # Build everything (including optional packages)
   - cargo build --all --all-targets
   - RUST_BACKTRACE=1 cargo test "tests::"
