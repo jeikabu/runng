@@ -1,6 +1,6 @@
 [package]
 name = "runng_derive"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Jake <jeikabu+github@gmail.com>"]
 
 description = "Macros for [runng](https://crates.io/crates/runng)"

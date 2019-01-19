@@ -1,6 +1,6 @@
 [package]
 name = "runng"
-version = "0.1.9"
+version = "0.1.10"
 authors = ["Jake W <jeikabu@gmail.com>"]
 
 description = "High-level wrapper around nng (Nanomsg-Next-Generation) aka Nanomsg2"
