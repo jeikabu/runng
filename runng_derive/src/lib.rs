@@ -34,7 +34,7 @@ fn get_nng_member(ast: &syn::DeriveInput) -> Option<syn::Ident> {
                                 Meta::Word(ref ident) if ident == "nng_member" =>
                                 // Return name of field with `#[nng_member]` attribute
                                 {
-                                    return field.ident.clone()
+                                    return field.ident.clone();
                                 }
                                 _ => (),
                             }
@@ -84,6 +84,8 @@ fn gen_get_impl(name: &syn::Ident, prefix: &str, member: &syn::Ident) -> TokenSt
     let getopt_bool = syn::Ident::new(&getopt_bool, syn::export::Span::call_site());
     let getopt_int = prefix.to_string() + "getopt_int";
     let getopt_int = syn::Ident::new(&getopt_int, syn::export::Span::call_site());
+    let getopt_ms = prefix.to_string() + "getopt_ms";
+    let getopt_ms = syn::Ident::new(&getopt_ms, syn::export::Span::call_site());
     let getopt_size = prefix.to_string() + "getopt_size";
     let getopt_size = syn::Ident::new(&getopt_size, syn::export::Span::call_site());
     let getopt_uint64 = prefix.to_string() + "getopt_uint64";
@@ -103,6 +105,12 @@ fn gen_get_impl(name: &syn::Ident, prefix: &str, member: &syn::Ident) -> TokenSt
                 unsafe {
                     let mut value: i32 = Default::default();
                     NngFail::succeed( #getopt_int (self.#member, option.as_cptr(), &mut value), value)
+                }
+            }
+            fn getopt_ms(&self, option: NngOption) -> NngResult<i32> {
+                unsafe {
+                    let mut value: i32 = Default::default();
+                    NngFail::succeed( #getopt_ms (self.#member, option.as_cptr(), &mut value), value)
                 }
             }
             fn getopt_size(&self, option: NngOption) -> NngResult<usize>
@@ -136,6 +144,8 @@ fn gen_set_impl(name: &syn::Ident, prefix: &str, member: &syn::Ident) -> TokenSt
     let setopt_bool = syn::Ident::new(&setopt_bool, syn::export::Span::call_site());
     let setopt_int = prefix.to_string() + "setopt_int";
     let setopt_int = syn::Ident::new(&setopt_int, syn::export::Span::call_site());
+    let setopt_ms = prefix.to_string() + "setopt_ms";
+    let setopt_ms = syn::Ident::new(&setopt_ms, syn::export::Span::call_site());
     let setopt_size = prefix.to_string() + "setopt_size";
     let setopt_size = syn::Ident::new(&setopt_size, syn::export::Span::call_site());
     let setopt_uint64 = prefix.to_string() + "setopt_uint64";
@@ -153,6 +163,11 @@ fn gen_set_impl(name: &syn::Ident, prefix: &str, member: &syn::Ident) -> TokenSt
             fn setopt_int(&mut self, option: NngOption, value: i32) -> NngReturn {
                 unsafe {
                     NngFail::from_i32(#setopt_int(self.#member, option.as_cptr(), value))
+                }
+            }
+            fn setopt_ms(&mut self, option: NngOption, value: i32) -> NngReturn {
+                unsafe {
+                    NngFail::from_i32(#setopt_ms(self.#member, option.as_cptr(), value))
                 }
             }
             fn setopt_size(&mut self, option: NngOption, value: usize) -> NngReturn {

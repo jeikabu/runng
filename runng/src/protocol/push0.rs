@@ -5,7 +5,7 @@ use runng_sys::*;
 
 /// Push half of push/pull ("pipeline") pattern.  See [nng_push](https://nanomsg.github.io/nng/man/v1.1.0/nng_push.7).
 pub struct Push0 {
-    socket: Arc<NngSocket>,
+    socket: NngSocket,
 }
 
 impl Push0 {
@@ -22,8 +22,8 @@ impl Socket for Push0 {
     fn socket(&self) -> &NngSocket {
         &self.socket
     }
-    fn clone_socket(&self) -> Arc<NngSocket> {
-        self.socket.clone()
+    fn socket_mut(&mut self) -> &mut NngSocket {
+        &mut self.socket
     }
 }
 
@@ -32,5 +32,5 @@ impl Listen for Push0 {}
 impl SendMsg for Push0 {}
 
 impl AsyncSocket for Push0 {
-    type ContextType = AsyncPublishContext;
+    type ContextType = AsyncPushContext;
 }

@@ -47,7 +47,7 @@ fn basic_thrift_works() -> NngReturn {
     let replier = factory.replier_open()?.listen(url)?;
 
     thread::spawn(move || {
-        let mut channel = TNngChannel::new(replier.clone_socket()).unwrap();
+        let mut channel = TNngChannel::new(replier.socket().clone()).unwrap();
         let (readable, writable) = channel.split().unwrap();
         let mut in_proto = TNngInputProtocol::new(readable);
         let mut out_proto = TNngOutputProtocol::new(writable);
@@ -60,7 +60,7 @@ fn basic_thrift_works() -> NngReturn {
 
     let requester = factory.requester_open()?.dial(url)?;
 
-    let mut channel = TNngChannel::new(requester.clone_socket()).unwrap();
+    let mut channel = TNngChannel::new(requester.socket().clone()).unwrap();
     let (readable, writable) = channel.split().unwrap();
     let in_proto = TNngInputProtocol::new(readable);
     let out_proto = TNngOutputProtocol::new(writable);
@@ -78,7 +78,7 @@ fn thrift_works() -> NngReturn {
     let factory = runng::Latest::default();
 
     let replier = factory.replier_open()?.listen(url)?;
-    let mut channel = TNngChannel::new(replier.clone_socket())?;
+    let mut channel = TNngChannel::new(replier.socket().clone())?;
     let (readable, writable) = channel.split().unwrap();
     let in_proto = TNngInputProtocol::new(readable);
     let out_proto = TNngOutputProtocol::new(writable);
@@ -91,7 +91,7 @@ fn thrift_works() -> NngReturn {
 
     let requester = factory.requester_open()?.dial(url)?;
 
-    let mut channel = TNngChannel::new(requester.clone_socket()).unwrap();
+    let mut channel = TNngChannel::new(requester.socket().clone()).unwrap();
     let (readable, writable) = channel.split().unwrap();
     let in_proto = TNngInputProtocol::new(readable);
     let out_proto = TNngOutputProtocol::new(writable);

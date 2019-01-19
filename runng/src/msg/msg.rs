@@ -155,4 +155,14 @@ impl NngMsg {
             nng_msg_clear(self.msg());
         }
     }
+
+    pub fn get_pipe(&self) -> Option<pipe::NngPipe> {
+        pipe::NngPipe::create(self)
+    }
+
+    pub fn set_pipe(&mut self, pipe: &pipe::NngPipe) {
+        unsafe {
+            nng_msg_set_pipe(self.msg(), pipe.nng_pipe());
+        }
+    }
 }

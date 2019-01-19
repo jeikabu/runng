@@ -9,17 +9,16 @@ use std;
 use std::{
     io,
     io::{Error, ErrorKind},
-    sync::Arc,
 };
 use thrift::transport::{ReadHalf, TIoChannel, WriteHalf};
 
 pub struct TNngChannel {
     message: NngMsg,
-    socket: Arc<NngSocket>,
+    socket: NngSocket,
 }
 
 impl TNngChannel {
-    pub fn new(socket: Arc<NngSocket>) -> runng::NngResult<TNngChannel> {
+    pub fn new(socket: NngSocket) -> runng::NngResult<TNngChannel> {
         let message = NngMsg::create()?;
         Ok(TNngChannel { message, socket })
     }
@@ -37,11 +36,8 @@ impl TIoChannel for TNngChannel {
     where
         Self: Sized,
     {
-        let clone = unsafe {
-            result_wrapper(TNngChannel::new(NngSocket::create(
-                self.socket.nng_socket(),
-            )))?
-        };
+        let clone =
+            unsafe { result_wrapper(TNngChannel::new(NngSocket::new(self.socket.nng_socket())))? };
         Ok((ReadHalf::new(self), WriteHalf::new(clone)))
     }
 }

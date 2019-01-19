@@ -1,10 +1,11 @@
 //! Return values and error handling
 
+use futures::sync::oneshot;
 use runng_sys::*;
 use std::{error, fmt, io};
 
 /// Error values returned by NNG functions.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[repr(i32)]
 pub enum NngError {
     EINTR = nng_errno_enum_NNG_EINTR as i32,
@@ -93,6 +94,8 @@ pub enum NngFail {
     IoError(io::Error),
     NulError(std::ffi::NulError),
     Unit,
+    Canceled,
+    NoneError,
 }
 
 impl NngFail {
@@ -143,6 +146,12 @@ impl From<std::ffi::NulError> for NngFail {
 impl From<()> for NngFail {
     fn from(_: ()) -> NngFail {
         NngFail::Unit
+    }
+}
+
+impl From<oneshot::Canceled> for NngFail {
+    fn from(_: oneshot::Canceled) -> NngFail {
+        NngFail::Canceled
     }
 }
 

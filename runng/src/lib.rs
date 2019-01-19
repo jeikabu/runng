@@ -32,11 +32,7 @@ use futures::{
 };
 use runng::{
     *,
-    protocol::{
-        AsyncReply,
-        AsyncRequest,
-        AsyncSocket,
-    },
+    protocol::*,
 };
 
 fn aio() -> NngReturn {

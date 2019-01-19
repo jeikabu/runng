@@ -2,11 +2,10 @@
 
 use super::*;
 use runng_sys::*;
-use std::sync::Arc;
 
 /// Pull half of push/pull ("pipeline") pattern.  See [nng_pull](https://nanomsg.github.io/nng/man/v1.1.0/nng_pull.7).
 pub struct Pull0 {
-    socket: Arc<NngSocket>,
+    socket: NngSocket,
 }
 
 impl Pull0 {
@@ -23,8 +22,8 @@ impl Socket for Pull0 {
     fn socket(&self) -> &NngSocket {
         &self.socket
     }
-    fn clone_socket(&self) -> Arc<NngSocket> {
-        self.socket.clone()
+    fn socket_mut(&mut self) -> &mut NngSocket {
+        &mut self.socket
     }
 }
 

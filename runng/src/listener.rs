@@ -3,7 +3,6 @@
 use super::*;
 use runng_derive::{NngGetOpts, NngSetOpts};
 use runng_sys::*;
-use std::sync::Arc;
 
 /// Wraps `nng_listener`.  See [nng_listener](https://nanomsg.github.io/nng/man/v1.1.0/nng_listener.5).
 #[derive(NngGetOpts, NngSetOpts)]
@@ -11,12 +10,12 @@ use std::sync::Arc;
 pub struct NngListener {
     #[nng_member]
     listener: nng_listener,
-    socket: Arc<NngSocket>,
+    socket: NngSocket,
 }
 
 impl NngListener {
     /// See [nng_listener_create](https://nanomsg.github.io/nng/man/v1.1.0/nng_listener_create.3).
-    pub(crate) fn create(socket: Arc<NngSocket>, url: &str) -> NngResult<Self> {
+    pub(crate) fn create(socket: NngSocket, url: &str) -> NngResult<Self> {
         unsafe {
             let mut listener = nng_listener { id: 0 };
             let (_cstring, url) = to_cstr(url)?;

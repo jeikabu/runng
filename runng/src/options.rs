@@ -27,6 +27,7 @@ impl Drop for NngString {
 pub trait GetOpts {
     fn getopt_bool(&self, option: NngOption) -> NngResult<bool>;
     fn getopt_int(&self, option: NngOption) -> NngResult<i32>;
+    fn getopt_ms(&self, option: NngOption) -> NngResult<nng_duration>;
     fn getopt_size(&self, option: NngOption) -> NngResult<usize>;
     fn getopt_uint64(&self, option: NngOption) -> NngResult<u64>;
     fn getopt_string(&self, option: NngOption) -> NngResult<NngString>;
@@ -36,10 +37,10 @@ pub trait GetOpts {
 pub trait SetOpts {
     fn setopt_bool(&mut self, option: NngOption, value: bool) -> NngReturn;
     fn setopt_int(&mut self, option: NngOption, value: i32) -> NngReturn;
+    fn setopt_ms(&mut self, option: NngOption, value: nng_duration) -> NngReturn;
     fn setopt_size(&mut self, option: NngOption, value: usize) -> NngReturn;
     fn setopt_uint64(&mut self, option: NngOption, value: u64) -> NngReturn;
     fn setopt_string(&mut self, option: NngOption, value: &str) -> NngReturn;
-    //fn setopt_string(&mut self, option: NngOption, value: &str) -> NngReturn;
 }
 
 pub struct NngOption(&'static [u8]);
