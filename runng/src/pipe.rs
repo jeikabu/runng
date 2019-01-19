@@ -9,16 +9,16 @@ use runng_sys::*;
 
 /// Pipe events.  See [nng_pipe_notify](https://nanomsg.github.io/nng/man/v1.1.0/nng_pipe_notify.3).
 #[derive(Clone, Copy, Debug)]
-#[repr(u32)]
+#[repr(i32)]
 pub enum PipeEvent {
     /// This event occurs after a connection and negotiation has completed, but before the pipe is added to the socket.
-    AddPre = nng_pipe_ev_NNG_PIPE_EV_ADD_PRE,
+    AddPre = nng_pipe_ev_NNG_PIPE_EV_ADD_PRE as i32,
     /// This event occurs after the pipe is fully added to the socket.
     /// Prior to this time, it is not possible to communicate over the pipe with the socket.
-    AddPost = nng_pipe_ev_NNG_PIPE_EV_ADD_POST,
+    AddPost = nng_pipe_ev_NNG_PIPE_EV_ADD_POST as i32,
     /// This event occurs after the pipe has been removed from the socket.
     /// The underlying transport may be closed at this point, and it is not possible communicate using this pipe.
-    RemPost = nng_pipe_ev_NNG_PIPE_EV_REM_POST,
+    RemPost = nng_pipe_ev_NNG_PIPE_EV_REM_POST as i32,
 }
 
 impl PipeEvent {
