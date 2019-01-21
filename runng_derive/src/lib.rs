@@ -18,8 +18,8 @@ pub fn derive_nng_set_opts(tokens: TokenStream) -> TokenStream {
 
 /// Adds `impl NngMsg` containing all nng_msg_*() variants like `nng_msg_append_u32()`
 #[proc_macro_derive(NngMsgOpts)]
-pub fn derive_nng_msg(tokens: TokenStream) -> TokenStream {
-    _derive_nng_msg(tokens)
+pub fn derive_nng_msg(_tokens: TokenStream) -> TokenStream {
+    _derive_nng_msg()
 }
 
 fn get_nng_member(ast: &syn::DeriveInput) -> Option<syn::Ident> {
@@ -197,7 +197,7 @@ fn gen_set_impl(name: &syn::Ident, prefix: &str, member: &syn::Ident) -> TokenSt
     gen.into()
 }
 
-fn _derive_nng_msg(tokens: TokenStream) -> TokenStream {
+fn _derive_nng_msg() -> TokenStream {
     let methods = gen_method_symbols(&["append", "insert"]);
     let add_methods = methods.map(|(member, method, utype)| {
         quote! {
