@@ -4,7 +4,7 @@ extern crate proc_macro;
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{Lit, Meta, MetaNameValue};
+use syn::{Ident, Lit, Meta, MetaNameValue};
 
 #[proc_macro_derive(NngGetOpts, attributes(prefix, nng_member))]
 pub fn derive_nng_get_opts(tokens: TokenStream) -> TokenStream {
@@ -14,6 +14,12 @@ pub fn derive_nng_get_opts(tokens: TokenStream) -> TokenStream {
 #[proc_macro_derive(NngSetOpts, attributes(prefix, nng_member))]
 pub fn derive_nng_set_opts(tokens: TokenStream) -> TokenStream {
     derive_nng_opts(tokens, gen_set_impl)
+}
+
+/// Adds `impl NngMsg` containing all nng_msg_*() variants like `nng_msg_append_u32()`
+#[proc_macro_derive(NngMsgOpts)]
+pub fn derive_nng_msg(tokens: TokenStream) -> TokenStream {
+    _derive_nng_msg(tokens)
 }
 
 fn get_nng_member(ast: &syn::DeriveInput) -> Option<syn::Ident> {
@@ -189,4 +195,68 @@ fn gen_set_impl(name: &syn::Ident, prefix: &str, member: &syn::Ident) -> TokenSt
         }
     };
     gen.into()
+}
+
+fn _derive_nng_msg(tokens: TokenStream) -> TokenStream {
+    let methods = gen_method_symbols(&["append", "insert"]);
+    let add_methods = methods.map(|(member, method, utype)| {
+        quote! {
+            pub fn #member(&mut self, data: #utype) -> NngReturn {
+                unsafe { NngFail::from_i32(#method(self.msg(), data)) }
+            }
+        }
+    });
+
+    let methods = gen_method_symbols(&["chop", "trim"]);
+    let remove_methods = methods.map(|(member, method, utype)| {
+        quote! {
+            pub fn #member(&mut self) -> NngResult<#utype> {
+                let mut val: #utype = 0;
+                unsafe { NngFail::succeed(#method(self.msg(), &mut val), val) }
+            }
+        }
+    });
+
+    let gen = quote! {
+        impl NngMsg {
+            #(#add_methods)*
+            #(#remove_methods)*
+        }
+    };
+    gen.into()
+}
+
+// Takes list of methods and generates all the nng_msg_*() variants.
+// For "append": nng_msg_append_u16 nng_msg_append_u32 .., nng_msg_header_append_u16 ..
+fn gen_method_symbols(
+    method_names: &'static [&'static str],
+) -> impl Iterator<Item = (Ident, Ident, Ident)> {
+    // To generate all the variants (nng_msg_append_u16, nng_msg_append_u32, ...) could use a
+    // triple-nested `for` loop, or instead triple-nested `map`.  Need `flatten()` to turn:
+    // [[[a b][c d]][[e f]]].flatten() -> [[a b][c d][e f]].flatten() -> [a b c...]
+    ["", "header"]
+        .iter()
+        .map(move |prefix| {
+            method_names
+                .iter()
+                .map(move |method| {
+                    ["u16", "u32", "u64"].iter().map(move |utype| {
+                        let (member, method) = if prefix.is_empty() {
+                            let member = format!("{}_{}", method, utype);
+                            let method = format!("nng_msg_{}_{}", method, utype);
+                            (member, method)
+                        } else {
+                            let member = format!("{}_{}_{}", prefix, method, utype);
+                            let method = format!("nng_msg_{}_{}_{}", prefix, method, utype);
+                            (member, method)
+                        };
+                        let member = syn::Ident::new(&member, syn::export::Span::call_site());
+                        let method = syn::Ident::new(&method, syn::export::Span::call_site());
+                        let utype = syn::Ident::new(&utype, syn::export::Span::call_site());
+                        (member, method, utype)
+                    })
+                })
+                .flatten()
+        })
+        .flatten()
 }
