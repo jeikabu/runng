@@ -8,7 +8,7 @@ mod tests {
     fn it_works() {
         unsafe {
             let url = CString::new("inproc://test").unwrap();
-            let url = url.as_bytes_with_nul().as_ptr() as *const i8;
+            let url = url.as_bytes_with_nul().as_ptr() as *const std::os::raw::c_char;
 
             // Reply socket
             let mut rep_socket = nng_socket { id: 0 };
