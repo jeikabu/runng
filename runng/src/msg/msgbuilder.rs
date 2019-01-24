@@ -1,6 +1,5 @@
 use crate::msg::NngMsg;
 use crate::*;
-use byteorder::{BigEndian, WriteBytesExt};
 
 /// Build `NngMsg` using fluent API.  See [nng_msg](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg.5).
 ///
@@ -20,8 +19,7 @@ pub struct MsgBuilder {
 impl MsgBuilder {
     /// Append `u32` to the body.
     pub fn append_u32(&mut self, data: u32) -> &mut Self {
-        let mut bytes = [0u8; std::mem::size_of::<u32>()];
-        bytes.as_mut().write_u32::<BigEndian>(data).unwrap();
+        let bytes = data.to_be_bytes();
         self.append_slice(&bytes)
     }
 
