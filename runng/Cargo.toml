@@ -24,7 +24,6 @@ stats = []
 
 [dependencies]
 backtrace = "0.3"
-byteorder = "1.2"
 futures = "0.1"
 log = "0.4"
 runng_derive = { version = "0.1", path = "../runng_derive" }

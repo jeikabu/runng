@@ -96,8 +96,10 @@ trait InternalSocket {
 }
 
 // Return string and pointer so string isn't dropped
-fn to_cstr(string: &str) -> Result<(std::ffi::CString, *const i8), std::ffi::NulError> {
+fn to_cstr(
+    string: &str,
+) -> Result<(std::ffi::CString, *const std::os::raw::c_char), std::ffi::NulError> {
     let string = std::ffi::CString::new(string)?;
-    let ptr = string.as_bytes_with_nul().as_ptr() as *const i8;
+    let ptr = string.as_bytes_with_nul().as_ptr() as *const std::os::raw::c_char;
     Ok((string, ptr))
 }
