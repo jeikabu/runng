@@ -40,20 +40,18 @@ fn main() -> NngReturn {
         let sock = protocol::Req0::open()?;
         let thread = thread::spawn(move || -> NngReturn {
             let sock = connect(sock, &url, is_dial)?;
-            let msg_builder = handle_data(&matches);
+            let reply = handle_data(&matches)?;
             handle_delay(&matches);
             if let Some(interval) = matches.value_of("interval") {
                 let interval = interval.parse::<u64>().unwrap();
                 loop {
-                    let msg = msg_builder.build()?;
-                    sock.send(msg)?;
+                    sock.send(reply.dup()?)?;
                     let msg = sock.recv()?;
                     handle_received_msg(&matches, msg);
                     thread::sleep(Duration::from_secs(interval));
                 }
             } else {
-                let msg = msg_builder.build()?;
-                sock.send(msg)?;
+                sock.send(reply.dup()?)?;
                 let msg = sock.recv()?;
                 handle_received_msg(&matches, msg);
             }
@@ -68,13 +66,12 @@ fn main() -> NngReturn {
         let sock = protocol::Rep0::open()?;
         let thread = thread::spawn(move || -> NngReturn {
             let sock = connect(sock, &url, is_dial)?;
-            let msg_builder = handle_data(&matches);
+            let reply = handle_data(&matches)?;
             //handle_delay(&matches);
             loop {
                 let msg = sock.recv()?;
                 handle_received_msg(&matches, msg);
-                let msg = msg_builder.build()?;
-                sock.send(msg)?;
+                sock.send(reply.dup()?)?;
             }
         });
         threads.push(thread);
@@ -85,18 +82,16 @@ fn main() -> NngReturn {
         let sock = protocol::Pub0::open()?;
         let thread = thread::spawn(move || -> NngReturn {
             let sock = connect(sock, &url, is_dial)?;
-            let msg_builder = handle_data(&matches);
+            let msg = handle_data(&matches)?;
             handle_delay(&matches);
             if let Some(interval) = matches.value_of("interval") {
                 let interval = interval.parse::<u64>().unwrap();
                 loop {
-                    let msg = msg_builder.build()?;
-                    sock.send(msg)?;
+                    sock.send(msg.dup()?)?;
                     thread::sleep(Duration::from_secs(interval));
                 }
             } else {
-                let msg = msg_builder.build()?;
-                sock.send(msg)?;
+                sock.send(msg.dup()?)?;
             }
 
             Ok(())
@@ -127,18 +122,16 @@ fn main() -> NngReturn {
         let sock = protocol::Push0::open()?;
         let thread = thread::spawn(move || -> NngReturn {
             let sock = connect(sock, &url, is_dial)?;
-            let msg_builder = handle_data(&matches);
+            let msg = handle_data(&matches)?;
             handle_delay(&matches);
             if let Some(interval) = matches.value_of("interval") {
                 let interval = interval.parse::<u64>().unwrap();
                 loop {
-                    let msg = msg_builder.build()?;
-                    sock.send(msg)?;
+                    sock.send(msg.dup()?)?;
                     thread::sleep(Duration::from_secs(interval));
                 }
             } else {
-                let msg = msg_builder.build()?;
-                sock.send(msg)?;
+                sock.send(msg.dup()?)?;
             }
 
             Ok(())
@@ -166,12 +159,12 @@ fn main() -> NngReturn {
     Ok(())
 }
 
-fn handle_data<'a>(matches: &ArgMatches<'a>) -> msg::MsgBuilder {
-    let mut msg_builder = msg::MsgBuilder::default();
+fn handle_data<'a>(matches: &ArgMatches<'a>) -> NngResult<msg::NngMsg> {
+    let mut msg = msg::NngMsg::create()?;
     if let Some(data) = matches.value_of("data") {
-        msg_builder.append_slice(data.as_bytes());
+        msg.append_slice(data.as_bytes());
     }
-    msg_builder
+    Ok(msg)
 }
 
 fn handle_delay<'a>(matches: &ArgMatches<'a>) {

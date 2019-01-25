@@ -41,7 +41,8 @@ impl NngMsg {
         NngMsg { msg }
     }
 
-    pub fn take(mut self) -> *mut nng_msg {
+    /// Take ownership of the contained nng_msg.  You are responsible for calling `nng_msg_free`.
+    pub unsafe fn take(mut self) -> *mut nng_msg {
         let msg = self.msg.msg;
         self.msg.msg = ptr::null_mut();
         msg
@@ -79,7 +80,11 @@ impl NngMsg {
         unsafe { nng_msg_len(self.msg()) == 0 }
     }
 
-    pub fn append(&mut self, data: *const u8, size: usize) -> NngReturn {
+    pub fn append_slice(&mut self, data: &[u8]) -> NngReturn {
+        self.append_ptr(data.as_ptr(), data.len())
+    }
+
+    pub fn append_ptr(&mut self, data: *const u8, size: usize) -> NngReturn {
         unsafe { NngFail::from_i32(nng_msg_append(self.msg(), data as *const c_void, size)) }
     }
 
@@ -143,5 +148,11 @@ impl NngMsg {
         unsafe {
             nng_msg_set_pipe(self.msg(), pipe.nng_pipe());
         }
+    }
+}
+
+impl Clone for NngMsg {
+    fn clone(&self) -> Self {
+        self.dup().unwrap()
     }
 }
