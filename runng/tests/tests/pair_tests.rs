@@ -119,7 +119,8 @@ fn pair1_poly() -> NngReturn {
         let thread = thread::spawn(move || -> NngReturn {
             let mut ctx = socket.dial(&url)?.create_async_context()?;
             // Send message containing identifier
-            let msg = msg::MsgBuilder::default().append_u32(i).build()?;
+            let mut msg = msg::NngMsg::create()?;
+            msg.append_u32(i)?;
             ctx.send(msg).wait().unwrap();
             // Receive reply and make sure it has same identifier
             let res = ctx

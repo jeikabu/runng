@@ -4,8 +4,9 @@ use runng::{protocol::*, *};
 use std::{thread, time::Duration};
 
 fn request_reply(requester: &mut AsyncRequestContext, request_bytes: usize) -> NngReturn {
-    let mut data = vec![0; request_bytes];
-    let msg = msg::MsgBuilder::default().append_vec(&mut data).build()?;
+    let data = vec![0; request_bytes];
+    let mut msg = msg::NngMsg::create()?;
+    msg.append_slice(&data)?;
     let req_future = requester.send(msg);
     req_future.wait().unwrap()?;
     Ok(())
