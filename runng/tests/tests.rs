@@ -12,7 +12,7 @@ mod tests {
 
     use crate::common::get_url;
     use futures::{future, future::Future, Stream};
-    use runng::{protocol::*, *};
+    use runng::{asyncio::*, protocol::*, *};
     use std::{thread, time::Duration};
 
     #[test]
@@ -66,7 +66,7 @@ mod tests {
         let num_msg_per_subscriber = 4;
 
         let sub_thread = thread::spawn(move || -> NngReturn {
-            let mut sub_ctx = subscriber.create_async_context()?;
+            let mut sub_ctx = subscriber.create_async_stream()?;
             let topic: Vec<u8> = vec![0; 4];
             sub_ctx.subscribe(topic.as_slice())?;
 
@@ -91,7 +91,7 @@ mod tests {
             Ok(())
         });
         let pub_thread = thread::spawn(move || -> NngReturn {
-            let mut pub_ctx = publisher.create_async_context()?;
+            let mut pub_ctx = publisher.create_async()?;
 
             // Beginning of message body contains topic
             let mut msg = msg::NngMsg::create()?;
@@ -131,8 +131,8 @@ mod tests {
 
         // Broker
         thread::spawn(move || -> NngReturn {
-            let mut broker_pull_ctx = broker_pull.create_async_context()?;
-            let mut broker_push_ctx = broker_push.create_async_context()?;
+            let mut broker_pull_ctx = broker_pull.create_async_stream()?;
+            let mut broker_push_ctx = broker_push.create_async()?;
             broker_pull_ctx
                 .receive()
                 .unwrap()
@@ -153,7 +153,7 @@ mod tests {
 
         // Subscriber
         thread::spawn(move || -> NngReturn {
-            let mut sub_ctx = subscriber.create_async_context()?;
+            let mut sub_ctx = subscriber.create_async_stream()?;
 
             let topic: Vec<u8> = vec![0; 4];
             sub_ctx.subscribe(topic.as_slice())?;
@@ -181,7 +181,7 @@ mod tests {
 
         // Publisher
         thread::spawn(move || -> NngReturn {
-            let mut pub_ctx = publisher.create_async_context()?;
+            let mut pub_ctx = publisher.create_async()?;
             for _ in 0..10 {
                 let mut msg = msg::NngMsg::create()?;
                 msg.append_u32(0)?; // topic

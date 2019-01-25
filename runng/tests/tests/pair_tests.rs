@@ -5,7 +5,7 @@ use futures::{
 };
 use futures_timer::Delay;
 use log::{debug, info};
-use runng::{protocol::*, *};
+use runng::{asyncio::*, protocol::*, *};
 use std::{
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -16,7 +16,7 @@ use std::{
 };
 
 fn forward(
-    ctx: &mut AsyncPairContext,
+    ctx: &mut PairStreamHandle,
     msg: Result<msg::NngMsg, NngFail>,
 ) -> impl IntoFuture<Item = (), Error = ()> {
     // Increment value.  If larger than some value send a stop message and return Err to stop for_each().  Otherwise forware it.
@@ -40,12 +40,12 @@ fn pair() -> NngReturn {
     let b = factory.pair_open()?.dial(&url)?;
 
     let a_thread = thread::spawn(move || -> NngReturn {
-        let mut ctx = a.create_async_context()?;
+        let mut ctx = a.create_async_stream()?;
         // Send the first (0th) message
         let mut msg = msg::NngMsg::create()?;
         msg.append_u32(0);
         ctx.send(msg).wait()?;
-        let stream = ctx
+        let _stream = ctx
             .receive()
             .unwrap()
             .take_while(not_stop_message)
@@ -56,7 +56,7 @@ fn pair() -> NngReturn {
         Ok(())
     });
     let b_thread = thread::spawn(move || -> NngReturn {
-        let mut ctx = b.create_async_context()?;
+        let mut ctx = b.create_async_stream()?;
         ctx.receive()
             .unwrap()
             .take_while(not_stop_message)
@@ -89,7 +89,7 @@ fn pair1_poly() -> NngReturn {
     {
         let url = url.clone();
         let thread = thread::spawn(move || -> NngReturn {
-            let mut ctx = a.listen(&url)?.create_async_context()?;
+            let mut ctx = a.listen(&url)?.create_async_stream()?;
             ctx.receive()
                 .unwrap()
                 .take_while(not_stop_message)
@@ -117,7 +117,7 @@ fn pair1_poly() -> NngReturn {
         let url = url.clone();
         let socket = b.clone();
         let thread = thread::spawn(move || -> NngReturn {
-            let mut ctx = socket.dial(&url)?.create_async_context()?;
+            let mut ctx = socket.dial(&url)?.create_async_stream()?;
             // Send message containing identifier
             let mut msg = msg::NngMsg::create()?;
             msg.append_u32(i)?;
@@ -134,9 +134,9 @@ fn pair1_poly() -> NngReturn {
                     _ => Err(()),
                 })
                 .wait();
-            let res = if let Ok((msg, stream)) = res {
+            let res = if let Ok((msg, _stream)) = res {
                 let mut msg = msg.unwrap().unwrap();
-                let reply = msg.trim_u32().unwrap();
+                let _reply = msg.trim_u32().unwrap();
                 //TODO: this logic may not be correct.  The listener may not be able to send a reply to the sender via the pipe
                 //https://github.com/nanomsg/nng/issues/862
                 // if i == reply {

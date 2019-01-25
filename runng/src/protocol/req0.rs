@@ -1,6 +1,7 @@
 //! Request/reply pattern.
 
 use super::*;
+use crate::asyncio::*;
 use runng_sys::*;
 
 /// Request half of request/reply pattern.  See [nng_req](https://nanomsg.github.io/nng/man/v1.1.0/nng_req.7).
@@ -33,5 +34,5 @@ impl SendMsg for Req0 {}
 impl RecvMsg for Req0 {}
 
 impl AsyncSocket for Req0 {
-    type ContextType = AsyncRequestContext;
+    type ContextType = RequestAsyncHandle;
 }
