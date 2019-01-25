@@ -23,7 +23,8 @@ fn pushpull() -> NngReturn {
         let mut push_ctx = pusher.create_async_context()?;
         // Send messages
         for i in 0..count {
-            let msg = msg::MsgBuilder::default().append_u32(i).build()?;
+            let mut msg = msg::NngMsg::create()?;
+            msg.append_u32(i)?;
             push_ctx.send(msg).wait().unwrap()?;
         }
         // Send a stop message

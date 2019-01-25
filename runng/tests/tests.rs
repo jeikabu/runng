@@ -94,10 +94,9 @@ mod tests {
             let mut pub_ctx = publisher.create_async_context()?;
 
             // Beginning of message body contains topic
-            let msg = msg::MsgBuilder::default()
-                .append_u32(0) // topic
-                .append_u32(1)
-                .build()?;
+            let mut msg = msg::NngMsg::create()?;
+            msg.append_u32(0)?; // topic
+            msg.append_u32(1)?;
 
             for _ in 0..num_msg_per_subscriber {
                 let msg = msg.dup()?;
@@ -106,9 +105,8 @@ mod tests {
             }
 
             // Send stop message
-            let msg = msg::MsgBuilder::default()
-                .append_u32(0) // topic
-                .build()?;
+            let mut msg = msg::NngMsg::create()?;
+            msg.append_u32(0)?; // topic
             pub_ctx.send(msg).wait().unwrap()?;
             Ok(())
         });
