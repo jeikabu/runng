@@ -1,5 +1,5 @@
 //! Socket basics
-//! 
+//!
 //! Instantiating any of the various "protocols" creates a socket.
 //! A socket may be cloned and it will increase the reference count of the underlying `nng_socket`.
 //! Depending on the gurantees of the originating protocol, simultaneous use of the socket __may not be safe__.

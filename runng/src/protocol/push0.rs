@@ -1,6 +1,7 @@
 //! Push/pull ("pipeline") pattern.
 
 use super::*;
+use crate::asyncio::*;
 use runng_sys::*;
 
 /// Push half of push/pull ("pipeline") pattern.  See [nng_push](https://nanomsg.github.io/nng/man/v1.1.0/nng_push.7).
@@ -32,5 +33,5 @@ impl Listen for Push0 {}
 impl SendMsg for Push0 {}
 
 impl AsyncSocket for Push0 {
-    type ContextType = AsyncPushContext;
+    type ContextType = PushAsyncHandle;
 }

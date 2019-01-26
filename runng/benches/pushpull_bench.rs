@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion, ParameterizedBenchmark, Throughput};
 use futures::{future::Future, Stream};
-use runng::{protocol::*, *};
+use runng::{asyncio::*, protocol::*, *};
 use std::{
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -17,16 +17,13 @@ fn nng_pushpull(crit: &mut Criterion, url: &str) -> NngReturn {
 
     // Replier
     let factory = Latest::default();
-    let mut pusher = factory
-        .pusher_open()?
-        .listen(&url)?
-        .create_async_context()?;
+    let mut pusher = factory.pusher_open()?.listen(&url)?.create_async()?;
 
-    let mut puller = factory.puller_open()?.dial(&url)?.create_async_context()?;
+    let mut puller = factory.puller_open()?.dial(&url)?.create_async_stream()?;
 
     let recv_count = Arc::new(AtomicUsize::new(0));
     let thread_count = recv_count.clone();
-    let thread = thread::spawn(move || {
+    let _thread = thread::spawn(move || {
         while thread_count.load(Ordering::Relaxed) == 0 {
             let push_future = pusher.send(msg::NngMsg::create().unwrap());
             push_future.wait().unwrap().unwrap();

@@ -2,12 +2,12 @@
 
 use crate::{
     aio::{AioCallbackArg, NngAio},
+    asyncio::*,
     ctx::NngCtx,
     msg::NngMsg,
-    protocol::AsyncContext,
     *,
 };
-use futures::sync::oneshot::{channel, Receiver, Sender};
+use futures::sync::oneshot;
 use log::{debug, info};
 use runng_sys::*;
 
@@ -21,7 +21,7 @@ enum RequestState {
 struct RequestContextAioArg {
     ctx: NngCtx,
     state: RequestState,
-    sender: Option<Sender<NngResult<NngMsg>>>,
+    sender: Option<oneshot::Sender<NngResult<NngMsg>>>,
 }
 
 impl RequestContextAioArg {
@@ -34,7 +34,7 @@ impl RequestContextAioArg {
         };
         NngAio::register_aio(arg, request_callback)
     }
-    pub fn send(&mut self, msg: NngMsg, sender: Sender<NngResult<NngMsg>>) {
+    pub fn send(&mut self, msg: NngMsg, sender: oneshot::Sender<NngResult<NngMsg>>) {
         if self.state != RequestState::Ready {
             panic!();
         }
@@ -62,11 +62,11 @@ impl Aio for RequestContextAioArg {
 }
 
 /// Asynchronous context for request socket.
-pub struct AsyncRequestContext {
+pub struct RequestAsyncHandle {
     aio_arg: Box<RequestContextAioArg>,
 }
 
-impl AsyncContext for AsyncRequestContext {
+impl AsyncContext for RequestAsyncHandle {
     fn create(socket: NngSocket) -> NngResult<Self> {
         let aio_arg = RequestContextAioArg::create(socket)?;
         let ctx = Self { aio_arg };
@@ -77,12 +77,12 @@ impl AsyncContext for AsyncRequestContext {
 /// Trait for asynchronous contexts that can send a request and receive a reply.
 pub trait AsyncRequest {
     /// Asynchronously send a request and return a future for the reply.
-    fn send(&mut self, msg: NngMsg) -> Receiver<NngResult<NngMsg>>;
+    fn send(&mut self, msg: NngMsg) -> oneshot::Receiver<NngResult<NngMsg>>;
 }
 
-impl AsyncRequest for AsyncRequestContext {
-    fn send(&mut self, msg: NngMsg) -> Receiver<NngResult<NngMsg>> {
-        let (sender, receiver) = channel::<NngResult<NngMsg>>();
+impl AsyncRequest for RequestAsyncHandle {
+    fn send(&mut self, msg: NngMsg) -> oneshot::Receiver<NngResult<NngMsg>> {
+        let (sender, receiver) = oneshot::channel::<NngResult<NngMsg>>();
         self.aio_arg.send(msg, sender);
         receiver
     }

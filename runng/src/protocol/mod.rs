@@ -18,55 +18,10 @@ pub use self::rep0::*;
 pub use self::req0::*;
 pub use self::sub0::*;
 
-pub mod pair;
-pub mod publish;
-pub mod pull;
-pub mod reply;
-pub mod request;
-
-pub use self::pair::*;
-pub use self::publish::*;
-pub use self::pull::*;
-pub use self::reply::*;
-pub use self::request::*;
-
-use futures::{sync::mpsc, Sink};
-
 use crate::{msg::NngMsg, *};
 use runng_sys::*;
-
-/// A `Socket` that can be turned into a context for asynchronous I/O.
-///
-/// # Examples
-/// ```
-/// use runng::{
-///     *,
-///     protocol::AsyncSocket,
-/// };
-/// fn test() -> Result<(), NngFail> {
-///     let factory = Latest::default();
-///     let pusher = factory.pusher_open()?.listen("inproc://test")?;
-///     let mut push_ctx = pusher.create_async_context()?;
-///     Ok(())
-/// }
-/// ```
-pub trait AsyncSocket: Socket {
-    /// The type of aynchronous context produced
-    type ContextType: AsyncContext;
-
-    /// Turns the `Socket` into an asynchronous context
-    fn create_async_context(&self) -> NngResult<Self::ContextType> {
-        let socket = self.socket().clone();
-        let ctx = Self::ContextType::create(socket)?;
-        Ok(ctx)
-    }
-}
-
-/// Context for asynchrounous I/O.
-pub trait AsyncContext: Sized {
-    /// Create a new asynchronous context using specified socket.
-    fn create(socket: NngSocket) -> NngResult<Self>;
-}
+use runng_sys::*;
+use std::{collections::VecDeque, sync::Mutex};
 
 pub trait Subscribe {
     fn subscribe(&self, topic: &[u8]) -> NngReturn;
@@ -88,20 +43,7 @@ where
     })
 }
 
-fn try_signal_complete(sender: &mut mpsc::Sender<NngResult<NngMsg>>, message: NngResult<NngMsg>) {
-    let res = sender.try_send(message);
-    if let Err(err) = res {
-        if err.is_disconnected() {
-            let message = err.into_inner();
-            debug!("mpsc::disconnected {:?}", message);
-            sender.close().unwrap();
-        } else {
-            debug!("mpsc::send failed {}", err);
-        }
-    }
-}
-
-fn subscribe(socket: nng_socket, topic: &[u8]) -> NngReturn {
+pub(crate) fn subscribe(socket: nng_socket, topic: &[u8]) -> NngReturn {
     unsafe {
         let opt = NNG_OPT_SUB_SUBSCRIBE.as_ptr() as *const ::std::os::raw::c_char;
         let topic_ptr = topic.as_ptr() as *const ::std::os::raw::c_void;

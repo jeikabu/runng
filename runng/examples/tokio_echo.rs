@@ -12,7 +12,7 @@ use clap::{App, Arg, ArgMatches};
 use env_logger::{Builder, Env};
 use futures::{future::lazy, Future, Stream};
 use log::info;
-use runng::{protocol::*, *};
+use runng::{asyncio::*, protocol::*, *};
 
 fn main() -> NngReturn {
     Builder::from_env(Env::default().default_filter_or("debug"))
@@ -46,12 +46,12 @@ fn get_matches<'a>() -> ArgMatches<'a> {
         .get_matches()
 }
 
-fn create_echo<'a>(matches: &ArgMatches<'a>) -> NngResult<AsyncReplyContext> {
+fn create_echo<'a>(matches: &ArgMatches<'a>) -> NngResult<ReplyStreamHandle> {
     let url = matches.value_of("listen").unwrap();
     let factory = Latest::default();
     let replier = factory
         .replier_open()?
         .listen(&url)?
-        .create_async_context()?;
+        .create_async_stream()?;
     Ok(replier)
 }

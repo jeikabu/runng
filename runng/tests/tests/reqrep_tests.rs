@@ -1,7 +1,7 @@
 use crate::common::{create_stop_message, get_url, not_stop_message};
 use futures::{future, future::Future, Stream};
 use log::{debug, info};
-use runng::{protocol::*, *};
+use runng::{asyncio::*, protocol::*, *};
 use std::{
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -26,19 +26,15 @@ fn example_basic() -> NngReturn {
 
 #[test]
 fn example_async() -> NngReturn {
-    info!("async");
     let url = get_url();
 
     let factory = Latest::default();
     let mut rep_ctx = factory
         .replier_open()?
         .listen(&url)?
-        .create_async_context()?;
+        .create_async_stream()?;
 
-    let mut req_ctx = factory
-        .requester_open()?
-        .dial(&url)?
-        .create_async_context()?;
+    let mut req_ctx = factory.requester_open()?.dial(&url)?.create_async()?;
     let req_future = req_ctx.send(msg::NngMsg::create()?);
     rep_ctx
         .receive()
@@ -66,7 +62,7 @@ fn contexts() -> NngReturn {
     let mut rep_ctx = factory
         .replier_open()?
         .listen(&url)?
-        .create_async_context()?;
+        .create_async_stream()?;
     let rep_recv_count = recv_count.clone();
     let rep = thread::spawn(move || -> NngReturn {
         rep_ctx
@@ -86,14 +82,14 @@ fn contexts() -> NngReturn {
     });
 
     // Requesters share a socket
-    let mut req_socket = factory.requester_open()?.dial(&url)?;
+    let req_socket = factory.requester_open()?.dial(&url)?;
     const NUM_REQUESTERS: u32 = 2;
     const NUM_REQUESTS: u32 = 100;
     let mut threads = vec![];
     for _ in 0..NUM_REQUESTERS {
-        let mut socket_clone = req_socket.clone();
+        let socket_clone = req_socket.clone();
         let req = thread::spawn(move || -> NngReturn {
-            let mut req_ctx = socket_clone.create_async_context()?;
+            let mut req_ctx = socket_clone.create_async()?;
             for i in 0..NUM_REQUESTS {
                 let mut msg = msg::NngMsg::create()?;
                 msg.append_u32(i)?;
@@ -108,7 +104,7 @@ fn contexts() -> NngReturn {
         .for_each(|thread| thread.join().unwrap().unwrap());
 
     // Send stop message so repier exits
-    let mut req_ctx = req_socket.create_async_context()?;
+    let mut req_ctx = req_socket.create_async()?;
     // Call close() to "handle" the oneshot Receiver because the replier won't actually reply
     req_ctx.send(create_stop_message()).close();
     rep.join().unwrap()?;

@@ -1,6 +1,6 @@
 use crate::common::{create_stop_message, get_url, not_stop_message};
 use futures::{future, future::Future, Stream};
-use runng::{protocol::*, *};
+use runng::{asyncio::*, protocol::*, *};
 use std::{
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -20,7 +20,7 @@ fn pushpull() -> NngReturn {
 
     // Pusher
     let push_thread = thread::spawn(move || -> NngReturn {
-        let mut push_ctx = pusher.create_async_context()?;
+        let mut push_ctx = pusher.create_async()?;
         // Send messages
         for i in 0..count {
             let mut msg = msg::NngMsg::create()?;
@@ -36,7 +36,7 @@ fn pushpull() -> NngReturn {
     let recv_count = Arc::new(AtomicUsize::new(0));
     let thread_count = recv_count.clone();
     let pull_thread = thread::spawn(move || -> NngReturn {
-        let mut pull_ctx = puller.create_async_context()?;
+        let mut pull_ctx = puller.create_async_stream()?;
         pull_ctx
             .receive()
             .unwrap()
@@ -61,6 +61,54 @@ fn pushpull() -> NngReturn {
     Ok(())
 }
 
+#[test]
+fn read() -> NngReturn {
+    let url = get_url();
+    let factory = Latest::default();
+
+    let pusher = factory.pusher_open()?.listen(&url)?;
+    let puller = factory.puller_open()?.dial(&url)?;
+    let count = 4;
+
+    // Pusher
+    let push_thread = thread::spawn(move || -> NngReturn {
+        let mut push_ctx = pusher.create_async()?;
+        // Send messages
+        for i in 0..count {
+            let mut msg = msg::NngMsg::create()?;
+            msg.append_u32(i)?;
+            push_ctx.send(msg).wait().unwrap()?;
+        }
+        // Send a stop message
+        push_ctx.send(create_stop_message()).wait().unwrap()?;
+        Ok(())
+    });
+
+    // Puller
+    let recv_count = Arc::new(AtomicUsize::new(0));
+    let thread_count = recv_count.clone();
+    let pull_thread = thread::spawn(move || -> NngReturn {
+        let mut read_ctx = puller.create_async()?;
+        loop {
+            let msg = read_ctx.receive().wait()??;
+            if msg.is_empty() {
+                break;
+            } else {
+                thread_count.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+        Ok(())
+    });
+
+    push_thread.join().unwrap()?;
+    pull_thread.join().unwrap()?;
+
+    // Received number of messages we sent
+    assert_eq!(recv_count.load(Ordering::Relaxed), count as usize);
+
+    Ok(())
+}
+
 // #[test]
 // fn crash() -> NngReturn {
 //     let url = get_url();
@@ -71,7 +119,7 @@ fn pushpull() -> NngReturn {
 
 //     // Pusher
 //     let push_thread = thread::spawn(move || -> NngReturn {
-//         let mut push_ctx = pusher.create_async_context()?;
+//         let mut push_ctx = pusher.create_async()?;
 //         // Send messages
 //         loop {
 //             let msg = msg::NngMsg::create()?;
@@ -84,7 +132,7 @@ fn pushpull() -> NngReturn {
 //     let recv_count = Arc::new(AtomicUsize::new(0));
 //     let thread_count = recv_count.clone();
 //     let pull_thread = thread::spawn(move || -> NngReturn {
-//         puller.create_async_context()?
+//         puller.create_async()?
 //             .receive().unwrap()
 //             .for_each(|msg| {
 //                 debug!("Pulled: {:?}", msg);

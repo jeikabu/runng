@@ -1,9 +1,9 @@
 use criterion::{criterion_group, criterion_main, Criterion, ParameterizedBenchmark, Throughput};
 use futures::{future::Future, Stream};
-use runng::{protocol::*, *};
+use runng::{asyncio::*, protocol::*, *};
 use std::{thread, time::Duration};
 
-fn request_reply(requester: &mut AsyncRequestContext, request_bytes: usize) -> NngReturn {
+fn request_reply(requester: &mut RequestAsyncHandle, request_bytes: usize) -> NngReturn {
     let data = vec![0; request_bytes];
     let mut msg = msg::NngMsg::create()?;
     msg.append_slice(&data)?;
@@ -21,7 +21,7 @@ fn nng_reqrep(crit: &mut Criterion, url: &str) -> NngReturn {
     let mut rep_ctx = factory
         .replier_open()?
         .listen(&url)?
-        .create_async_context()?;
+        .create_async_stream()?;
     thread::spawn(move || -> NngReturn {
         let rep_future = rep_ctx.receive().unwrap().for_each(|_request| {
             let msg = msg::NngMsg::create().unwrap();
@@ -32,10 +32,7 @@ fn nng_reqrep(crit: &mut Criterion, url: &str) -> NngReturn {
         Ok(())
     });
 
-    let mut requester = factory
-        .requester_open()?
-        .dial(&url)?
-        .create_async_context()?;
+    let mut requester = factory.requester_open()?.dial(&url)?.create_async()?;
 
     let benchmark = ParameterizedBenchmark::new(
         format!("reqrep({})", url),
