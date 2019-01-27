@@ -23,8 +23,7 @@ use futures::{sync::mpsc, Sink};
 use crate::{msg::NngMsg, *};
 use futures::{future, future::Future, sync::oneshot};
 use runng_sys::*;
-use runng_sys::*;
-use std::{collections::VecDeque, sync::Mutex};
+use std::{collections::VecDeque};
 
 /// A `Socket` that can be turned into a context for asynchronous I/O.
 ///

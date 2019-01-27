@@ -1,16 +1,11 @@
 use crate::common::{create_stop_message, get_url, not_stop_message};
 use futures::{
     future::{Either, Future, IntoFuture},
-    stream::{once, Stream},
+    stream::Stream,
 };
 use futures_timer::Delay;
-use log::{debug, info};
-use runng::{asyncio::*, protocol::*, *};
+use runng::{asyncio::*, *};
 use std::{
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
     thread,
     time::Duration,
 };

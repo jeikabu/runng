@@ -18,8 +18,7 @@ pub use self::rep0::*;
 pub use self::req0::*;
 pub use self::sub0::*;
 
-use crate::{msg::NngMsg, *};
-use runng_sys::*;
+use crate::*;
 use runng_sys::*;
 use std::{collections::VecDeque, sync::Mutex};
 
