@@ -4,15 +4,14 @@ Runtime statistics
 Statistics are organized as a tree.  Starting at the root, nodes may have a child whose siblings are likewise children of the parent.
 
 The lifetime of the children is bound to that of the root.  This won't compile:
-```no_compile
-use log::{debug};
-use runng::{stats::{NngStat, NngStatChild, NngStatRoot}};
+```compile_fail
+use runng::stats::*;
 let mut child: Option<NngStatChild> = None;
 {
-    let root = NngStatRoot::new().unwrap();
+    let root = NngStatRoot::create().unwrap();
     child = root.child();
 }
-debug!("Name = {}", child.unwrap().name().unwrap());
+println!("Name = {}", child.unwrap().name().unwrap());
 ```
 
 ## Examples
@@ -117,8 +116,8 @@ pub trait NngStat {
 
 /* Root of tree of statistics snapshot.
 ## Examples
-```rust,no_run
-use runng::{stats::NngStat, stats::NngStatRoot};
+```rust
+# use runng::stats::*;
 let child = NngStatRoot::new().unwrap().child();
 ```
 */
