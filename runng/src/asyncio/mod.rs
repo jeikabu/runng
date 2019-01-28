@@ -22,7 +22,7 @@ use futures::{sync::mpsc, Sink};
 
 use crate::{msg::NngMsg, *};
 use futures::{future, future::Future, sync::oneshot};
-use std::{collections::VecDeque};
+use std::collections::VecDeque;
 
 /// Context for asynchrounous I/O.
 pub trait AsyncContext: Sized {
@@ -104,8 +104,11 @@ impl WorkQueue {
     }
 }
 
-
-trait NngSink: Sink<SinkItem=NngResult<NngMsg>, SinkError=mpsc::SendError<NngResult<NngMsg>>>
-{}
-impl<T: Sink<SinkItem=NngResult<NngMsg>, SinkError=mpsc::SendError<NngResult<NngMsg>>>> NngSink for T
-{}
+trait NngSink:
+    Sink<SinkItem = NngResult<NngMsg>, SinkError = mpsc::SendError<NngResult<NngMsg>>>
+{
+}
+impl<T: Sink<SinkItem = NngResult<NngMsg>, SinkError = mpsc::SendError<NngResult<NngMsg>>>> NngSink
+    for T
+{
+}

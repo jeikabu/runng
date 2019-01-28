@@ -5,10 +5,7 @@ use futures::{
 };
 use futures_timer::Delay;
 use runng::{asyncio::*, *};
-use std::{
-    thread,
-    time::Duration,
-};
+use std::{thread, time::Duration};
 
 fn forward(
     ctx: &mut PairStreamHandle,

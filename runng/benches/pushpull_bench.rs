@@ -13,7 +13,7 @@ use std::{
 fn latency(crit: &mut Criterion, url: &str) -> NngReturn {
     let url = url.to_owned();
 
-    let parameters: Vec<usize> = vec![0, 128, 1024, 4*1024, 16*1024];
+    let parameters: Vec<usize> = vec![0, 128, 1024, 4 * 1024, 16 * 1024];
 
     let factory = Latest::default();
     let mut pusher = factory.pusher_open()?.listen(&url)?.create_async()?;

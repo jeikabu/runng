@@ -5,7 +5,7 @@ use std::{thread, time::Duration};
 
 fn nng_reqrep(crit: &mut Criterion, url: &str) -> NngReturn {
     let url = url.to_owned();
-    let parameters: Vec<usize> = vec![0, 128, 1024, 4*1024, 16*1024];
+    let parameters: Vec<usize> = vec![0, 128, 1024, 4 * 1024, 16 * 1024];
 
     let factory = Latest::default();
     let mut replier = factory.replier_open()?.listen(&url)?.create_async()?;
