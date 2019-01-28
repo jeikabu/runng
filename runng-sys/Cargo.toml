@@ -24,6 +24,8 @@ vs2017 = [] # Visual Studio 15 2017 Win64
 stats = []
 # Enable TLS (requires mbedTLS)
 tls = []
+# Enable using bindgen to regenerated `bindings.rs` (requires clang)
+regen_bindings = []
 
 [build-dependencies]
 cmake = "0.1"

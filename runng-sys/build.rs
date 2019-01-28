@@ -42,16 +42,22 @@ fn main() {
     // Tell rustc to use nng static library
     println!("cargo:rustc-link-lib=static=nng");
 
-    // https://rust-lang-nursery.github.io/rust-bindgen
-    // https://docs.rs/bindgen
-    let bindings = bindgen::Builder::default()
-        .header("wrapper.h")
-        // This is needed if use `#include <nng.h>` instead of `#include "path/nng.h"`
-        //.clang_arg("-Inng/src/")
-        .generate()
-        .expect("Unable to generate bindings");
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
-    bindings
-        .write_to_file(out_path.join("bindings.rs"))
-        .expect("Couldn't write bindings");
+    let bindings_filename = "bindings.rs";
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap())
+        .join(bindings_filename);
+    if cfg!(feature = "regen_bindings") {
+        // https://rust-lang-nursery.github.io/rust-bindgen
+        // https://docs.rs/bindgen
+        let bindings = bindgen::Builder::default()
+            .header("wrapper.h")
+            // This is needed if use `#include <nng.h>` instead of `#include "path/nng.h"`
+            //.clang_arg("-Inng/src/")
+            .generate()
+            .expect("Unable to generate bindings");
+        bindings
+            .write_to_file(bindings_filename)
+            .expect(&format!("Couldn't write {}", bindings_filename));
+    }
+    std::fs::copy(bindings_filename, out_path.to_owned())
+        .expect(&format!("Unable to copy {} to {:?}", bindings_filename, out_path));
 }
