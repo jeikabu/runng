@@ -42,9 +42,14 @@ fn main() {
     // Tell rustc to use nng static library
     println!("cargo:rustc-link-lib=static=nng");
 
-    let bindings_filename = "bindings.rs";
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap())
-        .join(bindings_filename);
+    let target_os_arch = format!(
+        "{}-{}.rs",
+        env::var("CARGO_CFG_TARGET_OS").unwrap(),
+        env::var("CARGO_CFG_TARGET_ARCH").unwrap()
+    );
+    let bindings_subdir = "bindings";
+    let in_path = PathBuf::from(bindings_subdir).join(target_os_arch);
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap()).join("bindings.rs");
     if cfg!(feature = "regen_bindings") {
         // https://rust-lang-nursery.github.io/rust-bindgen
         // https://docs.rs/bindgen
@@ -54,10 +59,12 @@ fn main() {
             //.clang_arg("-Inng/src/")
             .generate()
             .expect("Unable to generate bindings");
+        std::fs::create_dir_all(bindings_subdir.to_owned())
+            .expect("Unable to create binding subdirectory");
         bindings
-            .write_to_file(bindings_filename)
-            .expect(&format!("Couldn't write {}", bindings_filename));
+            .write_to_file(in_path.to_owned())
+            .expect(&format!("Couldn't write {:?}", in_path));
     }
-    std::fs::copy(bindings_filename, out_path.to_owned())
-        .expect(&format!("Unable to copy {} to {:?}", bindings_filename, out_path));
+    std::fs::copy(in_path.to_owned(), out_path.to_owned())
+        .expect(&format!("Unable to copy {:?} to {:?}", in_path, out_path));
 }

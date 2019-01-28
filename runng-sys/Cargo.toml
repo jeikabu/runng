@@ -16,7 +16,7 @@ appveyor = { repository = "jake-ruyi/runng", branch = "master", service = "githu
 travis-ci = { repository = "jeikabu/runng", branch = "master" }
 
 [features]
-default = ["stats"]
+default = ["stats", "regen_bindings"]
 # Cmake generators
 ninja = [] # Ninja
 vs2017 = [] # Visual Studio 15 2017 Win64
