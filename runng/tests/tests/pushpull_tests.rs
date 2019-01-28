@@ -36,7 +36,7 @@ fn pushpull() -> NngReturn {
     let recv_count = Arc::new(AtomicUsize::new(0));
     let thread_count = recv_count.clone();
     let pull_thread = thread::spawn(move || -> NngReturn {
-        let mut pull_ctx = puller.create_async_stream()?;
+        let mut pull_ctx = puller.create_async_stream(1)?;
         pull_ctx
             .receive()
             .unwrap()

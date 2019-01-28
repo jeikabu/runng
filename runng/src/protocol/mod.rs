@@ -20,7 +20,6 @@ pub use self::sub0::*;
 
 use crate::*;
 use runng_sys::*;
-use std::{collections::VecDeque, sync::Mutex};
 
 pub trait Subscribe {
     fn subscribe(&self, topic: &[u8]) -> NngReturn;

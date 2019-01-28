@@ -43,7 +43,7 @@ fn aio() -> NngReturn {
     let mut rep_ctx = factory
         .replier_open()?
         .listen(&url)?
-        .create_async_stream()?;
+        .create_async_stream(1)?;
 
     let mut req_ctx = factory
         .requester_open()?

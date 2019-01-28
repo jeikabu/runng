@@ -81,9 +81,9 @@ pub struct ReplyStreamHandle {
     receiver: Option<mpsc::Receiver<NngResult<NngMsg>>>,
 }
 
-impl AsyncContext for ReplyStreamHandle {
-    fn create(socket: NngSocket) -> NngResult<Self> {
-        let (sender, receiver) = mpsc::channel(1024);
+impl AsyncStreamContext for ReplyStreamHandle {
+    fn create(socket: NngSocket, buffer: usize) -> NngResult<Self> {
+        let (sender, receiver) = mpsc::channel(buffer);
         let aio_arg = ReplyContextAioArg::create(socket, sender)?;
         let receiver = Some(receiver);
         let ctx = Self { aio_arg, receiver };
