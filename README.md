@@ -25,17 +25,16 @@ runng = "0.1"
 runng-sys = "1.1.1-rc"
 ```
 
+Requirements:
+- [cmake](https://cmake.org/) in `PATH`
+    - On Linux/macOS: default generator is "Unix Makefiles" and should _just work_
+    - On Windows: default generator is [ninja](https://ninja-build.org/) and must also be in `PATH`
+- [libclang](https://rust-lang.github.io/rust-bindgen/requirements.html)
+
 ## Build
 
 1. Update submodules: `git submodule update --init --recursive`
-1. Add [cmake](https://cmake.org) to `PATH`
-    - On Linux/macOS: default generator is "Unix Makefiles"
-    - On Windows: default generator is [ninja](https://ninja-build.org/) and must also be in `PATH`
+1. Install requirements
 1. `cargo build`
-
-Once [cargo issue #4942 is resolved](https://github.com/rust-lang/cargo/issues/4942) will also be able to build with `ninja` feature ([recommended by NNG](https://github.com/nanomsg/nng#requirements)).  Currently, can:
-1. Add [ninja](https://ninja-build.org/) to `PATH`
-1. `cd runng-sys`
-1. `cargo build --features ninja`
 
 To build optional packages: `cargo build --all`

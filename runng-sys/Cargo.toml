@@ -16,16 +16,15 @@ appveyor = { repository = "jake-ruyi/runng", branch = "master", service = "githu
 travis-ci = { repository = "jeikabu/runng", branch = "master" }
 
 [features]
-default = ["stats", "regen_bindings"]
+default = ["nng-stats"]
 # Cmake generators
-ninja = [] # Ninja
-vs2017 = [] # Visual Studio 15 2017 Win64
+cmake-ninja = [] # Ninja
+cmake-vs2017 = [] # Visual Studio 15 2017
+cmake-vs2017-win64 = [] # Visual Studio 15 2017 Win64
 # Enable NNG stats
-stats = []
+nng-stats = []
 # Enable TLS (requires mbedTLS)
-tls = []
-# Enable using bindgen to regenerated `bindings.rs` (requires clang)
-regen_bindings = []
+nng-tls = []
 
 [build-dependencies]
 cmake = "0.1"
