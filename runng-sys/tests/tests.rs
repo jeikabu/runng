@@ -7,7 +7,7 @@ mod tests {
     #[test]
     fn example() {
         unsafe {
-            let url = CString::new("inproc://test").unwrap();
+            let url = CString::new("inproc://runng-sys/tests/example").unwrap();
             let url = url.as_bytes_with_nul().as_ptr() as *const std::os::raw::c_char;
 
             // Reply socket
@@ -44,9 +44,9 @@ mod tests {
     }
 
     #[test]
-    fn it_works() {
+    fn basic() {
         unsafe {
-            let url = CString::new("inproc://test").unwrap();
+            let url = CString::new("inproc://runng-sys/tests/basic").unwrap();
             let url = url.as_bytes_with_nul().as_ptr() as *const std::os::raw::c_char;
 
             // Reply socket
