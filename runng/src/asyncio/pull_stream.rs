@@ -59,9 +59,9 @@ pub struct PullAsyncStream {
     receiver: Option<mpsc::Receiver<NngResult<NngMsg>>>,
 }
 
-impl AsyncContext for PullAsyncStream {
-    fn create(socket: NngSocket) -> NngResult<Self> {
-        let (sender, receiver) = mpsc::channel::<NngResult<NngMsg>>(1024);
+impl AsyncStreamContext for PullAsyncStream {
+    fn create(socket: NngSocket, buffer: usize) -> NngResult<Self> {
+        let (sender, receiver) = mpsc::channel::<NngResult<NngMsg>>(buffer);
         let aio_arg = PullContextAioArg::create(socket, sender)?;
         let receiver = Some(receiver);
         Ok(Self { aio_arg, receiver })
@@ -131,10 +131,10 @@ impl AsyncPull for SubscribeAsyncHandle {
     }
 }
 
-impl AsyncContext for SubscribeAsyncHandle {
+impl AsyncStreamContext for SubscribeAsyncHandle {
     /// Create an asynchronous context using the specified socket.
-    fn create(socket: NngSocket) -> NngResult<Self> {
-        let ctx = PullAsyncStream::create(socket)?;
+    fn create(socket: NngSocket, buffer: usize) -> NngResult<Self> {
+        let ctx = PullAsyncStream::create(socket, buffer)?;
         let ctx = Self { ctx };
         Ok(ctx)
     }

@@ -52,6 +52,6 @@ fn create_echo<'a>(matches: &ArgMatches<'a>) -> NngResult<ReplyStreamHandle> {
     let replier = factory
         .replier_open()?
         .listen(&url)?
-        .create_async_stream()?;
+        .create_async_stream(1)?;
     Ok(replier)
 }

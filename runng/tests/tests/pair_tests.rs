@@ -1,19 +1,11 @@
 use crate::common::{create_stop_message, get_url, not_stop_message};
 use futures::{
     future::{Either, Future, IntoFuture},
-    stream::{once, Stream},
+    stream::Stream,
 };
 use futures_timer::Delay;
-use log::{debug, info};
-use runng::{asyncio::*, protocol::*, *};
-use std::{
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-    thread,
-    time::Duration,
-};
+use runng::{asyncio::*, *};
+use std::{thread, time::Duration};
 
 fn forward(
     ctx: &mut PairStreamHandle,
@@ -40,7 +32,7 @@ fn pair() -> NngReturn {
     let b = factory.pair_open()?.dial(&url)?;
 
     let a_thread = thread::spawn(move || -> NngReturn {
-        let mut ctx = a.create_async_stream()?;
+        let mut ctx = a.create_async_stream(1)?;
         // Send the first (0th) message
         let mut msg = msg::NngMsg::create()?;
         msg.append_u32(0);
@@ -56,7 +48,7 @@ fn pair() -> NngReturn {
         Ok(())
     });
     let b_thread = thread::spawn(move || -> NngReturn {
-        let mut ctx = b.create_async_stream()?;
+        let mut ctx = b.create_async_stream(1)?;
         ctx.receive()
             .unwrap()
             .take_while(not_stop_message)
@@ -89,7 +81,7 @@ fn pair1_poly() -> NngReturn {
     {
         let url = url.clone();
         let thread = thread::spawn(move || -> NngReturn {
-            let mut ctx = a.listen(&url)?.create_async_stream()?;
+            let mut ctx = a.listen(&url)?.create_async_stream(1)?;
             ctx.receive()
                 .unwrap()
                 .take_while(not_stop_message)
@@ -117,7 +109,7 @@ fn pair1_poly() -> NngReturn {
         let url = url.clone();
         let socket = b.clone();
         let thread = thread::spawn(move || -> NngReturn {
-            let mut ctx = socket.dial(&url)?.create_async_stream()?;
+            let mut ctx = socket.dial(&url)?.create_async_stream(1)?;
             // Send message containing identifier
             let mut msg = msg::NngMsg::create()?;
             msg.append_u32(i)?;

@@ -34,10 +34,10 @@ impl Listen for Pair0 {}
 impl SendMsg for Pair0 {}
 impl RecvMsg for Pair0 {}
 
-impl AsyncStream for Pair0 {
+impl AsyncSocket for Pair0 {
     type ContextType = PairAsyncHandle;
 }
 
-impl AsyncSocket for Pair0 {
+impl AsyncStream for Pair0 {
     type ContextType = PairStreamHandle;
 }

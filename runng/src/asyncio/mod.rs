@@ -22,9 +22,19 @@ use futures::{sync::mpsc, Sink};
 
 use crate::{msg::NngMsg, *};
 use futures::{future, future::Future, sync::oneshot};
-use runng_sys::*;
-use runng_sys::*;
-use std::{collections::VecDeque, sync::Mutex};
+use std::collections::VecDeque;
+
+/// Context for asynchrounous I/O.
+pub trait AsyncContext: Sized {
+    /// Create a new asynchronous context using specified socket.
+    fn create(socket: NngSocket) -> NngResult<Self>;
+}
+
+pub trait AsyncStreamContext: Sized {
+    /// Create a new asynchronous context using specified socket.
+    fn create(socket: NngSocket, buffer: usize) -> NngResult<Self>;
+    //fn create_unbounded(socket: NngSocket) -> NngResult<Self>;
+}
 
 /// A `Socket` that can be turned into a context for asynchronous I/O.
 ///
@@ -55,33 +65,14 @@ pub trait AsyncSocket: Socket {
 
 pub trait AsyncStream: Socket {
     /// The type of aynchronous context produced
-    type ContextType: AsyncContext;
+    type ContextType: AsyncStreamContext;
 
     /// Turns the `Socket` into an asynchronous context
-    fn create_async_stream(&self) -> NngResult<Self::ContextType> {
+    fn create_async_stream(&self, buffer: usize) -> NngResult<Self::ContextType> {
         let socket = self.socket().clone();
-        let ctx = Self::ContextType::create(socket)?;
+        let ctx = Self::ContextType::create(socket, buffer)?;
         Ok(ctx)
     }
-}
-
-/// Context for asynchrounous I/O.
-pub trait AsyncContext: Sized {
-    /// Create a new asynchronous context using specified socket.
-    fn create(socket: NngSocket) -> NngResult<Self>;
-}
-
-fn nng_open<T, O, S>(open_func: O, socket_create_func: S) -> NngResult<T>
-where
-    O: Fn(&mut nng_socket) -> i32,
-    S: Fn(NngSocket) -> T,
-{
-    let mut socket = nng_socket { id: 0 };
-    let res = open_func(&mut socket);
-    NngFail::succeed_then(res, || {
-        let socket = NngSocket::new(socket);
-        socket_create_func(socket)
-    })
 }
 
 fn try_signal_complete(sender: &mut mpsc::Sender<NngResult<NngMsg>>, message: NngResult<NngMsg>) {
@@ -111,4 +102,13 @@ impl WorkQueue {
             self.ready.push_back(message);
         }
     }
+}
+
+trait NngSink:
+    Sink<SinkItem = NngResult<NngMsg>, SinkError = mpsc::SendError<NngResult<NngMsg>>>
+{
+}
+impl<T: Sink<SinkItem = NngResult<NngMsg>, SinkError = mpsc::SendError<NngResult<NngMsg>>>> NngSink
+    for T
+{
 }

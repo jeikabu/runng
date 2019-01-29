@@ -66,7 +66,7 @@ mod tests {
         let num_msg_per_subscriber = 4;
 
         let sub_thread = thread::spawn(move || -> NngReturn {
-            let mut sub_ctx = subscriber.create_async_stream()?;
+            let mut sub_ctx = subscriber.create_async_stream(1)?;
             let topic: Vec<u8> = vec![0; 4];
             sub_ctx.subscribe(topic.as_slice())?;
 
@@ -131,7 +131,7 @@ mod tests {
 
         // Broker
         thread::spawn(move || -> NngReturn {
-            let mut broker_pull_ctx = broker_pull.create_async_stream()?;
+            let mut broker_pull_ctx = broker_pull.create_async_stream(1)?;
             let mut broker_push_ctx = broker_push.create_async()?;
             broker_pull_ctx
                 .receive()
@@ -153,7 +153,7 @@ mod tests {
 
         // Subscriber
         thread::spawn(move || -> NngReturn {
-            let mut sub_ctx = subscriber.create_async_stream()?;
+            let mut sub_ctx = subscriber.create_async_stream(1)?;
 
             let topic: Vec<u8> = vec![0; 4];
             sub_ctx.subscribe(topic.as_slice())?;

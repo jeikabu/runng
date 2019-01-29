@@ -31,8 +31,13 @@ pub struct NngMsg {
 impl NngMsg {
     /// Create a message.  See [nng_msg_alloc](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg_alloc.3).
     pub fn create() -> NngResult<Self> {
+        NngMsg::with_size(0)
+    }
+
+    /// Create a message with body length `size_bytes`.  See [nng_msg_alloc](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg_alloc.3).
+    pub fn with_size(size_bytes: usize) -> NngResult<Self> {
         let mut msg: *mut nng_msg = ptr::null_mut();
-        let res = unsafe { nng_msg_alloc(&mut msg, 0) };
+        let res = unsafe { nng_msg_alloc(&mut msg, size_bytes) };
         NngFail::succeed_then(res, || NngMsg::new_msg(msg))
     }
 

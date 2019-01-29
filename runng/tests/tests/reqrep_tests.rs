@@ -1,7 +1,7 @@
 use crate::common::{create_stop_message, get_url, not_stop_message};
-use futures::{future, future::Future, Stream};
+use futures::{future::Future, Stream};
 use log::{debug, info};
-use runng::{asyncio::*, protocol::*, *};
+use runng::{asyncio::*, *};
 use std::{
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -32,7 +32,7 @@ fn example_async() -> NngReturn {
     let mut rep_ctx = factory
         .replier_open()?
         .listen(&url)?
-        .create_async_stream()?;
+        .create_async_stream(1)?;
 
     let mut req_ctx = factory.requester_open()?.dial(&url)?.create_async()?;
     let req_future = req_ctx.send(msg::NngMsg::create()?);
@@ -62,7 +62,7 @@ fn contexts() -> NngReturn {
     let mut rep_ctx = factory
         .replier_open()?
         .listen(&url)?
-        .create_async_stream()?;
+        .create_async_stream(1)?;
     let rep_recv_count = recv_count.clone();
     let rep = thread::spawn(move || -> NngReturn {
         rep_ctx

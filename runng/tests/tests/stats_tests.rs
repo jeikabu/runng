@@ -2,7 +2,7 @@
 
 use crate::common::init_logging;
 use log::debug;
-use runng::{stats::NngStat, stats::NngStatChild, stats::NngStatRoot, *};
+use runng::{stats::*, *};
 
 fn init_stats() -> NngResult<(runng::protocol::push0::Push0, runng::protocol::pull0::Pull0)> {
     init_logging();
