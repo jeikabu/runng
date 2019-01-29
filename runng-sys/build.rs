@@ -16,8 +16,16 @@ fn main() {
             "Ninja"
         }
     };
-    let stats = if cfg!(feature = "nng-stats") { "ON" } else { "OFF" };
-    let tls = if cfg!(feature = "nng-tls") { "ON" } else { "OFF" };
+    let stats = if cfg!(feature = "nng-stats") {
+        "ON"
+    } else {
+        "OFF"
+    };
+    let tls = if cfg!(feature = "nng-tls") {
+        "ON"
+    } else {
+        "OFF"
+    };
 
     // Run cmake to build nng
     let dst = Config::new("nng")
