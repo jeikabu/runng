@@ -1,4 +1,5 @@
 use crate::*;
+use runng_derive::NngMsgOpts;
 use runng_sys::*;
 use std::{os::raw::c_void, ptr, slice};
 
@@ -22,7 +23,7 @@ impl Drop for DroppableMsg {
 }
 
 /// Wraps `nng_msg`.  See [nng_msg](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg.5).
-#[derive(Debug)]
+#[derive(Debug, NngMsgOpts)]
 pub struct NngMsg {
     msg: DroppableMsg,
 }
@@ -30,8 +31,13 @@ pub struct NngMsg {
 impl NngMsg {
     /// Create a message.  See [nng_msg_alloc](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg_alloc.3).
     pub fn create() -> NngResult<Self> {
+        NngMsg::with_size(0)
+    }
+
+    /// Create a message with body length `size_bytes`.  See [nng_msg_alloc](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg_alloc.3).
+    pub fn with_size(size_bytes: usize) -> NngResult<Self> {
         let mut msg: *mut nng_msg = ptr::null_mut();
-        let res = unsafe { nng_msg_alloc(&mut msg, 0) };
+        let res = unsafe { nng_msg_alloc(&mut msg, size_bytes) };
         NngFail::succeed_then(res, || NngMsg::new_msg(msg))
     }
 
@@ -40,7 +46,8 @@ impl NngMsg {
         NngMsg { msg }
     }
 
-    pub fn take(mut self) -> *mut nng_msg {
+    /// Take ownership of the contained nng_msg.  You are responsible for calling `nng_msg_free`.
+    pub unsafe fn take(mut self) -> *mut nng_msg {
         let msg = self.msg.msg;
         self.msg.msg = ptr::null_mut();
         msg
@@ -78,7 +85,11 @@ impl NngMsg {
         unsafe { nng_msg_len(self.msg()) == 0 }
     }
 
-    pub fn append(&mut self, data: *const u8, size: usize) -> NngReturn {
+    pub fn append_slice(&mut self, data: &[u8]) -> NngReturn {
+        self.append_ptr(data.as_ptr(), data.len())
+    }
+
+    pub fn append_ptr(&mut self, data: *const u8, size: usize) -> NngReturn {
         unsafe { NngFail::from_i32(nng_msg_append(self.msg(), data as *const c_void, size)) }
     }
 
@@ -122,28 +133,6 @@ impl NngMsg {
         unsafe { NngFail::from_i32(nng_msg_header_chop(self.msg(), size)) }
     }
 
-    pub fn append_u32(&mut self, data: u32) -> NngReturn {
-        unsafe { NngFail::from_i32(nng_msg_append_u32(self.msg(), data)) }
-    }
-
-    pub fn insert_u32(&mut self, data: u32) -> NngReturn {
-        unsafe { NngFail::from_i32(nng_msg_insert_u32(self.msg(), data)) }
-    }
-
-    pub fn trim_u32(&mut self) -> NngResult<u32> {
-        unsafe {
-            let mut val: u32 = 0;
-            NngFail::succeed(nng_msg_trim_u32(self.msg(), &mut val), val)
-        }
-    }
-
-    pub fn chop_u32(&mut self) -> NngResult<u32> {
-        unsafe {
-            let mut val: u32 = 0;
-            NngFail::succeed(nng_msg_chop_u32(self.msg(), &mut val), val)
-        }
-    }
-
     pub fn dup(&self) -> NngResult<NngMsg> {
         let mut msg: *mut nng_msg = ptr::null_mut();
         let res = unsafe { nng_msg_dup(&mut msg, self.msg()) };
@@ -164,5 +153,11 @@ impl NngMsg {
         unsafe {
             nng_msg_set_pipe(self.msg(), pipe.nng_pipe());
         }
+    }
+}
+
+impl Clone for NngMsg {
+    fn clone(&self) -> Self {
+        self.dup().unwrap()
     }
 }

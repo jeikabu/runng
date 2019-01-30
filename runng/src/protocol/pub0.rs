@@ -1,6 +1,7 @@
 //! Publisher/subscriber pattern.
 
 use super::*;
+use crate::asyncio::*;
 use runng_sys::*;
 
 /// Publish half of publisher/subscriber pattern.  See [nng_pub](https://nanomsg.github.io/nng/man/v1.1.0/nng_pub.7).
@@ -31,5 +32,5 @@ impl Listen for Pub0 {}
 impl SendMsg for Pub0 {}
 
 impl AsyncSocket for Pub0 {
-    type ContextType = AsyncPushContext;
+    type ContextType = PushAsyncHandle;
 }

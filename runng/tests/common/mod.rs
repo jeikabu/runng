@@ -1,5 +1,5 @@
 use env_logger::{Builder, Env};
-use futures::{future, Future, Stream};
+use futures::{future, Future};
 use runng::{msg::NngMsg, NngResult};
 use std::{
     sync::atomic::{AtomicUsize, Ordering},

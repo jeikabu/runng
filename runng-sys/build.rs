@@ -3,9 +3,11 @@ use std::{env, path::PathBuf};
 
 fn main() {
     // Compile-time features
-    let generator = if cfg!(feature = "ninja") {
+    let generator = if cfg!(feature = "cmake-ninja") {
         "Ninja"
-    } else if cfg!(feature = "vs2017") {
+    } else if cfg!(feature = "cmake-vs2017") {
+        "Visual Studio 15 2017"
+    } else if cfg!(feature = "cmake-vs2017-win64") {
         "Visual Studio 15 2017 Win64"
     } else {
         if cfg!(target_family = "unix") {
@@ -14,8 +16,16 @@ fn main() {
             "Ninja"
         }
     };
-    let stats = if cfg!(feature = "stats") { "ON" } else { "OFF" };
-    let tls = if cfg!(feature = "tls") { "ON" } else { "OFF" };
+    let stats = if cfg!(feature = "nng-stats") {
+        "ON"
+    } else {
+        "OFF"
+    };
+    let tls = if cfg!(feature = "nng-tls") {
+        "ON"
+    } else {
+        "OFF"
+    };
 
     // Run cmake to build nng
     let dst = Config::new("nng")

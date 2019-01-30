@@ -2,8 +2,8 @@
 
 use crate::{
     aio::{AioCallbackArg, NngAio},
+    asyncio::*,
     msg::NngMsg,
-    protocol::AsyncContext,
     *,
 };
 use futures::sync::oneshot;
@@ -16,7 +16,7 @@ enum PushState {
     Sending,
 }
 
-pub(crate) struct PushContextAioArg {
+struct PushContextAioArg {
     aio: NngAio,
     state: PushState,
     sender: Option<oneshot::Sender<NngReturn>>,
@@ -63,11 +63,11 @@ impl Aio for PushContextAioArg {
 }
 
 /// Asynchronous context for publish socket.
-pub struct AsyncPushContext {
+pub struct PushAsyncHandle {
     aio_arg: Box<PushContextAioArg>,
 }
 
-impl AsyncContext for AsyncPushContext {
+impl AsyncContext for PushAsyncHandle {
     /// Create an asynchronous context using the specified socket.
     fn create(socket: NngSocket) -> NngResult<Self> {
         let aio_arg = PushContextAioArg::create(socket)?;
@@ -81,7 +81,7 @@ pub trait AsyncPush {
     fn send(&mut self, msg: NngMsg) -> oneshot::Receiver<NngReturn>;
 }
 
-impl AsyncPush for AsyncPushContext {
+impl AsyncPush for PushAsyncHandle {
     fn send(&mut self, msg: NngMsg) -> oneshot::Receiver<NngReturn> {
         let (sender, receiver) = oneshot::channel::<NngReturn>();
         self.aio_arg.send(msg, sender);

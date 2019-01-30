@@ -1,6 +1,7 @@
 //! Publisher/subscriber pattern.
 
 use super::*;
+use crate::asyncio::*;
 use runng_sys::*;
 
 /// Subscribe half of publisher/subscriber pattern.  See [nng_sub](https://nanomsg.github.io/nng/man/v1.1.0/nng_sub.7).
@@ -38,6 +39,6 @@ impl Dial for Sub0 {}
 impl Listen for Sub0 {}
 impl RecvMsg for Sub0 {}
 
-impl AsyncSocket for Sub0 {
-    type ContextType = AsyncSubscribeContext;
+impl AsyncStream for Sub0 {
+    type ContextType = SubscribeAsyncHandle;
 }

@@ -32,6 +32,7 @@ use futures::{
 };
 use runng::{
     *,
+    asyncio::*,
     protocol::*,
 };
 
@@ -42,17 +43,23 @@ fn aio() -> NngReturn {
     let mut rep_ctx = factory
         .replier_open()?
         .listen(&url)?
-        .create_async_context()?;
+        .create_async_stream(1)?;
 
-    let requester = factory.requester_open()?.dial(&url)?;
-    let mut req_ctx = requester.create_async_context()?;
+    let mut req_ctx = factory
+        .requester_open()?
+        .dial(&url)?
+        .create_async()?;
     let req_future = req_ctx.send(msg::NngMsg::create()?);
-    rep_ctx.receive().unwrap()
-        .take(1).for_each(|_request|{
+    rep_ctx
+        .receive()
+        .unwrap()
+        .take(1)
+        .for_each(|_request| {
             let msg = msg::NngMsg::create().unwrap();
-            rep_ctx.reply(msg).wait().unwrap();
+            rep_ctx.reply(msg).wait().unwrap().unwrap();
             Ok(())
-        }).wait();
+        })
+        .wait()?;
     req_future.wait().unwrap()?;
 
     Ok(())
@@ -64,6 +71,7 @@ Additional examples [in `examples/` folder](https://github.com/jeikabu/runng/tre
 */
 
 pub mod aio;
+pub mod asyncio;
 pub mod ctx;
 pub mod dialer;
 pub mod factory;
@@ -96,8 +104,10 @@ trait InternalSocket {
 }
 
 // Return string and pointer so string isn't dropped
-fn to_cstr(string: &str) -> Result<(std::ffi::CString, *const i8), std::ffi::NulError> {
+fn to_cstr(
+    string: &str,
+) -> Result<(std::ffi::CString, *const std::os::raw::c_char), std::ffi::NulError> {
     let string = std::ffi::CString::new(string)?;
-    let ptr = string.as_bytes_with_nul().as_ptr() as *const i8;
+    let ptr = string.as_bytes_with_nul().as_ptr() as *const std::os::raw::c_char;
     Ok((string, ptr))
 }

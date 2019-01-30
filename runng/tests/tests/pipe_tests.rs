@@ -45,3 +45,32 @@ fn notify() -> NngReturn {
     assert_eq!(NUM_BAD.load(Ordering::Relaxed), 0);
     Ok(())
 }
+
+#[test]
+fn dialer_listener() -> NngReturn {
+    let url = get_url();
+
+    let factory = Latest::default();
+    let rep = factory.replier_open()?.listen(&url)?;
+    let req = factory.requester_open()?.dial(&url)?;
+    req.send(msg::NngMsg::create()?)?;
+    let msg = rep.recv()?;
+    let rep_pipe = msg.get_pipe().unwrap();
+    rep.send(msg::NngMsg::create()?)?;
+    let msg = req.recv()?;
+    let req_pipe = msg.get_pipe().unwrap();
+
+    unsafe {
+        // Requester pipe
+        req_pipe.socket().unwrap();
+        req_pipe.dialer().unwrap();
+        assert!(req_pipe.listener().is_none());
+
+        // Replier pipe
+        rep_pipe.socket().unwrap();
+        assert!(rep_pipe.dialer().is_none());
+        rep_pipe.listener().unwrap();
+    }
+
+    Ok(())
+}

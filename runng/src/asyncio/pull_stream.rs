@@ -2,8 +2,9 @@
 
 use crate::{
     aio::{AioCallbackArg, NngAio},
+    asyncio::*,
     msg::NngMsg,
-    protocol::{subscribe, try_signal_complete, AsyncContext, Subscribe},
+    protocol::{subscribe, Subscribe},
     *,
 };
 use futures::sync::mpsc;
@@ -15,7 +16,7 @@ enum PullState {
     Receiving,
 }
 
-pub(crate) struct PullContextAioArg {
+struct PullContextAioArg {
     aio: NngAio,
     state: PullState,
     sender: mpsc::Sender<NngResult<NngMsg>>,
@@ -53,14 +54,14 @@ impl Aio for PullContextAioArg {
 }
 
 /// Asynchronous context for pull socket.
-pub struct AsyncPullContext {
+pub struct PullAsyncStream {
     aio_arg: Box<PullContextAioArg>,
     receiver: Option<mpsc::Receiver<NngResult<NngMsg>>>,
 }
 
-impl AsyncContext for AsyncPullContext {
-    fn create(socket: NngSocket) -> NngResult<Self> {
-        let (sender, receiver) = mpsc::channel::<NngResult<NngMsg>>(1024);
+impl AsyncStreamContext for PullAsyncStream {
+    fn create(socket: NngSocket, buffer: usize) -> NngResult<Self> {
+        let (sender, receiver) = mpsc::channel::<NngResult<NngMsg>>(buffer);
         let aio_arg = PullContextAioArg::create(socket, sender)?;
         let receiver = Some(receiver);
         Ok(Self { aio_arg, receiver })
@@ -73,7 +74,7 @@ pub trait AsyncPull {
     fn receive(&mut self) -> Option<mpsc::Receiver<NngResult<NngMsg>>>;
 }
 
-impl AsyncPull for AsyncPullContext {
+impl AsyncPull for PullAsyncStream {
     fn receive(&mut self) -> Option<mpsc::Receiver<NngResult<NngMsg>>> {
         let receiver = self.receiver.take();
         if receiver.is_some() {
@@ -120,32 +121,32 @@ unsafe extern "C" fn pull_callback(arg: AioCallbackArg) {
 }
 
 /// Asynchronous context for subscribe socket.
-pub struct AsyncSubscribeContext {
-    ctx: AsyncPullContext,
+pub struct SubscribeAsyncHandle {
+    ctx: PullAsyncStream,
 }
 
-impl AsyncPull for AsyncSubscribeContext {
+impl AsyncPull for SubscribeAsyncHandle {
     fn receive(&mut self) -> Option<mpsc::Receiver<NngResult<NngMsg>>> {
         self.ctx.receive()
     }
 }
 
-impl AsyncContext for AsyncSubscribeContext {
+impl AsyncStreamContext for SubscribeAsyncHandle {
     /// Create an asynchronous context using the specified socket.
-    fn create(socket: NngSocket) -> NngResult<Self> {
-        let ctx = AsyncPullContext::create(socket)?;
+    fn create(socket: NngSocket, buffer: usize) -> NngResult<Self> {
+        let ctx = PullAsyncStream::create(socket, buffer)?;
         let ctx = Self { ctx };
         Ok(ctx)
     }
 }
 
-impl InternalSocket for AsyncSubscribeContext {
+impl InternalSocket for SubscribeAsyncHandle {
     fn socket(&self) -> &NngSocket {
         self.ctx.aio_arg.aio().socket()
     }
 }
 
-impl Subscribe for AsyncSubscribeContext {
+impl Subscribe for SubscribeAsyncHandle {
     fn subscribe(&self, topic: &[u8]) -> NngReturn {
         unsafe { subscribe(self.socket().nng_socket(), topic) }
     }

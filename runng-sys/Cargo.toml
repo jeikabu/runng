@@ -1,6 +1,6 @@
 [package]
 name = "runng-sys"
-version = "1.1.1-rc.2"
+version = "1.1.1-rc.4"
 authors = ["Jake W <jeikabu@gmail.com>"]
 
 description = "Bindings to nng (Nanomsg-Next-Generation) aka Nanomsg2"
@@ -16,14 +16,15 @@ appveyor = { repository = "jake-ruyi/runng", branch = "master", service = "githu
 travis-ci = { repository = "jeikabu/runng", branch = "master" }
 
 [features]
-default = ["stats"]
+default = ["nng-stats"]
 # Cmake generators
-ninja = [] # Ninja
-vs2017 = [] # Visual Studio 15 2017 Win64
+cmake-ninja = [] # Ninja
+cmake-vs2017 = [] # Visual Studio 15 2017
+cmake-vs2017-win64 = [] # Visual Studio 15 2017 Win64
 # Enable NNG stats
-stats = []
+nng-stats = []
 # Enable TLS (requires mbedTLS)
-tls = []
+nng-tls = []
 
 [build-dependencies]
 cmake = "0.1"

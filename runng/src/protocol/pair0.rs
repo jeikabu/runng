@@ -1,6 +1,7 @@
 //! Pair protocol
 
 use super::*;
+use crate::asyncio::*;
 use runng_sys::*;
 
 /// Half of pair pattern.  See [nng_pair](https://nanomsg.github.io/nng/man/v1.1.0/nng_pair.7).
@@ -34,5 +35,9 @@ impl SendMsg for Pair0 {}
 impl RecvMsg for Pair0 {}
 
 impl AsyncSocket for Pair0 {
-    type ContextType = AsyncPairContext;
+    type ContextType = PairAsyncHandle;
+}
+
+impl AsyncStream for Pair0 {
+    type ContextType = PairStreamHandle;
 }

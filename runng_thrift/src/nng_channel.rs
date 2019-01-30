@@ -64,7 +64,7 @@ impl Read for TNngChannel {
 impl Write for TNngChannel {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         let len = buf.len();
-        let res = self.message.append(buf.as_ptr(), len);
+        let res = self.message.append_slice(buf);
         trace!("Write {}", len);
         if let Err(_) = res {
             Err(Error::from(ErrorKind::Other))
