@@ -7,31 +7,6 @@ use crate::{dialer::UnsafeDialer, listener::UnsafeListener, msg::NngMsg};
 use runng_derive::NngGetOpts;
 use runng_sys::*;
 
-/// Pipe events.  See [nng_pipe_notify](https://nanomsg.github.io/nng/man/v1.1.0/nng_pipe_notify.3).
-#[derive(Clone, Copy, Debug)]
-#[repr(i32)]
-pub enum PipeEvent {
-    /// This event occurs after a connection and negotiation has completed, but before the pipe is added to the socket.
-    AddPre = nng_pipe_ev_NNG_PIPE_EV_ADD_PRE as i32,
-    /// This event occurs after the pipe is fully added to the socket.
-    /// Prior to this time, it is not possible to communicate over the pipe with the socket.
-    AddPost = nng_pipe_ev_NNG_PIPE_EV_ADD_POST as i32,
-    /// This event occurs after the pipe has been removed from the socket.
-    /// The underlying transport may be closed at this point, and it is not possible communicate using this pipe.
-    RemPost = nng_pipe_ev_NNG_PIPE_EV_REM_POST as i32,
-}
-
-impl PipeEvent {
-    pub fn from_i32(value: i32) -> Option<PipeEvent> {
-        match value {
-            value if value == PipeEvent::AddPre as i32 => Some(PipeEvent::AddPre),
-            value if value == PipeEvent::AddPost as i32 => Some(PipeEvent::AddPost),
-            value if value == PipeEvent::RemPost as i32 => Some(PipeEvent::RemPost),
-            _ => None,
-        }
-    }
-}
-
 pub type PipeNotifyCallback =
     unsafe extern "C" fn(pipe: nng_pipe, event: i32, arg1: PipeNotifyCallbackArg);
 pub type PipeNotifyCallbackArg = *mut ::std::os::raw::c_void;

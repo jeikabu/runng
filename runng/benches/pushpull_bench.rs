@@ -1,14 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion, ParameterizedBenchmark, Throughput};
-use futures::{future::Future, Stream};
-use runng::{asyncio::*, protocol::*, *};
-use std::{
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-    thread,
-    time::Duration,
-};
+use futures::future::Future;
+use runng::{asyncio::*, *};
+use std::time::Duration;
 
 fn latency(crit: &mut Criterion, url: &str) -> NngReturn {
     let url = url.to_owned();

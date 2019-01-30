@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion, ParameterizedBenchmark, Throughput};
-use futures::{future::Future, Stream};
-use runng::{asyncio::*, protocol::*, *};
-use std::{thread, time::Duration};
+use futures::future::Future;
+use runng::{asyncio::*, *};
+use std::time::Duration;
 
 fn nng_reqrep(crit: &mut Criterion, url: &str) -> NngReturn {
     let url = url.to_owned();

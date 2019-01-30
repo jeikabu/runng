@@ -1,6 +1,6 @@
 use crate::common::{create_stop_message, get_url, not_stop_message};
 use futures::{future::Future, Stream};
-use log::{debug, info};
+use log::info;
 use runng::{asyncio::*, *};
 use std::{
     sync::{

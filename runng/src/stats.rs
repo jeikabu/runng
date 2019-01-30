@@ -46,58 +46,6 @@ use crate::*;
 use runng_sys::*;
 use std::marker;
 
-/// Type of statistic.  See `NngStatChild::stat_type`.
-#[derive(Clone, Copy, Debug)]
-#[repr(i32)]
-pub enum NngStatType {
-    Scope = nng_stat_type_enum_NNG_STAT_SCOPE as i32,
-    Level = nng_stat_type_enum_NNG_STAT_LEVEL as i32,
-    Counter = nng_stat_type_enum_NNG_STAT_COUNTER as i32,
-    String = nng_stat_type_enum_NNG_STAT_STRING as i32,
-    Boolean = nng_stat_type_enum_NNG_STAT_BOOLEAN as i32,
-    Id = nng_stat_type_enum_NNG_STAT_ID as i32,
-}
-
-impl NngStatType {
-    /// Converts value returned by [nng_stat_type](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_type.3) into `NngStatType`.
-    pub fn from_i32(value: i32) -> Option<NngStatType> {
-        match value {
-            value if value == NngStatType::Scope as i32 => Some(NngStatType::Scope),
-            value if value == NngStatType::Level as i32 => Some(NngStatType::Level),
-            value if value == NngStatType::Counter as i32 => Some(NngStatType::Counter),
-            value if value == NngStatType::String as i32 => Some(NngStatType::String),
-            value if value == NngStatType::Boolean as i32 => Some(NngStatType::Boolean),
-            value if value == NngStatType::Id as i32 => Some(NngStatType::Id),
-            _ => None,
-        }
-    }
-}
-
-/// Unit of quantity measured by statistic.  See `NngStatChild::unit()`.
-#[derive(Clone, Copy, Debug)]
-#[repr(i32)]
-pub enum NngStatUnit {
-    None = nng_unit_enum_NNG_UNIT_NONE as i32,
-    Bytes = nng_unit_enum_NNG_UNIT_BYTES as i32,
-    Messages = nng_unit_enum_NNG_UNIT_MESSAGES as i32,
-    Millis = nng_unit_enum_NNG_UNIT_MILLIS as i32,
-    Events = nng_unit_enum_NNG_UNIT_EVENTS as i32,
-}
-
-impl NngStatUnit {
-    /// Converts value returned by [nng_stat_unit](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_unit.3) into `NngStatUnit`.
-    pub fn from_i32(value: i32) -> Option<NngStatUnit> {
-        match value {
-            value if value == NngStatUnit::None as i32 => Some(NngStatUnit::None),
-            value if value == NngStatUnit::Bytes as i32 => Some(NngStatUnit::Bytes),
-            value if value == NngStatUnit::Messages as i32 => Some(NngStatUnit::Messages),
-            value if value == NngStatUnit::Millis as i32 => Some(NngStatUnit::Millis),
-            value if value == NngStatUnit::Events as i32 => Some(NngStatUnit::Events),
-            _ => None,
-        }
-    }
-}
-
 pub trait NngStat {
     /// Obtain underlying [`nng_stat`](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat.5).
     unsafe fn nng_stat(&self) -> *mut nng_stat;
@@ -185,10 +133,10 @@ impl<'root> NngStatChild<'root> {
     }
 
     /// See [nng_stat_type](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_type.3).
-    pub fn stat_type(&self) -> Option<NngStatType> {
+    pub fn stat_type(&self) -> Option<nng_stat_type_enum> {
         unsafe {
             let val = nng_stat_type(self.nng_stat());
-            NngStatType::from_i32(val)
+            nng_stat_type_enum::from_i32(val)
         }
     }
 
@@ -216,10 +164,10 @@ impl<'root> NngStatChild<'root> {
     }
 
     /// See [nng_stat_unit](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_unit.3).
-    pub fn unit(&self) -> Option<NngStatUnit> {
+    pub fn unit(&self) -> Option<nng_unit_enum> {
         unsafe {
             let val = nng_stat_unit(self.nng_stat());
-            NngStatUnit::from_i32(val)
+            nng_unit_enum::from_i32(val)
         }
     }
 
