@@ -54,12 +54,30 @@ fn main() {
 
     // https://rust-lang-nursery.github.io/rust-bindgen
     // https://docs.rs/bindgen
-    let bindings = bindgen::Builder::default()
+    let mut builder = bindgen::Builder::default()
         .header("wrapper.h")
         // This is needed if use `#include <nng.h>` instead of `#include "path/nng.h"`
         //.clang_arg("-Inng/src/")
-        .generate()
-        .expect("Unable to generate bindings");
+        ;
+    if !cfg!(feature = "legacy-111-rc4") {
+        builder = builder
+            .whitelist_type("nng_.*")
+            .whitelist_function("nng_.*")
+            .whitelist_var("NNG_.*")
+            // Generate `pub const NNG_UNIT_EVENTS` instead of `nng_unit_enum_NNG_UNIT_EVENTS`
+            .prepend_enum_name(false)
+            // Generate `pub enum ...` instead of multiple `pub const ...`
+            .rustified_enum("nng_.*_enum")
+            // Enum special cases:
+            .rustified_enum("nng_pipe_ev")
+            .rustified_enum("nng_sockaddr_family")
+            .rustified_enum("nng_zt_status")
+            // nostd support
+            // https://rust-embedded.github.io/book/interoperability/c-with-rust.html#automatically-generating-the-interface
+            .ctypes_prefix("cty")
+            .use_core();
+    }
+    let bindings = builder.generate().expect("Unable to generate bindings");
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     bindings
         .write_to_file(out_path.join("bindings.rs"))

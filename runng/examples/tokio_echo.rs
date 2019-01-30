@@ -12,7 +12,7 @@ use clap::{App, Arg, ArgMatches};
 use env_logger::{Builder, Env};
 use futures::{future::lazy, Future, Stream};
 use log::info;
-use runng::{asyncio::*, protocol::*, *};
+use runng::{asyncio::*, *};
 
 fn main() -> NngReturn {
     Builder::from_env(Env::default().default_filter_or("debug"))
