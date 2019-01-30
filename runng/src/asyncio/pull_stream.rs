@@ -98,7 +98,8 @@ unsafe extern "C" fn pull_callback(arg: AioCallbackArg) {
                     match res {
                         // nng_aio_close() calls nng_aio_stop which nng_aio_abort(NNG_ECANCELED) and waits.
                         // If we call start_receive() it will fail with ECANCELED and we infinite loop...
-                        NngFail::Err(NngError::ECLOSED) | NngFail::Err(NngError::ECANCELED) => {
+                        NngFail::Err(nng_errno_enum::NNG_ECLOSED)
+                        | NngFail::Err(nng_errno_enum::NNG_ECANCELED) => {
                             debug!("pull_callback {:?}", res);
                         }
                         _ => {

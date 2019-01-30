@@ -30,7 +30,7 @@ impl NngSocket {
     #[cfg(feature = "pipes")]
     pub fn notify(
         &self,
-        event: pipe::PipeEvent,
+        event: nng_pipe_ev,
         callback: pipe::PipeNotifyCallback,
         argument: pipe::PipeNotifyCallbackArg,
     ) -> NngReturn {
@@ -247,7 +247,7 @@ impl Drop for InnerSocket {
             match res {
                 Ok(()) => {}
                 // Can't panic here.  Thrift's TIoChannel::split() clones the socket handle so we may get ECLOSED
-                Err(NngFail::Err(NngError::ECLOSED)) => {}
+                Err(NngFail::Err(nng_errno_enum::NNG_ECLOSED)) => {}
                 Err(res) => {
                     debug!("nng_close {:?}", res);
                     panic!("nng_close {:?}", res);
