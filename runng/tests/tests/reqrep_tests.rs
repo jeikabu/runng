@@ -1,7 +1,9 @@
-use crate::common::{create_stop_message, get_url, not_stop_message};
+use crate::common::{create_stop_message, get_url, not_stop_message, sleep_fast};
 use futures::{future::Future, Stream};
 use log::info;
+use rand::Rng;
 use runng::{asyncio::*, *};
+use runng_sys::*;
 use std::{
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -12,13 +14,12 @@ use std::{
 
 #[test]
 fn example_basic() -> NngReturn {
-    info!("basic");
     let url = get_url();
 
     let factory = Latest::default();
     let rep = factory.replier_open()?.listen(&url)?;
     let req = factory.requester_open()?.dial(&url)?;
-    req.send(msg::NngMsg::create()?)?;
+    req.sendmsg(msg::NngMsg::create()?)?;
     rep.recv()?;
 
     Ok(())
@@ -47,6 +48,86 @@ fn example_async() -> NngReturn {
         })
         .wait()?;
     req_future.wait().unwrap()?;
+
+    Ok(())
+}
+
+#[test]
+fn zerocopy() -> NngReturn {
+    let url = get_url();
+
+    let factory = Latest::default();
+    let rep = factory.replier_open()?.listen(&url)?;
+    let req = factory.requester_open()?.dial(&url)?;
+
+    for _ in 0..10 {
+        let mut data = memory::Alloc::create(128).unwrap();
+        rand::thread_rng().fill(data.as_mut_slice());
+
+        req.send_zerocopy(data.clone()).unwrap();
+        let request = rep.recv_zerocopy().unwrap();
+        rep.send_zerocopy(request).unwrap();
+        let reply = req.recv_zerocopy().unwrap();
+        assert_eq!(data, reply);
+    }
+
+    Ok(())
+}
+
+fn send_loop<T>(socket: &T, mut msg: msg::NngMsg)
+where
+    T: socket::SendMsg,
+{
+    loop {
+        let res = socket.sendmsg_flags(msg, socket::Flags::NONBLOCK);
+        if let Err(senderror) = res {
+            if senderror.error == nng_errno_enum::NNG_EAGAIN {
+                msg = senderror.into_inner();
+                sleep_fast();
+            } else {
+                panic!(senderror)
+            }
+        } else {
+            break;
+        }
+    }
+}
+
+fn receive_loop<T>(socket: &T) -> msg::NngMsg
+where
+    T: socket::RecvMsg,
+{
+    loop {
+        let flags = socket::Flags::NONBLOCK;
+        let msg = socket.recvmsg_flags(flags);
+        match msg {
+            Ok(msg) => return msg,
+            Err(NngFail::Err(nng_errno_enum::NNG_EAGAIN)) => sleep_fast(),
+            Err(err) => panic!(err),
+        }
+    }
+}
+
+#[test]
+fn nonblock() -> NngReturn {
+    let url = get_url();
+
+    let factory = Latest::default();
+    let flags = socket::Flags::NONBLOCK;
+    let rep = factory.replier_open()?.listen_flags(&url, flags)?;
+    let req = factory.requester_open()?.dial_flags(&url, flags)?;
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    for _ in 0..10 {
+        let msg = msg::NngMsg::create().unwrap();
+        //rand::thread_rng().fill(data.as_mut_slice());
+        send_loop(&req, msg);
+        let request = receive_loop(&rep);
+        req.recvmsg_flags(socket::Flags::NONBLOCK);
+        send_loop(&rep, request);
+        let reply = receive_loop(&req);
+        //assert_eq!(data, reply);
+    }
 
     Ok(())
 }

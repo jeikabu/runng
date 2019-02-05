@@ -57,11 +57,11 @@ fn dialer_listener() -> NngReturn {
     let factory = Latest::default();
     let rep = factory.replier_open()?.listen(&url)?;
     let req = factory.requester_open()?.dial(&url)?;
-    req.send(msg::NngMsg::create()?)?;
-    let msg = rep.recv()?;
+    req.sendmsg(msg::NngMsg::create()?)?;
+    let msg = rep.recvmsg()?;
     let rep_pipe = msg.get_pipe().unwrap();
-    rep.send(msg::NngMsg::create()?)?;
-    let msg = req.recv()?;
+    rep.sendmsg(msg::NngMsg::create()?)?;
+    let msg = req.recvmsg()?;
     let req_pipe = msg.get_pipe().unwrap();
 
     unsafe {

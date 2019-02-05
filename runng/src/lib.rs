@@ -76,6 +76,7 @@ pub mod ctx;
 pub mod dialer;
 pub mod factory;
 pub mod listener;
+pub mod memory;
 pub mod msg;
 pub mod options;
 pub mod pipe;

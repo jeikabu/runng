@@ -45,14 +45,14 @@ fn main() -> NngReturn {
             if let Some(interval) = matches.value_of("interval") {
                 let interval = interval.parse::<u64>().unwrap();
                 loop {
-                    sock.send(reply.dup()?)?;
-                    let msg = sock.recv()?;
+                    sock.sendmsg(reply.dup()?)?;
+                    let msg = sock.recvmsg()?;
                     handle_received_msg(&matches, msg);
                     thread::sleep(Duration::from_secs(interval));
                 }
             } else {
-                sock.send(reply.dup()?)?;
-                let msg = sock.recv()?;
+                sock.sendmsg(reply.dup()?)?;
+                let msg = sock.recvmsg()?;
                 handle_received_msg(&matches, msg);
             }
 
@@ -69,9 +69,9 @@ fn main() -> NngReturn {
             let reply = handle_data(&matches)?;
             //handle_delay(&matches);
             loop {
-                let msg = sock.recv()?;
+                let msg = sock.recvmsg()?;
                 handle_received_msg(&matches, msg);
-                sock.send(reply.dup()?)?;
+                sock.sendmsg(reply.dup()?)?;
             }
         });
         threads.push(thread);
@@ -87,11 +87,11 @@ fn main() -> NngReturn {
             if let Some(interval) = matches.value_of("interval") {
                 let interval = interval.parse::<u64>().unwrap();
                 loop {
-                    sock.send(msg.dup()?)?;
+                    sock.sendmsg(msg.dup()?)?;
                     thread::sleep(Duration::from_secs(interval));
                 }
             } else {
-                sock.send(msg.dup()?)?;
+                sock.sendmsg(msg.dup()?)?;
             }
 
             Ok(())
@@ -110,7 +110,7 @@ fn main() -> NngReturn {
         let thread = thread::spawn(move || -> NngReturn {
             let sock = connect(sock, &url, is_dial)?;
             sock.subscribe(topic.as_bytes())?;
-            let msg = sock.recv()?;
+            let msg = sock.recvmsg()?;
             handle_received_msg(&matches, msg);
             Ok(())
         });
@@ -127,11 +127,11 @@ fn main() -> NngReturn {
             if let Some(interval) = matches.value_of("interval") {
                 let interval = interval.parse::<u64>().unwrap();
                 loop {
-                    sock.send(msg.dup()?)?;
+                    sock.sendmsg(msg.dup()?)?;
                     thread::sleep(Duration::from_secs(interval));
                 }
             } else {
-                sock.send(msg.dup()?)?;
+                sock.sendmsg(msg.dup()?)?;
             }
 
             Ok(())
@@ -145,7 +145,7 @@ fn main() -> NngReturn {
         let thread = thread::spawn(move || -> NngReturn {
             let sock = connect(sock, &url, is_dial)?;
             loop {
-                let msg = sock.recv()?;
+                let msg = sock.recvmsg()?;
                 handle_received_msg(&matches, msg);
             }
         });

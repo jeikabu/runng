@@ -46,7 +46,7 @@ impl Read for TNngChannel {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         //assert!(self.message.len() == 0);
         if self.message.len() == 0 {
-            let res = self.socket.recv();
+            let res = self.socket.recvmsg();
             match res {
                 Ok(msg) => {
                     trace!("Recv: {}", msg.len());
@@ -76,7 +76,7 @@ impl Write for TNngChannel {
         trace!("Flush {}", self.message.len());
         let mut msg = NngMsg::create()?;
         std::mem::swap(&mut self.message, &mut msg);
-        self.socket.send(msg)?;
+        self.socket.sendmsg(msg)?;
         Ok(())
     }
 }

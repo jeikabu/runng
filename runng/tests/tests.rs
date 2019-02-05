@@ -37,18 +37,18 @@ mod tests {
                             .unwrap()
                     );
                     req_dialer.start()?;
-                    requester.send(msg::NngMsg::create()?)?;
+                    requester.sendmsg(msg::NngMsg::create()?)?;
                     let _request = replier.recv()?;
                     // Drop the dialer
                 }
                 // requester still works
-                requester.send(msg::NngMsg::create()?)?;
+                requester.sendmsg(msg::NngMsg::create()?)?;
                 let _request = replier.recv()?;
                 // Drop the listener
             }
             // Replier still works
             let requester = factory.requester_open()?.dial(&url)?;
-            requester.send(msg::NngMsg::create()?)?;
+            requester.sendmsg(msg::NngMsg::create()?)?;
             let _request = replier.recv()?;
         }
 

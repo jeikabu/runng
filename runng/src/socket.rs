@@ -6,8 +6,17 @@
 //! When the last reference to the socket is dropped, `nng_close()` will be called.
 
 use super::{dialer::NngDialer, listener::NngListener, *};
+use bitflags::bitflags;
 use runng_sys::*;
 use std::sync::Arc;
+
+bitflags! {
+    #[derive(Default)]
+    pub struct Flags: i32 {
+        const NONBLOCK = nng_flag_enum::NNG_FLAG_NONBLOCK as i32;
+        const ALLOC = nng_flag_enum::NNG_FLAG_ALLOC as i32;
+    }
+}
 
 /// Wraps `nng_socket`.  See [nng_socket](https://nanomsg.github.io/nng/man/v1.1.0/nng_socket.5).
 pub struct NngSocket {
@@ -169,9 +178,15 @@ pub trait Socket: Sized {
 pub trait Listen: Socket {
     /// Listen for connections to specified URL.  See [nng_listen](https://nanomsg.github.io/nng/man/v1.1.0/nng_listen.3).
     fn listen(self, url: &str) -> NngResult<Self> {
+        self.listen_flags(url, Default::default())
+    }
+
+    /// Listen for connections to specified URL.  See [nng_listen](https://nanomsg.github.io/nng/man/v1.1.0/nng_listen.3).
+    fn listen_flags(self, url: &str, flags: Flags) -> NngResult<Self> {
         unsafe {
             let (_cstring, ptr) = to_cstr(url)?;
-            let res = nng_listen(self.nng_socket(), ptr, std::ptr::null_mut(), 0);
+            debug_assert!(!flags.contains(Flags::ALLOC));
+            let res = nng_listen(self.nng_socket(), ptr, std::ptr::null_mut(), flags.bits());
             NngFail::succeed(res, self)
         }
     }
@@ -185,9 +200,15 @@ pub trait Listen: Socket {
 pub trait Dial: Socket {
     /// Dial socket specified by URL.  See [nng_dial](https://nanomsg.github.io/nng/man/v1.1.0/nng_dial.3)
     fn dial(self, url: &str) -> NngResult<Self> {
+        self.dial_flags(url, Default::default())
+    }
+
+    /// Dial socket specified by URL.  See [nng_dial](https://nanomsg.github.io/nng/man/v1.1.0/nng_dial.3)
+    fn dial_flags(self, url: &str, flags: Flags) -> NngResult<Self> {
         unsafe {
             let (_cstring, ptr) = to_cstr(url)?;
-            let res = nng_dial(self.nng_socket(), ptr, std::ptr::null_mut(), 0);
+            debug_assert!(!flags.contains(Flags::ALLOC));
+            let res = nng_dial(self.nng_socket(), ptr, std::ptr::null_mut(), flags.bits());
             NngFail::succeed(res, self)
         }
     }
@@ -197,22 +218,112 @@ pub trait Dial: Socket {
     }
 }
 
+#[derive(Debug)]
+pub struct SendError<T> {
+    pub error: nng_errno_enum,
+    pub message: T,
+}
+
+impl<T> SendError<T> {
+    pub fn into_inner(self) -> T {
+        self.message
+    }
+}
+
 /// `Socket` that can send messages.
 pub trait SendMsg: Socket {
+    /// Send data.  See [nng_send](https://nanomsg.github.io/nng/man/v1.1.0/nng_send.3).
+    fn send(&self, data: &mut [u8]) -> NngReturn {
+        self.send_flags(data, Default::default())
+    }
+    /// Send data.  See [nng_send](https://nanomsg.github.io/nng/man/v1.1.0/nng_send.3).
+    fn send_flags(&self, data: &mut [u8], flags: Flags) -> NngReturn {
+        unsafe {
+            let ptr = data.as_mut_ptr() as *mut std::os::raw::c_void;
+            let res = nng_send(self.nng_socket(), ptr, data.len(), flags.bits());
+            NngFail::from_i32(res)
+        }
+    }
+    /// Sends data in "zero-copy" mode.  See `NNG_FLAG_ALLOC`.
+    fn send_zerocopy(&self, data: memory::Alloc) -> Result<(), SendError<memory::Alloc>> {
+        self.send_zerocopy_flags(data, Flags::ALLOC)
+    }
+    fn send_zerocopy_flags(
+        &self,
+        data: memory::Alloc,
+        flags: Flags,
+    ) -> Result<(), SendError<memory::Alloc>> {
+        let flags = (flags | Flags::ALLOC).bits();
+        unsafe {
+            let (ptr, size) = data.take();
+            let res = nng_send(self.nng_socket(), ptr, size, flags);
+            let error = nng_errno_enum::from_i32(res);
+            if let Some(error) = error {
+                let message = memory::Alloc::create_raw(ptr, size);
+                Err(SendError { error, message })
+            } else {
+                Ok(())
+            }
+        }
+    }
     /// Send a message.  See [nng_sendmsg](https://nanomsg.github.io/nng/man/v1.1.0/nng_sendmsg.3).
-    fn send(&self, msg: msg::NngMsg) -> NngReturn {
-        let res = unsafe { nng_sendmsg(self.nng_socket(), msg.take(), 0) };
-        NngFail::from_i32(res)
+    fn sendmsg(&self, msg: msg::NngMsg) -> NngReturn {
+        let res = self.sendmsg_flags(msg, Default::default());
+        match res {
+            Ok(()) => Ok(()),
+            Err(res) => Err(NngFail::Err(res.error)),
+        }
+    }
+    /// Send a message.  See [nng_sendmsg](https://nanomsg.github.io/nng/man/v1.1.0/nng_sendmsg.3).
+    fn sendmsg_flags(&self, msg: msg::NngMsg, flags: Flags) -> Result<(), SendError<msg::NngMsg>> {
+        unsafe {
+            let ptr = msg.take();
+            assert!(!ptr.is_null());
+            let res = nng_sendmsg(self.nng_socket(), ptr, flags.bits());
+            let error = nng_errno_enum::from_i32(res);
+            if let Some(error) = error {
+                let message = msg::NngMsg::new_msg(ptr);
+                Err(SendError { error, message })
+            } else {
+                Ok(())
+            }
+        }
     }
 }
 
 /// `Socket` that can receive messages.
 pub trait RecvMsg: Socket {
+    /// Receive data.  See [nng_recv](https://nanomsg.github.io/nng/man/v1.1.0/nng_recv.3).
+    fn recv(&self) -> NngReturn {
+        Ok(())
+    }
+    fn recv_zerocopy(&self) -> NngResult<memory::Alloc> {
+        self.recv_zerocopy_flags(Default::default())
+    }
+    fn recv_zerocopy_flags(&self, flags: Flags) -> NngResult<memory::Alloc> {
+        let flags = (flags | Flags::ALLOC).bits();
+        unsafe {
+            let mut ptr: *mut core::ffi::c_void = std::ptr::null_mut();
+            let mut size: usize = 0;
+            let ptr_ptr = (&mut ptr) as *mut _ as *mut core::ffi::c_void;
+            let res = nng_recv(self.nng_socket(), ptr_ptr, &mut size, flags);
+            let res = NngFail::from_i32(res);
+            match res {
+                Ok(()) => Ok(memory::Alloc::create_raw(ptr, size)),
+                Err(res) => Err(res),
+            }
+        }
+    }
+    //fn recv_flags(&self, flags: Flags) ->
+    /// Receive a message: `recvmsg_flags(..., 0)`
+    fn recvmsg(&self) -> NngResult<msg::NngMsg> {
+        self.recvmsg_flags(Default::default())
+    }
     /// Receive a message.  See [nng_recvmsg](https://nanomsg.github.io/nng/man/v1.1.0/nng_recvmsg.3).
-    fn recv(&self) -> NngResult<msg::NngMsg> {
+    fn recvmsg_flags(&self, flags: Flags) -> NngResult<msg::NngMsg> {
         unsafe {
             let mut recv_ptr: *mut nng_msg = std::ptr::null_mut();
-            let res = nng_recvmsg(self.nng_socket(), &mut recv_ptr, 0);
+            let res = nng_recvmsg(self.nng_socket(), &mut recv_ptr, flags.bits());
             NngFail::succeed_then(res, || msg::NngMsg::new_msg(recv_ptr))
         }
     }
