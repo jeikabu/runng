@@ -27,13 +27,13 @@ use std::collections::VecDeque;
 /// Context for asynchrounous I/O.
 pub trait AsyncContext: Sized {
     /// Create a new asynchronous context using specified socket.
-    fn create(socket: NngSocket) -> NngResult<Self>;
+    fn create(socket: NngSocket) -> Result<Self>;
 }
 
 pub trait AsyncStreamContext: Sized {
     /// Create a new asynchronous context using specified socket.
-    fn create(socket: NngSocket, buffer: usize) -> NngResult<Self>;
-    //fn create_unbounded(socket: NngSocket) -> NngResult<Self>;
+    fn create(socket: NngSocket, buffer: usize) -> Result<Self>;
+    //fn create_unbounded(socket: NngSocket) -> Result<Self>;
 }
 
 /// A `Socket` that can be turned into a context for asynchronous I/O.
@@ -43,9 +43,10 @@ pub trait AsyncStreamContext: Sized {
 /// use runng::{
 ///     *,
 ///     asyncio::*,
+///     factory::latest::ProtocolFactory,
 /// };
-/// fn test() -> Result<(), NngFail> {
-///     let factory = Latest::default();
+/// fn test() -> runng::Result<()> {
+///     let factory = ProtocolFactory::default();
 ///     let pusher = factory.pusher_open()?.listen("inproc://test")?;
 ///     let mut push_ctx = pusher.create_async()?;
 ///     Ok(())
@@ -56,7 +57,7 @@ pub trait AsyncSocket: Socket {
     type ContextType: AsyncContext;
 
     /// Turns the `Socket` into an asynchronous context
-    fn create_async(&self) -> NngResult<Self::ContextType> {
+    fn create_async(&self) -> Result<Self::ContextType> {
         let socket = self.socket().clone();
         let ctx = Self::ContextType::create(socket)?;
         Ok(ctx)
@@ -68,14 +69,14 @@ pub trait AsyncStream: Socket {
     type ContextType: AsyncStreamContext;
 
     /// Turns the `Socket` into an asynchronous context
-    fn create_async_stream(&self, buffer: usize) -> NngResult<Self::ContextType> {
+    fn create_async_stream(&self, buffer: usize) -> Result<Self::ContextType> {
         let socket = self.socket().clone();
         let ctx = Self::ContextType::create(socket, buffer)?;
         Ok(ctx)
     }
 }
 
-fn try_signal_complete(sender: &mut mpsc::Sender<NngResult<NngMsg>>, message: NngResult<NngMsg>) {
+fn try_signal_complete(sender: &mut mpsc::Sender<Result<NngMsg>>, message: Result<NngMsg>) {
     let res = sender.try_send(message);
     if let Err(err) = res {
         if err.is_disconnected() {
@@ -90,12 +91,12 @@ fn try_signal_complete(sender: &mut mpsc::Sender<NngResult<NngMsg>>, message: Nn
 
 #[derive(Debug, Default)]
 struct WorkQueue {
-    waiting: VecDeque<oneshot::Sender<NngResult<NngMsg>>>,
-    ready: VecDeque<NngResult<NngMsg>>,
+    waiting: VecDeque<oneshot::Sender<Result<NngMsg>>>,
+    ready: VecDeque<Result<NngMsg>>,
 }
 
 impl WorkQueue {
-    fn push_back(&mut self, message: NngResult<NngMsg>) {
+    fn push_back(&mut self, message: Result<NngMsg>) {
         if let Some(sender) = self.waiting.pop_front() {
             sender.send(message).unwrap();
         } else {
@@ -104,11 +105,8 @@ impl WorkQueue {
     }
 }
 
-trait NngSink:
-    Sink<SinkItem = NngResult<NngMsg>, SinkError = mpsc::SendError<NngResult<NngMsg>>>
-{
-}
-impl<T: Sink<SinkItem = NngResult<NngMsg>, SinkError = mpsc::SendError<NngResult<NngMsg>>>> NngSink
+trait NngSink: Sink<SinkItem = Result<NngMsg>, SinkError = mpsc::SendError<Result<NngMsg>>> {}
+impl<T: Sink<SinkItem = Result<NngMsg>, SinkError = mpsc::SendError<Result<NngMsg>>>> NngSink
     for T
 {
 }

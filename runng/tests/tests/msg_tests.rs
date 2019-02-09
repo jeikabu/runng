@@ -1,9 +1,9 @@
 use crate::common::rand_msg;
 use rand::Rng;
-use runng::*;
+use runng::msg::NngMsg;
 
 #[test]
-fn equality() -> NngReturn {
+fn equality() -> runng::Result<()> {
     // Cloned messages are equal
     let msg = rand_msg()?;
     let dupe = msg.clone();
@@ -11,7 +11,7 @@ fn equality() -> NngReturn {
 
     // Different body are not equal
     {
-        let mut other = msg::NngMsg::with_size(128)?;
+        let mut other = NngMsg::with_size(128)?;
         rand::thread_rng().fill(other.as_mut_slice());
         assert_ne!(msg, other);
     }
@@ -32,8 +32,8 @@ fn equality() -> NngReturn {
 
     // Empty messages are equal
     {
-        let empty0 = msg::NngMsg::create()?;
-        let empty1 = msg::NngMsg::create()?;
+        let empty0 = NngMsg::create()?;
+        let empty1 = NngMsg::create()?;
         assert_eq!(empty0, empty1);
     }
     Ok(())

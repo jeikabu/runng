@@ -17,7 +17,7 @@ struct PullAioArg {
 }
 
 impl PullAioArg {
-    pub fn create(socket: NngSocket) -> NngResult<Box<Self>> {
+    pub fn create(socket: NngSocket) -> Result<Box<Self>> {
         let aio = NngAio::new(socket);
         let queue = Mutex::new(WorkQueue::default());
         let arg = Self { aio, queue };
@@ -50,7 +50,7 @@ pub struct PullAsyncHandle {
 }
 
 impl AsyncContext for PullAsyncHandle {
-    fn create(socket: NngSocket) -> NngResult<Self> {
+    fn create(socket: NngSocket) -> Result<Self> {
         let aio_arg = PullAioArg::create(socket)?;
         Ok(Self { aio_arg })
     }
@@ -58,11 +58,11 @@ impl AsyncContext for PullAsyncHandle {
 
 pub trait ReadAsync {
     // FIXME: Can change this to -> impl Future later?
-    fn receive(&mut self) -> Box<dyn Future<Item = NngResult<NngMsg>, Error = oneshot::Canceled>>;
+    fn receive(&mut self) -> Box<dyn Future<Item = Result<NngMsg>, Error = oneshot::Canceled>>;
 }
 
 impl ReadAsync for PullAsyncHandle {
-    fn receive(&mut self) -> Box<dyn Future<Item = NngResult<NngMsg>, Error = oneshot::Canceled>> {
+    fn receive(&mut self) -> Box<dyn Future<Item = Result<NngMsg>, Error = oneshot::Canceled>> {
         let mut queue = self.aio_arg.queue.lock().unwrap();
         // If a value is ready return it immediately.  Otherwise
         if let Some(item) = queue.ready.pop_front() {
@@ -79,15 +79,15 @@ unsafe extern "C" fn read_callback(arg: AioCallbackArg) {
     let ctx = &mut *(arg as *mut PullAioArg);
     let aio = ctx.aio.nng_aio();
     let aio_res = nng_aio_result(aio);
-    let res = NngFail::from_i32(aio_res);
+    let res = Error::from_i32(aio_res);
     trace!("read_callback::{:?}", res);
     match res {
         Err(res) => {
             match res {
                 // nng_aio_close() calls nng_aio_stop which nng_aio_abort(NNG_ECANCELED) and waits.
                 // If we call start_receive() it will fail with ECANCELED and we infinite loop...
-                NngFail::Err(nng_errno_enum::NNG_ECLOSED)
-                | NngFail::Err(nng_errno_enum::NNG_ECANCELED) => {
+                Error::Errno(nng_errno_enum::NNG_ECLOSED)
+                | Error::Errno(nng_errno_enum::NNG_ECANCELED) => {
                     debug!("read_callback {:?}", res);
                 }
                 _ => {

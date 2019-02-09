@@ -74,7 +74,7 @@ impl NngPipe {
 
     /// Closes the pipe.  See [nng_pipe_close](https://nanomsg.github.io/nng/man/v1.1.0/nng_pipe_close.3).
     /// This will cause associated aio/ctx functions that were using the pipe to fail.
-    pub unsafe fn close(self) -> NngReturn {
-        NngFail::from_i32(nng_pipe_close(self.pipe))
+    pub unsafe fn close(self) -> Result<()> {
+        Error::from_i32(nng_pipe_close(self.pipe))
     }
 }

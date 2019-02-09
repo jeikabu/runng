@@ -22,31 +22,31 @@ use crate::*;
 use runng_sys::*;
 
 pub trait Subscribe {
-    fn subscribe(&self, topic: &[u8]) -> NngReturn;
-    fn subscribe_str(&self, topic: &str) -> NngReturn {
+    fn subscribe(&self, topic: &[u8]) -> Result<()>;
+    fn subscribe_str(&self, topic: &str) -> Result<()> {
         self.subscribe(topic.as_bytes())
     }
 }
 
-fn nng_open<T, O, S>(open_func: O, socket_create_func: S) -> NngResult<T>
+fn nng_open<T, O, S>(open_func: O, socket_create_func: S) -> Result<T>
 where
     O: Fn(&mut nng_socket) -> i32,
     S: Fn(NngSocket) -> T,
 {
     let mut socket = nng_socket { id: 0 };
     let res = open_func(&mut socket);
-    NngFail::succeed_then(res, || {
+    Error::zero_map(res, || {
         let socket = NngSocket::new(socket);
         socket_create_func(socket)
     })
 }
 
-pub(crate) fn subscribe(socket: nng_socket, topic: &[u8]) -> NngReturn {
+pub(crate) fn subscribe(socket: nng_socket, topic: &[u8]) -> Result<()> {
     unsafe {
         let opt = NNG_OPT_SUB_SUBSCRIBE.as_ptr() as *const ::std::os::raw::c_char;
         let topic_ptr = topic.as_ptr() as *const ::std::os::raw::c_void;
         let topic_size = std::mem::size_of_val(topic);
         let res = nng_setopt(socket, opt, topic_ptr, topic_size);
-        NngFail::from_i32(res)
+        Error::from_i32(res)
     }
 }

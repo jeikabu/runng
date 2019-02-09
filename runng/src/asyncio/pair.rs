@@ -11,7 +11,7 @@ pub struct PairAsyncHandle {
 }
 
 impl AsyncContext for PairAsyncHandle {
-    fn create(socket: NngSocket) -> NngResult<Self> {
+    fn create(socket: NngSocket) -> Result<Self> {
         let push = PushAsyncHandle::create(socket.clone())?;
         let pull = PullAsyncHandle::create(socket)?;
         let ctx = Self { push, pull };
@@ -20,13 +20,13 @@ impl AsyncContext for PairAsyncHandle {
 }
 
 impl AsyncPush for PairAsyncHandle {
-    fn send(&mut self, msg: NngMsg) -> oneshot::Receiver<NngReturn> {
+    fn send(&mut self, msg: NngMsg) -> oneshot::Receiver<Result<()>> {
         self.push.send(msg)
     }
 }
 
 impl ReadAsync for PairAsyncHandle {
-    fn receive(&mut self) -> Box<dyn Future<Item = NngResult<NngMsg>, Error = oneshot::Canceled>> {
+    fn receive(&mut self) -> Box<dyn Future<Item = Result<NngMsg>, Error = oneshot::Canceled>> {
         self.pull.receive()
     }
 }

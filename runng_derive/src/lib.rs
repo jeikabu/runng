@@ -101,42 +101,42 @@ fn gen_get_impl(name: &syn::Ident, prefix: &str, member: &syn::Ident) -> TokenSt
 
     let gen = quote! {
         impl GetOpts for #name {
-            fn getopt_bool(&self, option: NngOption) -> NngResult<bool> {
+            fn getopt_bool(&self, option: NngOption) -> Result<bool> {
                 unsafe {
                     let mut value: bool = Default::default();
-                    NngFail::succeed( #getopt_bool (self.#member, option.as_cptr(), &mut value), value)
+                    Error::zero_map( #getopt_bool (self.#member, option.as_cptr(), &mut value), || value)
                 }
             }
-            fn getopt_int(&self, option: NngOption) -> NngResult<i32> {
+            fn getopt_int(&self, option: NngOption) -> Result<i32> {
                 unsafe {
                     let mut value: i32 = Default::default();
-                    NngFail::succeed( #getopt_int (self.#member, option.as_cptr(), &mut value), value)
+                    Error::zero_map( #getopt_int (self.#member, option.as_cptr(), &mut value), || value)
                 }
             }
-            fn getopt_ms(&self, option: NngOption) -> NngResult<i32> {
+            fn getopt_ms(&self, option: NngOption) -> Result<i32> {
                 unsafe {
                     let mut value: i32 = Default::default();
-                    NngFail::succeed( #getopt_ms (self.#member, option.as_cptr(), &mut value), value)
+                    Error::zero_map( #getopt_ms (self.#member, option.as_cptr(), &mut value), || value)
                 }
             }
-            fn getopt_size(&self, option: NngOption) -> NngResult<usize>
+            fn getopt_size(&self, option: NngOption) -> Result<usize>
             {
                 unsafe {
                     let mut value: usize = Default::default();
-                    NngFail::succeed( #getopt_size (self.#member, option.as_cptr(), &mut value), value)
+                    Error::zero_map( #getopt_size (self.#member, option.as_cptr(), &mut value), || value)
                 }
             }
-            fn getopt_uint64(&self, option: NngOption) -> NngResult<u64> {
+            fn getopt_uint64(&self, option: NngOption) -> Result<u64> {
                 unsafe {
                     let mut value: u64 = Default::default();
-                    NngFail::succeed( #getopt_uint64 (self.#member, option.as_cptr(), &mut value), value)
+                    Error::zero_map( #getopt_uint64 (self.#member, option.as_cptr(), &mut value), || value)
                 }
             }
-            fn getopt_string(&self, option: NngOption) -> NngResult<NngString> {
+            fn getopt_string(&self, option: NngOption) -> Result<NngString> {
                 unsafe {
                     let mut value: *mut ::std::os::raw::c_char = std::ptr::null_mut();
                     let res = #getopt_string (self.#member, option.as_cptr(), &mut value);
-                    NngFail::from_i32(res)?;
+                    Error::from_i32(res)?;
                     Ok(NngString::new(value))
                 }
             }
@@ -161,35 +161,35 @@ fn gen_set_impl(name: &syn::Ident, prefix: &str, member: &syn::Ident) -> TokenSt
 
     let gen = quote! {
         impl SetOpts for #name {
-            fn setopt_bool(&mut self, option: NngOption, value: bool) -> NngReturn {
+            fn setopt_bool(&mut self, option: NngOption, value: bool) -> Result<()> {
                 unsafe {
-                    NngFail::from_i32(#setopt_bool(self.#member, option.as_cptr(), value))
+                    Error::from_i32(#setopt_bool(self.#member, option.as_cptr(), value))
                 }
             }
-            fn setopt_int(&mut self, option: NngOption, value: i32) -> NngReturn {
+            fn setopt_int(&mut self, option: NngOption, value: i32) -> Result<()> {
                 unsafe {
-                    NngFail::from_i32(#setopt_int(self.#member, option.as_cptr(), value))
+                    Error::from_i32(#setopt_int(self.#member, option.as_cptr(), value))
                 }
             }
-            fn setopt_ms(&mut self, option: NngOption, value: i32) -> NngReturn {
+            fn setopt_ms(&mut self, option: NngOption, value: i32) -> Result<()> {
                 unsafe {
-                    NngFail::from_i32(#setopt_ms(self.#member, option.as_cptr(), value))
+                    Error::from_i32(#setopt_ms(self.#member, option.as_cptr(), value))
                 }
             }
-            fn setopt_size(&mut self, option: NngOption, value: usize) -> NngReturn {
+            fn setopt_size(&mut self, option: NngOption, value: usize) -> Result<()> {
                 unsafe {
-                    NngFail::from_i32(#setopt_size(self.#member, option.as_cptr(), value))
+                    Error::from_i32(#setopt_size(self.#member, option.as_cptr(), value))
                 }
             }
-            fn setopt_uint64(&mut self, option: NngOption, value: u64) -> NngReturn {
+            fn setopt_uint64(&mut self, option: NngOption, value: u64) -> Result<()> {
                 unsafe {
-                    NngFail::from_i32(#setopt_uint64(self.#member, option.as_cptr(), value))
+                    Error::from_i32(#setopt_uint64(self.#member, option.as_cptr(), value))
                 }
             }
-            fn setopt_string(&mut self, option: NngOption, value: &str) -> NngReturn {
+            fn setopt_string(&mut self, option: NngOption, value: &str) -> Result<()> {
                 unsafe {
                     let (_, value) = to_cstr(value)?;
-                    NngFail::from_i32(#setopt_string(self.#member, option.as_cptr(), value))
+                    Error::from_i32(#setopt_string(self.#member, option.as_cptr(), value))
                 }
             }
         }
@@ -201,8 +201,8 @@ fn _derive_nng_msg() -> TokenStream {
     let methods = gen_method_symbols(&["append", "insert"]);
     let add_methods = methods.map(|(member, method, utype)| {
         quote! {
-            pub fn #member(&mut self, data: #utype) -> NngReturn {
-                unsafe { NngFail::from_i32(#method(self.msg(), data)) }
+            pub fn #member(&mut self, data: #utype) -> Result<()> {
+                unsafe { Error::from_i32(#method(self.msg(), data)) }
             }
         }
     });
@@ -210,9 +210,9 @@ fn _derive_nng_msg() -> TokenStream {
     let methods = gen_method_symbols(&["chop", "trim"]);
     let remove_methods = methods.map(|(member, method, utype)| {
         quote! {
-            pub fn #member(&mut self) -> NngResult<#utype> {
+            pub fn #member(&mut self) -> Result<#utype> {
                 let mut val: #utype = 0;
-                unsafe { NngFail::succeed(#method(self.msg(), &mut val), val) }
+                unsafe { Error::zero_map(#method(self.msg(), &mut val), || val) }
             }
         }
     });
