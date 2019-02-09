@@ -18,7 +18,7 @@ fn test() -> Result<(), NngFail> {
     let factory = Latest::default();
     let rep = factory.replier_open()?.listen(&url)?;
     let req = factory.requester_open()?.dial(&url)?;
-    req.send(msg::NngMsg::create()?)?;
+    req.sendmsg(msg::NngMsg::create()?)?;
     rep.recv()?;
     Ok(())
 }

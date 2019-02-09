@@ -3,29 +3,10 @@ use runng_derive::NngMsgOpts;
 use runng_sys::*;
 use std::{os::raw::c_void, ptr, slice};
 
-#[derive(Debug)]
-struct DroppableMsg {
-    msg: *mut nng_msg,
-}
-
-unsafe impl Send for DroppableMsg {}
-unsafe impl Sync for DroppableMsg {}
-
-impl Drop for DroppableMsg {
-    fn drop(&mut self) {
-        unsafe {
-            if !self.msg.is_null() {
-                trace!("Dropping {:x}", self.msg as u64);
-                nng_msg_free(self.msg);
-            }
-        }
-    }
-}
-
 /// Wraps `nng_msg`.  See [nng_msg](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg.5).
 #[derive(Debug, NngMsgOpts)]
 pub struct NngMsg {
-    msg: DroppableMsg,
+    msg: *mut nng_msg,
 }
 
 impl NngMsg {
@@ -42,22 +23,33 @@ impl NngMsg {
     }
 
     pub fn new_msg(msg: *mut nng_msg) -> NngMsg {
-        let msg = DroppableMsg { msg };
         NngMsg { msg }
     }
 
     /// Take ownership of the contained nng_msg.  You are responsible for calling `nng_msg_free`.
     pub unsafe fn take(mut self) -> *mut nng_msg {
-        let msg = self.msg.msg;
-        self.msg.msg = ptr::null_mut();
+        let msg = self.msg;
+        self.msg = ptr::null_mut();
         msg
     }
 
     pub unsafe fn msg(&self) -> *mut nng_msg {
-        self.msg.msg
+        self.msg
     }
 
-    pub fn header(&mut self) -> &[u8] {
+    pub fn as_slice(&self) -> &[u8] {
+        self.body()
+    }
+
+    pub fn as_mut_slice(&mut self) -> &mut [u8] {
+        unsafe {
+            let body = nng_msg_body(self.msg()) as *mut u8;
+            let len = nng_msg_len(self.msg());
+            slice::from_raw_parts_mut(body, len)
+        }
+    }
+
+    pub fn header(&self) -> &[u8] {
         unsafe {
             let header = nng_msg_header(self.msg()) as *mut u8;
             let len = nng_msg_header_len(self.msg());
@@ -69,7 +61,7 @@ impl NngMsg {
         unsafe { nng_msg_header_len(self.msg()) }
     }
 
-    pub fn body(&mut self) -> &[u8] {
+    pub fn body(&self) -> &[u8] {
         unsafe {
             let body = nng_msg_body(self.msg()) as *mut u8;
             let len = nng_msg_len(self.msg());
@@ -93,7 +85,11 @@ impl NngMsg {
         unsafe { NngFail::from_i32(nng_msg_append(self.msg(), data as *const c_void, size)) }
     }
 
-    pub fn insert(&mut self, data: *const u8, size: usize) -> NngReturn {
+    pub fn insert_slice(&mut self, data: &[u8]) -> NngReturn {
+        self.insert_ptr(data.as_ptr(), data.len())
+    }
+
+    pub fn insert_ptr(&mut self, data: *const u8, size: usize) -> NngReturn {
         unsafe { NngFail::from_i32(nng_msg_insert(self.msg(), data as *const c_void, size)) }
     }
 
@@ -105,7 +101,11 @@ impl NngMsg {
         unsafe { NngFail::from_i32(nng_msg_chop(self.msg(), size)) }
     }
 
-    pub fn header_append(&mut self, data: *const u8, size: usize) -> NngReturn {
+    pub fn header_append_slice(&mut self, data: &[u8]) -> NngReturn {
+        self.header_append_ptr(data.as_ptr(), data.len())
+    }
+
+    pub fn header_append_ptr(&mut self, data: *const u8, size: usize) -> NngReturn {
         unsafe {
             NngFail::from_i32(nng_msg_header_append(
                 self.msg(),
@@ -115,7 +115,11 @@ impl NngMsg {
         }
     }
 
-    pub fn header_insert(&mut self, data: *const u8, size: usize) -> NngReturn {
+    pub fn header_insert_slice(&mut self, data: &[u8]) -> NngReturn {
+        self.header_insert_ptr(data.as_ptr(), data.len())
+    }
+
+    pub fn header_insert_ptr(&mut self, data: *const u8, size: usize) -> NngReturn {
         unsafe {
             NngFail::from_i32(nng_msg_header_insert(
                 self.msg(),
@@ -159,5 +163,25 @@ impl NngMsg {
 impl Clone for NngMsg {
     fn clone(&self) -> Self {
         self.dup().unwrap()
+    }
+}
+
+unsafe impl Send for NngMsg {}
+unsafe impl Sync for NngMsg {}
+
+impl PartialEq for NngMsg {
+    fn eq(&self, other: &NngMsg) -> bool {
+        self.header() == other.header() && self.body() == other.body()
+    }
+}
+
+impl Drop for NngMsg {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.msg.is_null() {
+                trace!("Dropping {:x}", self.msg as u64);
+                nng_msg_free(self.msg);
+            }
+        }
     }
 }

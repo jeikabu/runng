@@ -19,6 +19,7 @@ bitflags! {
 }
 
 /// Wraps `nng_socket`.  See [nng_socket](https://nanomsg.github.io/nng/man/v1.1.0/nng_socket.5).
+#[derive(Debug)]
 pub struct NngSocket {
     socket: Arc<InnerSocket>,
 }
@@ -331,6 +332,7 @@ pub trait RecvMsg: Socket {
 
 /// "Unsafe" version of `NngSocket`.  Merely wraps `nng_socket` and makes no attempt to manage the underlying resources.
 /// May be invalid, close unexpectedly, etc.
+#[derive(Debug)]
 pub struct UnsafeSocket {
     socket: nng_socket,
 }
@@ -346,6 +348,7 @@ impl UnsafeSocket {
     }
 }
 
+#[derive(Debug)]
 struct InnerSocket {
     socket: nng_socket,
 }

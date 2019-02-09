@@ -5,7 +5,7 @@ use crate::asyncio::*;
 use runng_sys::*;
 
 /// Request half of request/reply pattern.  See [nng_req](https://nanomsg.github.io/nng/man/v1.1.0/nng_req.7).
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Req0 {
     socket: NngSocket,
 }

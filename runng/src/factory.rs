@@ -10,7 +10,7 @@ use super::*;
 /// let factory = Latest::default();
 /// let publisher = factory.publisher_open();
 /// ```
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Latest {}
 
 impl Latest {
@@ -38,7 +38,7 @@ impl Latest {
 }
 
 /// Protocols compatible with nanomsg
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Compat {}
 
 impl Compat {

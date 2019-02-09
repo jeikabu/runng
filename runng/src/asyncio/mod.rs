@@ -88,7 +88,7 @@ fn try_signal_complete(sender: &mut mpsc::Sender<NngResult<NngMsg>>, message: Nn
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct WorkQueue {
     waiting: VecDeque<oneshot::Sender<NngResult<NngMsg>>>,
     ready: VecDeque<NngResult<NngMsg>>,

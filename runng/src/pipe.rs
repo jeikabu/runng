@@ -12,7 +12,7 @@ pub type PipeNotifyCallback =
 pub type PipeNotifyCallbackArg = *mut ::std::os::raw::c_void;
 
 /// Wraps `nng_pipe`.  See [nng_pipe](https://nanomsg.github.io/nng/man/v1.1.0/nng_pipe.5).
-#[derive(NngGetOpts)] // Note: nng_pipe has no setopt() functions
+#[derive(Debug, NngGetOpts)] // Note: nng_pipe has no setopt() functions
 #[prefix = "nng_pipe_"]
 pub struct NngPipe {
     #[nng_member]

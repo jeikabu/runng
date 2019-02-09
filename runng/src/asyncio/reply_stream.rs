@@ -17,6 +17,7 @@ enum ReplyState {
     Sending,
 }
 
+#[derive(Debug)]
 struct ReplyContextAioArg {
     ctx: NngCtx,
     state: ReplyState,
@@ -76,6 +77,7 @@ impl Aio for ReplyContextAioArg {
 }
 
 /// Asynchronous context for reply socket.
+#[derive(Debug)]
 pub struct ReplyStreamHandle {
     aio_arg: Box<ReplyContextAioArg>,
     receiver: Option<mpsc::Receiver<NngResult<NngMsg>>>,

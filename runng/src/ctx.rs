@@ -14,6 +14,7 @@ pub trait Ctx {
 }
 
 /// Wraps `nng_ctx` and its associated `NngAio`.  See [nng_ctx](https://nanomsg.github.io/nng/man/v1.1.0/nng_ctx.5).
+#[derive(Debug)]
 pub struct NngCtx {
     ctx: nng_ctx,
     aio: NngAio,

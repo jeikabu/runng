@@ -4,6 +4,7 @@ mod common;
 mod tests {
 
     mod msg_tests;
+    mod options_tests;
     mod pair_tests;
     mod pipe_tests;
     mod pushpull_tests;

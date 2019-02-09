@@ -5,7 +5,7 @@ use runng_derive::{NngGetOpts, NngSetOpts};
 use runng_sys::*;
 
 /// Wraps `nng_listener`.  See [nng_listener](https://nanomsg.github.io/nng/man/v1.1.0/nng_listener.5).
-#[derive(NngGetOpts, NngSetOpts)]
+#[derive(Debug, NngGetOpts, NngSetOpts)]
 #[prefix = "nng_listener_"]
 pub struct NngListener {
     #[nng_member]
@@ -36,6 +36,7 @@ impl NngListener {
 
 /// "Unsafe" version of `NngListener`.  Merely wraps `nng_listener` and makes no attempt to manage the underlying resources.
 /// May be invalid, close unexpectedly, etc.
+#[derive(Debug)]
 pub struct UnsafeListener {
     listener: nng_listener,
 }

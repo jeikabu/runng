@@ -10,6 +10,7 @@ use futures::{future, future::Future, sync::oneshot};
 use runng_sys::*;
 use std::sync::Mutex;
 
+#[derive(Debug)]
 struct PullAioArg {
     aio: NngAio,
     queue: Mutex<WorkQueue>,
@@ -43,6 +44,7 @@ impl Aio for PullAioArg {
     }
 }
 
+#[derive(Debug)]
 pub struct PullAsyncHandle {
     aio_arg: Box<PullAioArg>,
 }

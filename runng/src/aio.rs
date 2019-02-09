@@ -12,6 +12,7 @@ pub trait Aio {
 }
 
 /// Wraps `nng_aio`.  See [nng_aio](https://nanomsg.github.io/nng/man/v1.1.0/nng_aio.5).
+#[derive(Debug)]
 pub struct NngAio {
     aio: *mut nng_aio,
     // This isn't strictly correct from an NNG perspective.  It may be associated with:

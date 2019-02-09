@@ -5,6 +5,7 @@ use crate::asyncio::*;
 use runng_sys::*;
 
 /// Push half of push/pull ("pipeline") pattern.  See [nng_push](https://nanomsg.github.io/nng/man/v1.1.0/nng_push.7).
+#[derive(Clone, Debug)]
 pub struct Push0 {
     socket: NngSocket,
 }

@@ -4,6 +4,7 @@ use crate::{asyncio::*, msg::NngMsg, *};
 use futures::{future::Future, sync::oneshot};
 
 /// Asynchronous context for request socket.
+#[derive(Debug)]
 pub struct PairAsyncHandle {
     push: PushAsyncHandle,
     pull: PullAsyncHandle,

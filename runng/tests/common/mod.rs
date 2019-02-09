@@ -1,5 +1,6 @@
 use env_logger::{Builder, Env};
 use futures::{future, Future};
+use rand::Rng;
 use runng::{msg::NngMsg, NngResult};
 use std::{
     sync::atomic::{AtomicUsize, Ordering},
@@ -32,4 +33,10 @@ pub fn not_stop_message(res: &NngResult<NngMsg>) -> impl Future<Item = bool, Err
 
 pub fn sleep_fast() {
     thread::sleep(time::Duration::from_millis(10));
+}
+
+pub fn rand_msg() -> NngResult<NngMsg> {
+    let mut msg = NngMsg::with_size(128)?;
+    rand::thread_rng().fill(msg.as_mut_slice());
+    Ok(msg)
 }

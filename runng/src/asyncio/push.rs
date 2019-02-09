@@ -16,6 +16,7 @@ enum PushState {
     Sending,
 }
 
+#[derive(Debug)]
 struct PushContextAioArg {
     aio: NngAio,
     state: PushState,
@@ -63,6 +64,7 @@ impl Aio for PushContextAioArg {
 }
 
 /// Asynchronous context for publish socket.
+#[derive(Debug)]
 pub struct PushAsyncHandle {
     aio_arg: Box<PushContextAioArg>,
 }

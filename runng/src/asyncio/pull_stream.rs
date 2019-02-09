@@ -16,6 +16,7 @@ enum PullState {
     Receiving,
 }
 
+#[derive(Debug)]
 struct PullContextAioArg {
     aio: NngAio,
     state: PullState,
@@ -54,6 +55,7 @@ impl Aio for PullContextAioArg {
 }
 
 /// Asynchronous context for pull socket.
+#[derive(Debug)]
 pub struct PullAsyncStream {
     aio_arg: Box<PullContextAioArg>,
     receiver: Option<mpsc::Receiver<NngResult<NngMsg>>>,
@@ -122,6 +124,7 @@ unsafe extern "C" fn pull_callback(arg: AioCallbackArg) {
 }
 
 /// Asynchronous context for subscribe socket.
+#[derive(Debug)]
 pub struct SubscribeAsyncHandle {
     ctx: PullAsyncStream,
 }

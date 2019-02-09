@@ -5,6 +5,7 @@ use crate::asyncio::*;
 use runng_sys::*;
 
 /// Publish half of publisher/subscriber pattern.  See [nng_pub](https://nanomsg.github.io/nng/man/v1.1.0/nng_pub.7).
+#[derive(Clone, Debug)]
 pub struct Pub0 {
     socket: NngSocket,
 }

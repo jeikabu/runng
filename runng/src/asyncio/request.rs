@@ -18,6 +18,7 @@ enum RequestState {
     Receiving,
 }
 
+#[derive(Debug)]
 struct RequestContextAioArg {
     ctx: NngCtx,
     state: RequestState,
@@ -62,6 +63,7 @@ impl Aio for RequestContextAioArg {
 }
 
 /// Asynchronous context for request socket.
+#[derive(Debug)]
 pub struct RequestAsyncHandle {
     aio_arg: Box<RequestContextAioArg>,
 }

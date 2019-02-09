@@ -1,7 +1,10 @@
 //! NNG options.  See [nng_options](https://nanomsg.github.io/nng/man/v1.1.0/nng_options.5).
 
 use super::*;
+use std::ffi::CStr;
 
+/// Wraps strings that should be released with `nng_strfree`.  See [nng_strfree](https://nanomsg.github.io/nng/man/v1.1.0/nng_strfree.3).
+#[derive(Debug)]
 pub struct NngString {
     pointer: *mut ::std::os::raw::c_char,
 }
@@ -11,7 +14,13 @@ impl NngString {
         NngString { pointer }
     }
     pub fn to_str(&self) -> Result<&str, std::str::Utf8Error> {
-        unsafe { std::ffi::CStr::from_ptr(self.pointer).to_str() }
+        unsafe { CStr::from_ptr(self.pointer).to_str() }
+    }
+}
+
+impl PartialEq for NngString {
+    fn eq(&self, other: &NngString) -> bool {
+        unsafe { CStr::from_ptr(self.pointer) == CStr::from_ptr(other.pointer) }
     }
 }
 
@@ -43,6 +52,8 @@ pub trait SetOpts {
     fn setopt_string(&mut self, option: NngOption, value: &str) -> NngReturn;
 }
 
+/// Wraps nng option names.  See [nng_options](https://nanomsg.github.io/nng/man/v1.1.0/nng_options.5).
+#[derive(Debug, PartialEq)]
 pub struct NngOption(&'static [u8]);
 
 impl NngOption {

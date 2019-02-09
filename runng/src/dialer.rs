@@ -5,7 +5,7 @@ use runng_derive::{NngGetOpts, NngSetOpts};
 use runng_sys::*;
 
 /// Wraps `nng_dialer`.  See [nng_dialer](https://nanomsg.github.io/nng/man/v1.1.0/nng_dialer.5).
-#[derive(NngGetOpts, NngSetOpts)]
+#[derive(Debug, NngGetOpts, NngSetOpts)]
 #[prefix = "nng_dialer_"]
 pub struct NngDialer {
     #[nng_member]
@@ -35,6 +35,7 @@ impl NngDialer {
 
 /// "Unsafe" version of `NngDialer`.  Merely wraps `nng_dialer` and makes no attempt to manage the underlying resources.
 /// May be invalid, close unexpectedly, etc.
+#[derive(Debug)]
 pub struct UnsafeDialer {
     dialer: nng_dialer,
 }

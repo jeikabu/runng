@@ -49,7 +49,7 @@ use std::marker;
 pub trait NngStat {
     /// Obtain underlying [`nng_stat`](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat.5).
     unsafe fn nng_stat(&self) -> *mut nng_stat;
-    /// Returns the first child statistic, if any.
+    /// Returns the first child statistic, if any.  See [nng_stat_child](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_child.3).
     fn child(&self) -> Option<NngStatChild> {
         unsafe {
             let node = nng_stat_child(self.nng_stat());
@@ -69,6 +69,7 @@ pub trait NngStat {
 let child = NngStatRoot::new().unwrap().child();
 ```
 */
+#[derive(Debug)]
 pub struct NngStatRoot<'root> {
     node: *mut nng_stat,
     _phantom: marker::PhantomData<&'root nng_stat>,
@@ -103,6 +104,7 @@ impl<'root> Drop for NngStatRoot<'root> {
     }
 }
 
+#[derive(Debug)]
 pub struct NngStatChild<'root> {
     node: *mut nng_stat,
     _phantom: marker::PhantomData<&'root nng_stat>,
@@ -188,6 +190,7 @@ impl<'root> NngStatChild<'root> {
 
     // The explicit `'root` lifetime is important here so the lifetime is the
     // top-level `NngStatRoot` rather than &self.
+    /// Get the next sibling statistic.  See [nng_stat_next](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_next.3).
     pub fn next(&self) -> Option<NngStatChild<'root>> {
         unsafe {
             let node = self.nng_stat();
@@ -208,6 +211,7 @@ impl<'root> NngStat for NngStatChild<'root> {
 }
 
 /// Iterator over sibling statistics
+#[derive(Debug)]
 pub struct Iter<'root> {
     node: Option<NngStatChild<'root>>,
 }

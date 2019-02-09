@@ -19,6 +19,7 @@ enum ReplyState {
     Sending,
 }
 
+#[derive(Debug)]
 struct ReplyContextAioArg {
     ctx: NngCtx,
     state: ReplyState,
@@ -80,6 +81,7 @@ impl Aio for ReplyContextAioArg {
 }
 
 /// Asynchronous context for reply socket.
+#[derive(Debug)]
 pub struct ReplyAsyncHandle {
     aio_arg: Box<ReplyContextAioArg>,
 }
