@@ -62,4 +62,4 @@ fn aio() -> NngReturn {
 }
 ```
 
-Additional examples [in `examples/` folder](https://github.com/jeikabu/runng/tree/master/runng/examples).
+Additional examples [in `examples/` folder](https://github.com/jeikabu/runng/tree/master/runng/examples) and [runng_examples](https://github.com/jeikabu/runng_examples).
