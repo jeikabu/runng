@@ -11,14 +11,21 @@ Features:
 
 Simple:
 ```rust
-use runng::*;
-fn test() -> Result<(), NngFail> {
+use runng::{
+    Dial, Listen, RecvMsg, SendMsg,
+    factory::latest::ProtocolFactory, 
+    msg::NngMsg,
+    protocol::*,
+};
+fn simple_reqrep() -> Result<(), runng::Error> {
     const url: &str = "inproc://test";
-    let factory = Latest::default();
+
+    let factory = ProtocolFactory::default();
     let rep = factory.replier_open()?.listen(&url)?;
     let req = factory.requester_open()?.dial(&url)?;
-    req.send(msg::NngMsg::new()?)?;
+    req.sendmsg(NngMsg::create()?)?;
     rep.recv()?;
+
     Ok(())
 }
 ```
@@ -30,32 +37,23 @@ use futures::{
     stream::Stream,
 };
 use runng::{
-    *,
-    protocol::{
-        AsyncReply,
-        AsyncRequest,
-        AsyncSocket,
-    },
+    Dial, Listen,
+    asyncio::*,
+    factory::latest::ProtocolFactory,
+    msg::NngMsg,
+    protocol::*,
 };
 
-fn aio() -> NngReturn {
+fn async_reqrep() -> Result<(), runng::Error> {
     const url: &str = "inproc://test";
 
-    let factory = Latest::default();
-    let mut rep_ctx = factory
-        .replier_open()?
-        .listen(&url)?
-        .create_async_context()?;
+    let factory = ProtocolFactory::default();
+    let mut rep_ctx = factory.replier_open()?.listen(&url)?.create_async()?;
 
-    let requester = factory.requester_open()?.dial(&url)?;
-    let mut req_ctx = requester.create_async_context()?;
-    let req_future = req_ctx.send(msg::NngMsg::new()?);
-    rep_ctx.receive()
-        .take(1).for_each(|_request|{
-            let msg = msg::NngMsg::new().unwrap();
-            rep_ctx.reply(msg).wait().unwrap();
-            Ok(())
-        }).wait();
+    let mut req_ctx = factory.requester_open()?.dial(&url)?.create_async()?;
+    let req_future = req_ctx.send(NngMsg::create()?);
+    let _request = rep_ctx.receive().wait()?;
+    rep_ctx.reply(NngMsg::create()?).wait()??;
     req_future.wait().unwrap()?;
 
     Ok(())

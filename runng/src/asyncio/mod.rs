@@ -98,7 +98,9 @@ struct WorkQueue {
 impl WorkQueue {
     fn push_back(&mut self, message: Result<NngMsg>) {
         if let Some(sender) = self.waiting.pop_front() {
-            sender.send(message).unwrap();
+            sender
+                .send(message)
+                .unwrap_or_else(|_msg| debug!("Dropping message"));
         } else {
             self.ready.push_back(message);
         }

@@ -43,8 +43,9 @@ fn stats_example() -> Result<()> {
 */
 
 use crate::*;
+use log::trace;
 use runng_sys::*;
-use std::{marker, result};
+use std::{ffi::CStr, marker, result};
 
 pub trait NngStat {
     /// Obtain underlying [`nng_stat`](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat.5).
@@ -53,11 +54,7 @@ pub trait NngStat {
     fn child(&self) -> Option<NngStatChild> {
         unsafe {
             let node = nng_stat_child(self.nng_stat());
-            if node.is_null() {
-                None
-            } else {
-                Some(NngStatChild::new(node))
-            }
+            NngStatChild::new(node)
         }
     }
 }
@@ -70,35 +67,31 @@ let child = NngStatRoot::new().unwrap().child();
 ```
 */
 #[derive(Debug)]
-pub struct NngStatRoot<'root> {
+pub struct NngStatRoot {
     node: *mut nng_stat,
-    _phantom: marker::PhantomData<&'root nng_stat>,
 }
 
-impl<'root> NngStatRoot<'root> {
+impl NngStatRoot {
     /// Get statistics snapshot.  See [nng_stats_get](https://nanomsg.github.io/nng/man/v1.1.0/nng_stats_get.3).
-    pub fn create() -> Result<NngStatRoot<'root>> {
+    pub fn create() -> Result<NngStatRoot> {
         unsafe {
             let mut node: *mut nng_stat = std::ptr::null_mut();
             let res = nng_stats_get(&mut node);
-            Error::zero_map(res, || NngStatRoot {
-                node,
-                _phantom: marker::PhantomData,
-            })
+            Error::zero_map(res, || NngStatRoot { node })
         }
     }
 }
 
-impl<'root> NngStat for NngStatRoot<'root> {
+impl NngStat for NngStatRoot {
     unsafe fn nng_stat(&self) -> *mut nng_stat {
         self.node
     }
 }
 
-impl<'root> Drop for NngStatRoot<'root> {
+impl Drop for NngStatRoot {
     fn drop(&mut self) {
         unsafe {
-            //trace!("Drop NngStatRoot");
+            trace!("Drop NngStatRoot");
             nng_stats_free(self.node)
         }
     }
@@ -112,17 +105,22 @@ pub struct NngStatChild<'root> {
 
 /// Child of statistic node in tree of statistics.  See `NngStat::child()`.
 impl<'root> NngStatChild<'root> {
-    pub fn new(node: *mut nng_stat) -> NngStatChild<'root> {
-        NngStatChild {
-            node,
-            _phantom: marker::PhantomData,
+    pub fn new(node: *mut nng_stat) -> Option<NngStatChild<'root>> {
+        if node.is_null() {
+            None
+        } else {
+            Some(NngStatChild {
+                node,
+                _phantom: marker::PhantomData,
+            })
         }
     }
+
     /// See [nng_stat_name](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_name.3).
     pub fn name(&self) -> result::Result<&str, std::str::Utf8Error> {
         unsafe {
             let ptr = nng_stat_name(self.nng_stat());
-            std::ffi::CStr::from_ptr(ptr).to_str()
+            CStr::from_ptr(ptr).to_str()
         }
     }
 
@@ -130,7 +128,7 @@ impl<'root> NngStatChild<'root> {
     pub fn desc(&self) -> result::Result<&str, std::str::Utf8Error> {
         unsafe {
             let ptr = nng_stat_desc(self.nng_stat());
-            std::ffi::CStr::from_ptr(ptr).to_str()
+            CStr::from_ptr(ptr).to_str()
         }
     }
 
@@ -156,12 +154,7 @@ impl<'root> NngStatChild<'root> {
             if ptr.is_null() {
                 return None;
             }
-            let string = std::ffi::CStr::from_ptr(ptr).to_str();
-            if let Ok(string) = string {
-                Some(string)
-            } else {
-                None
-            }
+            CStr::from_ptr(ptr).to_str().ok()
         }
     }
 
@@ -178,12 +171,12 @@ impl<'root> NngStatChild<'root> {
         unsafe { nng_stat_timestamp(self.nng_stat()) }
     }
 
-    /// Returns an iterator over sibling statistics.  See [nng_stat_next](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_next.3).
+    /// Returns an iterator over self and sibling statistics.  See [nng_stat_next](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_next.3).
     pub fn iter(&self) -> Iter {
         unsafe {
             let node = self.nng_stat();
             Iter {
-                node: Some(NngStatChild::new(node)),
+                node: NngStatChild::new(node),
             }
         }
     }
@@ -195,16 +188,12 @@ impl<'root> NngStatChild<'root> {
         unsafe {
             let node = self.nng_stat();
             let node = nng_stat_next(node);
-            if node.is_null() {
-                None
-            } else {
-                Some(NngStatChild::new(node))
-            }
+            NngStatChild::new(node)
         }
     }
 }
 
-impl<'root> NngStat for NngStatChild<'root> {
+impl<'root> NngStat for NngStatChild<'_> {
     unsafe fn nng_stat(&self) -> *mut nng_stat {
         self.node
     }
