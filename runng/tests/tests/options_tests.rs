@@ -1,11 +1,14 @@
 use crate::common::get_url;
-use runng::*;
-use runng_sys::*;
+use runng::{
+    factory::latest::ProtocolFactory,
+    options::{GetOpts, NngOption},
+    socket::*,
+};
 
 #[test]
-fn string_equality() -> NngReturn {
+fn string_equality() -> runng::Result<()> {
     let url = get_url();
-    let factory = Latest::default();
+    let factory = ProtocolFactory::default();
     let rep = factory.replier_open()?.listen(&url)?;
     let sockname0 = rep.socket().getopt_string(NngOption::SOCKNAME)?;
     let sockname1 = rep.socket().getopt_string(NngOption::SOCKNAME)?;
@@ -14,7 +17,7 @@ fn string_equality() -> NngReturn {
 }
 
 #[test]
-fn names() -> NngReturn {
+fn names() -> runng::Result<()> {
     assert_eq!(NngOption::SOCKNAME, NngOption::SOCKNAME);
     assert_ne!(NngOption::SOCKNAME, NngOption::PROTONAME);
     Ok(())

@@ -1,6 +1,6 @@
 use crate::common::{create_stop_message, get_url, not_stop_message};
 use futures::{future::Future, Stream};
-use runng::{asyncio::*, *};
+use runng::{asyncio::*, factory::latest::ProtocolFactory, msg::NngMsg, socket::*};
 use std::{
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -10,20 +10,20 @@ use std::{
 };
 
 #[test]
-fn pushpull() -> NngReturn {
+fn pushpull() -> runng::Result<()> {
     let url = get_url();
-    let factory = Latest::default();
+    let factory = ProtocolFactory::default();
 
     let pusher = factory.pusher_open()?.listen(&url)?;
     let puller = factory.puller_open()?.dial(&url)?;
     let count = 4;
 
     // Pusher
-    let push_thread = thread::spawn(move || -> NngReturn {
+    let push_thread = thread::spawn(move || -> runng::Result<()> {
         let mut push_ctx = pusher.create_async()?;
         // Send messages
         for i in 0..count {
-            let mut msg = msg::NngMsg::create()?;
+            let mut msg = NngMsg::create()?;
             msg.append_u32(i)?;
             push_ctx.send(msg).wait().unwrap()?;
         }
@@ -35,7 +35,7 @@ fn pushpull() -> NngReturn {
     // Puller
     let recv_count = Arc::new(AtomicUsize::new(0));
     let thread_count = recv_count.clone();
-    let pull_thread = thread::spawn(move || -> NngReturn {
+    let pull_thread = thread::spawn(move || -> runng::Result<()> {
         let mut pull_ctx = puller.create_async_stream(1)?;
         pull_ctx
             .receive()
@@ -62,20 +62,20 @@ fn pushpull() -> NngReturn {
 }
 
 #[test]
-fn read() -> NngReturn {
+fn read() -> runng::Result<()> {
     let url = get_url();
-    let factory = Latest::default();
+    let factory = ProtocolFactory::default();
 
     let pusher = factory.pusher_open()?.listen(&url)?;
     let puller = factory.puller_open()?.dial(&url)?;
     let count = 4;
 
     // Pusher
-    let push_thread = thread::spawn(move || -> NngReturn {
+    let push_thread = thread::spawn(move || -> runng::Result<()> {
         let mut push_ctx = pusher.create_async()?;
         // Send messages
         for i in 0..count {
-            let mut msg = msg::NngMsg::create()?;
+            let mut msg = NngMsg::create()?;
             msg.append_u32(i)?;
             push_ctx.send(msg).wait().unwrap()?;
         }
@@ -87,7 +87,7 @@ fn read() -> NngReturn {
     // Puller
     let recv_count = Arc::new(AtomicUsize::new(0));
     let thread_count = recv_count.clone();
-    let pull_thread = thread::spawn(move || -> NngReturn {
+    let pull_thread = thread::spawn(move || -> runng::Result<()> {
         let mut read_ctx = puller.create_async()?;
         loop {
             let msg = read_ctx.receive().wait()??;
@@ -110,19 +110,19 @@ fn read() -> NngReturn {
 }
 
 // #[test]
-// fn crash() -> NngReturn {
+// fn crash() -> runng::Result<()> {
 //     let url = get_url();
-//     let factory = Latest::default();
+//     let factory = ProtocolFactory::default();
 
 //     let pusher = factory.pusher_open()?.listen(&url)?;
 //     let puller = factory.puller_open()?.dial(&url)?;
 
 //     // Pusher
-//     let push_thread = thread::spawn(move || -> NngReturn {
+//     let push_thread = thread::spawn(move || -> runng::Result<()> {
 //         let mut push_ctx = pusher.create_async()?;
 //         // Send messages
 //         loop {
-//             let msg = msg::NngMsg::create()?;
+//             let msg = NngMsg::create()?;
 //             push_ctx.send(msg).wait().unwrap()?;
 //         }
 //         Ok(())
@@ -131,7 +131,7 @@ fn read() -> NngReturn {
 //     // Puller
 //     let recv_count = Arc::new(AtomicUsize::new(0));
 //     let thread_count = recv_count.clone();
-//     let pull_thread = thread::spawn(move || -> NngReturn {
+//     let pull_thread = thread::spawn(move || -> runng::Result<()> {
 //         puller.create_async()?
 //             .receive().unwrap()
 //             .for_each(|msg| {

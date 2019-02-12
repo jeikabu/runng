@@ -1,6 +1,6 @@
 //! Asynchronous I/O
 
-use super::*;
+use crate::*;
 use runng_sys::*;
 use std::ptr;
 
@@ -36,17 +36,17 @@ impl NngAio {
     }
 
     /// Finish initialization of `nng_aio`.  See [nng_aio_alloc](https://nanomsg.github.io/nng/man/v1.1.0/nng_aio_alloc.3).
-    pub fn init(&mut self, callback: AioCallback, arg: AioCallbackArg) -> NngReturn {
+    pub fn init(&mut self, callback: AioCallback, arg: AioCallbackArg) -> Result<()> {
         unsafe {
             let mut aio: *mut nng_aio = ptr::null_mut();
             //https://doc.rust-lang.org/stable/book/first-edition/ffi.html#callbacks-from-c-code-to-rust-functions
             let res = nng_aio_alloc(&mut aio, Some(callback), arg);
             self.aio = aio;
-            NngFail::from_i32(res)
+            Error::from_i32(res)
         }
     }
 
-    pub(crate) fn register_aio<T>(arg: T, callback: AioCallback) -> NngResult<Box<T>>
+    pub(crate) fn register_aio<T>(arg: T, callback: AioCallback) -> Result<Box<T>>
     where
         T: Aio,
     {

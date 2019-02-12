@@ -1,19 +1,19 @@
 //! NNG options.  See [nng_options](https://nanomsg.github.io/nng/man/v1.1.0/nng_options.5).
 
-use super::*;
-use std::ffi::CStr;
+use crate::*;
+use std::{ffi::CStr, os::raw::c_char, result};
 
 /// Wraps strings that should be released with `nng_strfree`.  See [nng_strfree](https://nanomsg.github.io/nng/man/v1.1.0/nng_strfree.3).
 #[derive(Debug)]
 pub struct NngString {
-    pointer: *mut ::std::os::raw::c_char,
+    pointer: *mut c_char,
 }
 
 impl NngString {
-    pub fn new(pointer: *mut ::std::os::raw::c_char) -> NngString {
+    pub fn new(pointer: *mut c_char) -> NngString {
         NngString { pointer }
     }
-    pub fn to_str(&self) -> Result<&str, std::str::Utf8Error> {
+    pub fn to_str(&self) -> result::Result<&str, std::str::Utf8Error> {
         unsafe { CStr::from_ptr(self.pointer).to_str() }
     }
 }
@@ -34,22 +34,22 @@ impl Drop for NngString {
 
 /// Trait for types which support getting NNG options.
 pub trait GetOpts {
-    fn getopt_bool(&self, option: NngOption) -> NngResult<bool>;
-    fn getopt_int(&self, option: NngOption) -> NngResult<i32>;
-    fn getopt_ms(&self, option: NngOption) -> NngResult<nng_duration>;
-    fn getopt_size(&self, option: NngOption) -> NngResult<usize>;
-    fn getopt_uint64(&self, option: NngOption) -> NngResult<u64>;
-    fn getopt_string(&self, option: NngOption) -> NngResult<NngString>;
+    fn getopt_bool(&self, option: NngOption) -> Result<bool>;
+    fn getopt_int(&self, option: NngOption) -> Result<i32>;
+    fn getopt_ms(&self, option: NngOption) -> Result<nng_duration>;
+    fn getopt_size(&self, option: NngOption) -> Result<usize>;
+    fn getopt_uint64(&self, option: NngOption) -> Result<u64>;
+    fn getopt_string(&self, option: NngOption) -> Result<NngString>;
 }
 
 /// Trait for types which support setting NNG options.
 pub trait SetOpts {
-    fn setopt_bool(&mut self, option: NngOption, value: bool) -> NngReturn;
-    fn setopt_int(&mut self, option: NngOption, value: i32) -> NngReturn;
-    fn setopt_ms(&mut self, option: NngOption, value: nng_duration) -> NngReturn;
-    fn setopt_size(&mut self, option: NngOption, value: usize) -> NngReturn;
-    fn setopt_uint64(&mut self, option: NngOption, value: u64) -> NngReturn;
-    fn setopt_string(&mut self, option: NngOption, value: &str) -> NngReturn;
+    fn setopt_bool(&mut self, option: NngOption, value: bool) -> Result<()>;
+    fn setopt_int(&mut self, option: NngOption, value: i32) -> Result<()>;
+    fn setopt_ms(&mut self, option: NngOption, value: nng_duration) -> Result<()>;
+    fn setopt_size(&mut self, option: NngOption, value: usize) -> Result<()>;
+    fn setopt_uint64(&mut self, option: NngOption, value: u64) -> Result<()>;
+    fn setopt_string(&mut self, option: NngOption, value: &str) -> Result<()>;
 }
 
 /// Wraps nng option names.  See [nng_options](https://nanomsg.github.io/nng/man/v1.1.0/nng_options.5).
@@ -58,8 +58,8 @@ pub struct NngOption(&'static [u8]);
 
 impl NngOption {
     /// Return option name as `const char*` suitable for passing to C functions.
-    pub fn as_cptr(&self) -> *const ::std::os::raw::c_char {
-        self.0.as_ptr() as *const ::std::os::raw::c_char
+    pub fn as_cptr(&self) -> *const c_char {
+        self.0.as_ptr() as *const c_char
     }
 
     pub const SOCKNAME: NngOption = NngOption(NNG_OPT_SOCKNAME);

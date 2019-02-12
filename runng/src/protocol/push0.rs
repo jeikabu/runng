@@ -12,7 +12,7 @@ pub struct Push0 {
 
 impl Push0 {
     /// Create a push socket.  See [nng_push_open](https://nanomsg.github.io/nng/man/v1.1.0/nng_push_open.3).
-    pub fn open() -> NngResult<Self> {
+    pub fn open() -> Result<Self> {
         nng_open(
             |socket| unsafe { nng_push0_open(socket) },
             |socket| Push0 { socket },

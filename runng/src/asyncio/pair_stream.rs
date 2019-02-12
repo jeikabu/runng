@@ -11,7 +11,7 @@ pub struct PairStreamHandle {
 }
 
 impl AsyncStreamContext for PairStreamHandle {
-    fn create(socket: NngSocket, buffer: usize) -> NngResult<Self> {
+    fn create(socket: NngSocket, buffer: usize) -> Result<Self> {
         let push = PushAsyncHandle::create(socket.clone())?;
         let pull = PullAsyncStream::create(socket, buffer)?;
         let ctx = Self { push, pull };
@@ -20,13 +20,13 @@ impl AsyncStreamContext for PairStreamHandle {
 }
 
 impl AsyncPush for PairStreamHandle {
-    fn send(&mut self, msg: NngMsg) -> oneshot::Receiver<NngReturn> {
+    fn send(&mut self, msg: NngMsg) -> oneshot::Receiver<Result<()>> {
         self.push.send(msg)
     }
 }
 
 impl AsyncPull for PairStreamHandle {
-    fn receive(&mut self) -> Option<mpsc::Receiver<NngResult<NngMsg>>> {
+    fn receive(&mut self) -> Option<mpsc::Receiver<Result<NngMsg>>> {
         self.pull.receive()
     }
 }

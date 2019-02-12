@@ -45,6 +45,18 @@ impl Alloc {
     }
 }
 
+impl AsRef<[u8]> for Alloc {
+    fn as_ref(&self) -> &[u8] {
+        self.as_slice()
+    }
+}
+
+impl AsMut<[u8]> for Alloc {
+    fn as_mut(&mut self) -> &mut [u8] {
+        self.as_mut_slice()
+    }
+}
+
 impl Clone for Alloc {
     fn clone(&self) -> Self {
         let src = self.as_slice();

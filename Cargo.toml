@@ -3,6 +3,3 @@ members = [
     "runng",
     "runng_derive",
 ]
-
-[patch.crates-io]
-cty = { git = 'https://github.com/jeikabu/cty' }

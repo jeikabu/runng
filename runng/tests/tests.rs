@@ -13,13 +13,13 @@ mod tests {
 
     use crate::common::get_url;
     use futures::{future, future::Future, Stream};
-    use runng::{asyncio::*, protocol::*, *};
+    use runng::{asyncio::*, factory::latest::ProtocolFactory, protocol::*, *};
     use std::{thread, time::Duration};
 
     #[test]
-    fn listenerdialer() -> NngReturn {
+    fn listenerdialer() -> runng::Result<()> {
         let url = get_url();
-        let factory = Latest::default();
+        let factory = ProtocolFactory::default();
 
         let replier = factory.replier_open()?;
         {
@@ -57,16 +57,16 @@ mod tests {
     }
 
     #[test]
-    fn pubsub() -> NngReturn {
+    fn pubsub() -> runng::Result<()> {
         let url = get_url();
-        let factory = Latest::default();
+        let factory = ProtocolFactory::default();
 
         let publisher = factory.publisher_open()?.listen(&url)?;
         let subscriber = factory.subscriber_open()?.dial(&url)?;
 
         let num_msg_per_subscriber = 4;
 
-        let sub_thread = thread::spawn(move || -> NngReturn {
+        let sub_thread = thread::spawn(move || -> runng::Result<()> {
             let mut sub_ctx = subscriber.create_async_stream(1)?;
             let topic: Vec<u8> = vec![0; 4];
             sub_ctx.subscribe(topic.as_slice())?;
@@ -91,7 +91,7 @@ mod tests {
                 .unwrap();
             Ok(())
         });
-        let pub_thread = thread::spawn(move || -> NngReturn {
+        let pub_thread = thread::spawn(move || -> runng::Result<()> {
             let mut pub_ctx = publisher.create_async()?;
 
             // Beginning of message body contains topic
@@ -119,11 +119,11 @@ mod tests {
     }
 
     #[test]
-    fn broker() -> NngReturn {
+    fn broker() -> runng::Result<()> {
         let url_broker_in = get_url();
         let url_broker_out = get_url();
 
-        let factory = Latest::default();
+        let factory = ProtocolFactory::default();
 
         let broker_pull = factory.puller_open()?.listen(&url_broker_in)?;
         let broker_push = factory.publisher_open()?.listen(&url_broker_out)?;
@@ -131,7 +131,7 @@ mod tests {
         thread::sleep(Duration::from_millis(50));
 
         // Broker
-        thread::spawn(move || -> NngReturn {
+        thread::spawn(move || -> runng::Result<()> {
             let mut broker_pull_ctx = broker_pull.create_async_stream(1)?;
             let mut broker_push_ctx = broker_push.create_async()?;
             broker_pull_ctx
@@ -153,7 +153,7 @@ mod tests {
         let subscriber = factory.subscriber_open()?.dial(&url_broker_out)?;
 
         // Subscriber
-        thread::spawn(move || -> NngReturn {
+        thread::spawn(move || -> runng::Result<()> {
             let mut sub_ctx = subscriber.create_async_stream(1)?;
 
             let topic: Vec<u8> = vec![0; 4];
@@ -181,7 +181,7 @@ mod tests {
         thread::sleep(Duration::from_millis(50));
 
         // Publisher
-        thread::spawn(move || -> NngReturn {
+        thread::spawn(move || -> runng::Result<()> {
             let mut pub_ctx = publisher.create_async()?;
             for _ in 0..10 {
                 let mut msg = msg::NngMsg::create()?;

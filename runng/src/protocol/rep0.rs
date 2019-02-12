@@ -1,7 +1,7 @@
 //! Request/reply pattern.
 
 use super::*;
-use crate::asyncio::*;
+use crate::{asyncio::*, *};
 use runng_sys::*;
 
 /// Reply half of request/reply pattern.  See [nng_rep](https://nanomsg.github.io/nng/man/v1.1.0/nng_rep.7).
@@ -12,7 +12,7 @@ pub struct Rep0 {
 
 impl Rep0 {
     /// Create a new reply socket.  See [nng_rep_open](https://nanomsg.github.io/nng/man/v1.1.0/nng_rep_open.3).
-    pub fn open() -> NngResult<Self> {
+    pub fn open() -> Result<Self> {
         nng_open(
             |socket| unsafe { nng_rep0_open(socket) },
             |socket| Rep0 { socket },

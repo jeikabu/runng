@@ -2,7 +2,7 @@ use crate::common::{create_stop_message, get_url, not_stop_message, sleep_fast};
 use futures::{future::Future, Stream};
 use log::info;
 use rand::Rng;
-use runng::{asyncio::*, *};
+use runng::{asyncio::*, factory::latest::ProtocolFactory, memory, msg::NngMsg, socket, socket::*};
 use runng_sys::*;
 use std::{
     sync::{
@@ -13,36 +13,36 @@ use std::{
 };
 
 #[test]
-fn example_basic() -> NngReturn {
+fn example_basic() -> runng::Result<()> {
     let url = get_url();
 
-    let factory = Latest::default();
+    let factory = ProtocolFactory::default();
     let rep = factory.replier_open()?.listen(&url)?;
     let req = factory.requester_open()?.dial(&url)?;
-    req.sendmsg(msg::NngMsg::create()?)?;
+    req.sendmsg(NngMsg::create()?)?;
     rep.recv()?;
 
     Ok(())
 }
 
 #[test]
-fn example_async() -> NngReturn {
+fn example_async() -> runng::Result<()> {
     let url = get_url();
 
-    let factory = Latest::default();
+    let factory = ProtocolFactory::default();
     let mut rep_ctx = factory
         .replier_open()?
         .listen(&url)?
         .create_async_stream(1)?;
 
     let mut req_ctx = factory.requester_open()?.dial(&url)?.create_async()?;
-    let req_future = req_ctx.send(msg::NngMsg::create()?);
+    let req_future = req_ctx.send(NngMsg::create()?);
     rep_ctx
         .receive()
         .unwrap()
         .take(1)
         .for_each(|_request| {
-            let msg = msg::NngMsg::create().unwrap();
+            let msg = NngMsg::create().unwrap();
             rep_ctx.reply(msg).wait().unwrap().unwrap();
             Ok(())
         })
@@ -53,10 +53,10 @@ fn example_async() -> NngReturn {
 }
 
 #[test]
-fn zerocopy() -> NngReturn {
+fn zerocopy() -> runng::Result<()> {
     let url = get_url();
 
-    let factory = Latest::default();
+    let factory = ProtocolFactory::default();
     let rep = factory.replier_open()?.listen(&url)?;
     let req = factory.requester_open()?.dial(&url)?;
 
@@ -74,7 +74,7 @@ fn zerocopy() -> NngReturn {
     Ok(())
 }
 
-fn send_loop<T>(socket: &T, mut msg: msg::NngMsg)
+fn send_loop<T>(socket: &T, mut msg: NngMsg)
 where
     T: socket::SendMsg,
 {
@@ -93,7 +93,7 @@ where
     }
 }
 
-fn receive_loop<T>(socket: &T) -> msg::NngMsg
+fn receive_loop<T>(socket: &T) -> NngMsg
 where
     T: socket::RecvMsg,
 {
@@ -102,24 +102,24 @@ where
         let msg = socket.recvmsg_flags(flags);
         match msg {
             Ok(msg) => return msg,
-            Err(NngFail::Err(nng_errno_enum::NNG_EAGAIN)) => sleep_fast(),
+            Err(runng::Error::Errno(nng_errno_enum::NNG_EAGAIN)) => sleep_fast(),
             Err(err) => panic!(err),
         }
     }
 }
 
 #[test]
-fn nonblock() -> NngReturn {
+fn nonblock() -> runng::Result<()> {
     let url = get_url();
 
-    let factory = Latest::default();
+    let factory = ProtocolFactory::default();
     let flags = socket::Flags::NONBLOCK;
     let rep = factory.replier_open()?.listen_flags(&url, flags)?;
     let req = factory.requester_open()?.dial_flags(&url, flags)?;
     std::thread::sleep(std::time::Duration::from_millis(50));
 
     for _ in 0..10 {
-        let msg = msg::NngMsg::create().unwrap();
+        let msg = NngMsg::create()?;
         //rand::thread_rng().fill(data.as_mut_slice());
         send_loop(&req, msg);
         let request = receive_loop(&rep);
@@ -133,9 +133,9 @@ fn nonblock() -> NngReturn {
 }
 
 #[test]
-fn contexts() -> NngReturn {
+fn contexts() -> runng::Result<()> {
     let url = get_url();
-    let factory = Latest::default();
+    let factory = ProtocolFactory::default();
 
     let recv_count = Arc::new(AtomicUsize::new(0));
 
@@ -145,7 +145,7 @@ fn contexts() -> NngReturn {
         .listen(&url)?
         .create_async_stream(1)?;
     let rep_recv_count = recv_count.clone();
-    let rep = thread::spawn(move || -> NngReturn {
+    let rep = thread::spawn(move || -> runng::Result<()> {
         rep_ctx
             .receive()
             .unwrap()
@@ -154,7 +154,7 @@ fn contexts() -> NngReturn {
             .for_each(|_request| {
                 rep_recv_count.fetch_add(1, Ordering::Relaxed);
 
-                let msg = msg::NngMsg::create().unwrap();
+                let msg = NngMsg::create().unwrap();
                 rep_ctx.reply(msg).wait().unwrap().unwrap();
                 Ok(())
             })
@@ -169,12 +169,12 @@ fn contexts() -> NngReturn {
     let mut threads = vec![];
     for _ in 0..NUM_REQUESTERS {
         let socket_clone = req_socket.clone();
-        let req = thread::spawn(move || -> NngReturn {
+        let req = thread::spawn(move || -> runng::Result<()> {
             let mut req_ctx = socket_clone.create_async()?;
             for i in 0..NUM_REQUESTS {
-                let mut msg = msg::NngMsg::create()?;
+                let mut msg = NngMsg::create()?;
                 msg.append_u32(i)?;
-                req_ctx.send(msg).wait()?;
+                req_ctx.send(msg).wait()??;
             }
             Ok(())
         });

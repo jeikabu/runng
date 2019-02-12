@@ -12,7 +12,7 @@ pub struct Pull0 {
 
 impl Pull0 {
     /// Create a pull socket.  See [nng_pull_open](https://nanomsg.github.io/nng/man/v1.1.0/nng_pull_open.3).
-    pub fn open() -> NngResult<Self> {
+    pub fn open() -> Result<Self> {
         nng_open(
             |socket| unsafe { nng_pull0_open(socket) },
             |socket| Pull0 { socket },

@@ -4,39 +4,45 @@ use futures::{
     stream::Stream,
 };
 use futures_timer::Delay;
-use runng::{asyncio::*, *};
+use runng::{
+    asyncio::*,
+    factory::latest::ProtocolFactory,
+    msg::NngMsg,
+    options::{NngOption, SetOpts},
+    socket::*,
+};
 use std::{thread, time::Duration};
 
 fn forward(
     ctx: &mut PairStreamHandle,
-    msg: Result<msg::NngMsg, NngFail>,
+    msg: runng::Result<NngMsg>,
 ) -> impl IntoFuture<Item = (), Error = ()> {
-    // Increment value.  If larger than some value send a stop message and return Err to stop for_each().  Otherwise forware it.
+    // Increment value.  If larger than some value send a stop message and return Err to stop for_each().  Otherwise forward it.
     let mut msg = msg.unwrap();
     let value = msg.trim_u32().unwrap() + 1;
     if value > 100 {
-        ctx.send(create_stop_message()).wait().unwrap();
+        ctx.send(create_stop_message()).wait().unwrap().unwrap();
         Err(())
     } else {
         msg.append_u32(value).unwrap();
-        ctx.send(msg).wait().unwrap();
+        ctx.send(msg).wait().unwrap().unwrap();
         Ok(())
     }
 }
 
 #[test]
-fn pair() -> NngReturn {
+fn pair() -> runng::Result<()> {
     let url = get_url();
-    let factory = Latest::default();
+    let factory = ProtocolFactory::default();
     let a = factory.pair_open()?.listen(&url)?;
     let b = factory.pair_open()?.dial(&url)?;
 
-    let a_thread = thread::spawn(move || -> NngReturn {
+    let a_thread = thread::spawn(move || -> runng::Result<()> {
         let mut ctx = a.create_async_stream(1)?;
         // Send the first (0th) message
-        let mut msg = msg::NngMsg::create()?;
-        msg.append_u32(0);
-        ctx.send(msg).wait()?;
+        let mut msg = NngMsg::create()?;
+        msg.append_u32(0)?;
+        ctx.send(msg).wait()??;
         let _stream = ctx
             .receive()
             .unwrap()
@@ -47,14 +53,15 @@ fn pair() -> NngReturn {
             .unwrap();
         Ok(())
     });
-    let b_thread = thread::spawn(move || -> NngReturn {
+    let b_thread = thread::spawn(move || -> runng::Result<()> {
         let mut ctx = b.create_async_stream(1)?;
         ctx.receive()
             .unwrap()
             .take_while(not_stop_message)
             // Receive a message and send it to other pair
             .for_each(|msg| forward(&mut ctx, msg))
-            .wait();
+            .wait()
+            .expect_err("Err means stop processing stream");
         Ok(())
     });
 
@@ -65,9 +72,9 @@ fn pair() -> NngReturn {
 
 #[ignore]
 #[test]
-fn pair1_poly() -> NngReturn {
+fn pair1_poly() -> runng::Result<()> {
     let url = get_url();
-    let factory = Latest::default();
+    let factory = ProtocolFactory::default();
 
     // Enable pair ver 1 socket "polyamorous" mode; multiple dialers can share a socket
     let mut a = factory.pair_open()?;
@@ -80,7 +87,7 @@ fn pair1_poly() -> NngReturn {
     let mut threads = vec![];
     {
         let url = url.clone();
-        let thread = thread::spawn(move || -> NngReturn {
+        let thread = thread::spawn(move || -> runng::Result<()> {
             let mut ctx = a.listen(&url)?.create_async_stream(1)?;
             ctx.receive()
                 .unwrap()
@@ -92,10 +99,10 @@ fn pair1_poly() -> NngReturn {
                     // Response message's pipe must be set to that of the received message
                     let pipe = msg.get_pipe().unwrap();
                     response.set_pipe(&pipe);
-                    ctx.send(response).wait().unwrap();
+                    ctx.send(response).wait().unwrap().unwrap();
                     Ok(())
                 })
-                .wait();
+                .wait()?;
             Ok(())
         });
         threads.push(thread);
@@ -108,12 +115,12 @@ fn pair1_poly() -> NngReturn {
     for i in 0..NUM_DIALERS {
         let url = url.clone();
         let socket = b.clone();
-        let thread = thread::spawn(move || -> NngReturn {
+        let thread = thread::spawn(move || -> runng::Result<()> {
             let mut ctx = socket.dial(&url)?.create_async_stream(1)?;
             // Send message containing identifier
-            let mut msg = msg::NngMsg::create()?;
+            let mut msg = NngMsg::create()?;
             msg.append_u32(i)?;
-            ctx.send(msg).wait().unwrap();
+            ctx.send(msg).wait().unwrap()?;
             // Receive reply and make sure it has same identifier
             let res = ctx
                 .receive()
@@ -140,12 +147,12 @@ fn pair1_poly() -> NngReturn {
             } else {
                 Err(())
             };
-            ctx.send(create_stop_message()).wait()?;
+            ctx.send(create_stop_message()).wait()??;
             // FIXME: when reexamine Result handling, impl From should permit `into()` to be used
             if res.is_ok() {
                 Ok(())
             } else {
-                Err(NngFail::Unknown(-1))
+                Err(runng::Error::UnknownErrno(-1))
             }
         });
         threads.push(thread);

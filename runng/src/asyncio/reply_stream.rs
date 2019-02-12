@@ -21,15 +21,15 @@ enum ReplyState {
 struct ReplyContextAioArg {
     ctx: NngCtx,
     state: ReplyState,
-    request_sender: mpsc::Sender<NngResult<NngMsg>>,
-    reply_sender: Option<oneshot::Sender<NngReturn>>,
+    request_sender: mpsc::Sender<Result<NngMsg>>,
+    reply_sender: Option<oneshot::Sender<Result<()>>>,
 }
 
 impl ReplyContextAioArg {
     pub fn create(
         socket: NngSocket,
-        request_sender: mpsc::Sender<NngResult<NngMsg>>,
-    ) -> NngResult<Box<Self>> {
+        request_sender: mpsc::Sender<Result<NngMsg>>,
+    ) -> Result<Box<Self>> {
         let ctx = NngCtx::create(socket)?;
         let arg = Self {
             ctx,
@@ -50,7 +50,7 @@ impl ReplyContextAioArg {
         }
     }
 
-    pub fn reply(&mut self, msg: NngMsg, sender: oneshot::Sender<NngReturn>) {
+    pub fn reply(&mut self, msg: NngMsg, sender: oneshot::Sender<Result<()>>) {
         if self.state != ReplyState::Wait {
             panic!();
         }
@@ -80,11 +80,11 @@ impl Aio for ReplyContextAioArg {
 #[derive(Debug)]
 pub struct ReplyStreamHandle {
     aio_arg: Box<ReplyContextAioArg>,
-    receiver: Option<mpsc::Receiver<NngResult<NngMsg>>>,
+    receiver: Option<mpsc::Receiver<Result<NngMsg>>>,
 }
 
 impl AsyncStreamContext for ReplyStreamHandle {
-    fn create(socket: NngSocket, buffer: usize) -> NngResult<Self> {
+    fn create(socket: NngSocket, buffer: usize) -> Result<Self> {
         let (sender, receiver) = mpsc::channel(buffer);
         let aio_arg = ReplyContextAioArg::create(socket, sender)?;
         let receiver = Some(receiver);
@@ -96,13 +96,13 @@ impl AsyncStreamContext for ReplyStreamHandle {
 /// Trait for asynchronous contexts that can receive a request and then send a reply.
 pub trait AsyncReply {
     /// Asynchronously receive a request.
-    fn receive(&mut self) -> Option<mpsc::Receiver<NngResult<NngMsg>>>;
+    fn receive(&mut self) -> Option<mpsc::Receiver<Result<NngMsg>>>;
     /// Asynchronously reply to previously received request.
-    fn reply(&mut self, msg: NngMsg) -> oneshot::Receiver<NngReturn>;
+    fn reply(&mut self, msg: NngMsg) -> oneshot::Receiver<Result<()>>;
 }
 
 impl AsyncReply for ReplyStreamHandle {
-    fn receive(&mut self) -> Option<mpsc::Receiver<NngResult<NngMsg>>> {
+    fn receive(&mut self) -> Option<mpsc::Receiver<Result<NngMsg>>> {
         let receiver = self.receiver.take();
         if receiver.is_some() {
             self.aio_arg.start_receive();
@@ -110,7 +110,7 @@ impl AsyncReply for ReplyStreamHandle {
         receiver
     }
 
-    fn reply(&mut self, msg: NngMsg) -> oneshot::Receiver<NngReturn> {
+    fn reply(&mut self, msg: NngMsg) -> oneshot::Receiver<Result<()>> {
         let (sender, receiver) = oneshot::channel();
         self.aio_arg.reply(msg, sender);
         receiver
@@ -123,12 +123,12 @@ unsafe extern "C" fn reply_callback(arg: AioCallbackArg) {
     trace!("reply_callback::{:?}", ctx.state);
     match ctx.state {
         ReplyState::Receiving => {
-            let res = NngFail::from_i32(nng_aio_result(aio_nng));
+            let res = Error::from_i32(nng_aio_result(aio_nng));
             match res {
                 Err(res) => {
                     match res {
-                        NngFail::Err(nng_errno_enum::NNG_ECLOSED)
-                        | NngFail::Err(nng_errno_enum::NNG_ECANCELED) => {
+                        Error::Errno(nng_errno_enum::NNG_ECLOSED)
+                        | Error::Errno(nng_errno_enum::NNG_ECANCELED) => {
                             debug!("reply_callback {:?}", res);
                         }
                         _ => {
@@ -149,7 +149,7 @@ unsafe extern "C" fn reply_callback(arg: AioCallbackArg) {
         }
         ReplyState::Wait => panic!(),
         ReplyState::Sending => {
-            let res = NngFail::from_i32(nng_aio_result(aio_nng));
+            let res = Error::from_i32(nng_aio_result(aio_nng));
             if res.is_err() {
                 // Nng requires we resume ownership of the message
                 let _ = NngMsg::new_msg(nng_aio_get_msg(aio_nng));

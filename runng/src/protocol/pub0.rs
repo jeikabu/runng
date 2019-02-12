@@ -12,7 +12,7 @@ pub struct Pub0 {
 
 impl Pub0 {
     /// Create a pub socket.  See [nng_pub_open](https://nanomsg.github.io/nng/man/v1.1.0/nng_pub_open.3).
-    pub fn open() -> NngResult<Self> {
+    pub fn open() -> Result<Self> {
         let open_func = |socket: &mut nng_socket| unsafe { nng_pub0_open(socket) };
         let socket_create_func = |socket| Pub0 { socket };
         nng_open(open_func, socket_create_func)

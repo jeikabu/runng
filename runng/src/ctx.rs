@@ -22,10 +22,10 @@ pub struct NngCtx {
 
 impl NngCtx {
     /// Creates a new context using the specified socket.  See [nng_ctx_open](https://nanomsg.github.io/nng/man/v1.1.0/nng_ctx_open.3).
-    pub fn create(socket: NngSocket) -> NngResult<Self> {
+    pub fn create(socket: NngSocket) -> Result<Self> {
         let mut ctx = nng_ctx { id: 0 };
         let res = unsafe { nng_ctx_open(&mut ctx, socket.nng_socket()) };
-        NngFail::from_i32(res)?;
+        Error::from_i32(res)?;
         let aio = NngAio::new(socket);
         let ctx = NngCtx { ctx, aio };
         Ok(ctx)

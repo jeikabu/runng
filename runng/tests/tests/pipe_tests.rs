@@ -1,8 +1,7 @@
 //#![cfg(feature = "pipes")]
 
 use crate::common::{get_url, sleep_fast};
-use runng::pipe::*;
-use runng::*;
+use runng::{factory::latest::ProtocolFactory, msg::NngMsg, pipe::*, socket::*};
 use runng_sys::{nng_pipe, nng_pipe_ev, nng_pipe_ev::*};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -12,19 +11,19 @@ static NUM_REMPOST: AtomicUsize = AtomicUsize::new(0);
 static NUM_BAD: AtomicUsize = AtomicUsize::new(0);
 
 extern "C" fn notify_callback(_pipe: nng_pipe, event: i32, _arg: PipeNotifyCallbackArg) {
-    match nng_pipe_ev::from_i32(event) {
-        Some(NNG_PIPE_EV_ADD_PRE) => NUM_ADDPRE.fetch_add(1, Ordering::Relaxed),
-        Some(NNG_PIPE_EV_ADD_POST) => NUM_ADDPOST.fetch_add(1, Ordering::Relaxed),
-        Some(NNG_PIPE_EV_REM_POST) => NUM_REMPOST.fetch_add(1, Ordering::Relaxed),
+    match nng_pipe_ev::try_from(event) {
+        Ok(NNG_PIPE_EV_ADD_PRE) => NUM_ADDPRE.fetch_add(1, Ordering::Relaxed),
+        Ok(NNG_PIPE_EV_ADD_POST) => NUM_ADDPOST.fetch_add(1, Ordering::Relaxed),
+        Ok(NNG_PIPE_EV_REM_POST) => NUM_REMPOST.fetch_add(1, Ordering::Relaxed),
         _ => NUM_BAD.fetch_add(1, Ordering::Relaxed),
     };
 }
 
 #[test]
-fn notify() -> NngReturn {
+fn notify() -> runng::Result<()> {
     let url = get_url();
 
-    let factory = Latest::default();
+    let factory = ProtocolFactory::default();
     let rep = factory.replier_open()?.listen(&url)?;
     [
         NNG_PIPE_EV_ADD_PRE,
@@ -51,16 +50,16 @@ fn notify() -> NngReturn {
 }
 
 #[test]
-fn dialer_listener() -> NngReturn {
+fn dialer_listener() -> runng::Result<()> {
     let url = get_url();
 
-    let factory = Latest::default();
+    let factory = ProtocolFactory::default();
     let rep = factory.replier_open()?.listen(&url)?;
     let req = factory.requester_open()?.dial(&url)?;
-    req.sendmsg(msg::NngMsg::create()?)?;
+    req.sendmsg(NngMsg::create()?)?;
     let msg = rep.recvmsg()?;
     let rep_pipe = msg.get_pipe().unwrap();
-    rep.sendmsg(msg::NngMsg::create()?)?;
+    rep.sendmsg(NngMsg::create()?)?;
     let msg = req.recvmsg()?;
     let req_pipe = msg.get_pipe().unwrap();
 

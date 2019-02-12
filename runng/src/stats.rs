@@ -25,10 +25,10 @@ use runng::{
 };
 
 #[test]
-fn stats_example() -> NngReturn {
+fn stats_example() -> Result<()> {
     // https://github.com/nanomsg/nng/issues/841
     let url = "inproc://test";
-    let factory = Latest::default();
+    let factory = ProtocolFactory::default();
     let _pusher = factory.pusher_open()?.listen(&url)?;
     let _puller = factory.puller_open()?.dial(&url)?;
 
@@ -44,7 +44,7 @@ fn stats_example() -> NngReturn {
 
 use crate::*;
 use runng_sys::*;
-use std::marker;
+use std::{marker, result};
 
 pub trait NngStat {
     /// Obtain underlying [`nng_stat`](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat.5).
@@ -77,11 +77,11 @@ pub struct NngStatRoot<'root> {
 
 impl<'root> NngStatRoot<'root> {
     /// Get statistics snapshot.  See [nng_stats_get](https://nanomsg.github.io/nng/man/v1.1.0/nng_stats_get.3).
-    pub fn create() -> NngResult<NngStatRoot<'root>> {
+    pub fn create() -> Result<NngStatRoot<'root>> {
         unsafe {
             let mut node: *mut nng_stat = std::ptr::null_mut();
             let res = nng_stats_get(&mut node);
-            NngFail::succeed_then(res, || NngStatRoot {
+            Error::zero_map(res, || NngStatRoot {
                 node,
                 _phantom: marker::PhantomData,
             })
@@ -119,7 +119,7 @@ impl<'root> NngStatChild<'root> {
         }
     }
     /// See [nng_stat_name](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_name.3).
-    pub fn name(&self) -> Result<&str, std::str::Utf8Error> {
+    pub fn name(&self) -> result::Result<&str, std::str::Utf8Error> {
         unsafe {
             let ptr = nng_stat_name(self.nng_stat());
             std::ffi::CStr::from_ptr(ptr).to_str()
@@ -127,7 +127,7 @@ impl<'root> NngStatChild<'root> {
     }
 
     /// See [nng_stat_desc](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_desc.3).
-    pub fn desc(&self) -> Result<&str, std::str::Utf8Error> {
+    pub fn desc(&self) -> result::Result<&str, std::str::Utf8Error> {
         unsafe {
             let ptr = nng_stat_desc(self.nng_stat());
             std::ffi::CStr::from_ptr(ptr).to_str()
@@ -135,10 +135,10 @@ impl<'root> NngStatChild<'root> {
     }
 
     /// See [nng_stat_type](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_type.3).
-    pub fn stat_type(&self) -> Option<nng_stat_type_enum> {
+    pub fn stat_type(&self) -> result::Result<nng_stat_type_enum, TryFromIntError> {
         unsafe {
             let val = nng_stat_type(self.nng_stat());
-            nng_stat_type_enum::from_i32(val)
+            nng_stat_type_enum::try_from(val)
         }
     }
 
@@ -166,10 +166,10 @@ impl<'root> NngStatChild<'root> {
     }
 
     /// See [nng_stat_unit](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_unit.3).
-    pub fn unit(&self) -> Option<nng_unit_enum> {
+    pub fn unit(&self) -> result::Result<nng_unit_enum, TryFromIntError> {
         unsafe {
             let val = nng_stat_unit(self.nng_stat());
-            nng_unit_enum::from_i32(val)
+            nng_unit_enum::try_from(val)
         }
     }
 

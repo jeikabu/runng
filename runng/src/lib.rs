@@ -12,13 +12,13 @@ Features:
 
 Simple:
 ```rust
-use runng::*;
-fn test() -> Result<(), NngFail> {
+use runng::{*, msg::NngMsg};
+fn test() -> runng::Result<()> {
     const url: &str = "inproc://test";
-    let factory = Latest::default();
+    let factory = factory::latest::ProtocolFactory::default();
     let rep = factory.replier_open()?.listen(&url)?;
     let req = factory.requester_open()?.dial(&url)?;
-    req.sendmsg(msg::NngMsg::create()?)?;
+    req.sendmsg(NngMsg::create()?)?;
     rep.recv()?;
     Ok(())
 }
@@ -33,13 +33,14 @@ use futures::{
 use runng::{
     *,
     asyncio::*,
+    factory::latest::ProtocolFactory,
     protocol::*,
 };
 
-fn aio() -> NngReturn {
+fn aio() -> runng::Result<()> {
     const url: &str = "inproc://test";
 
-    let factory = Latest::default();
+    let factory = ProtocolFactory::default();
     let mut rep_ctx = factory
         .replier_open()?
         .listen(&url)?
@@ -107,7 +108,7 @@ trait InternalSocket {
 // Return string and pointer so string isn't dropped
 fn to_cstr(
     string: &str,
-) -> Result<(std::ffi::CString, *const std::os::raw::c_char), std::ffi::NulError> {
+) -> std::result::Result<(std::ffi::CString, *const std::os::raw::c_char), std::ffi::NulError> {
     let string = std::ffi::CString::new(string)?;
     let ptr = string.as_bytes_with_nul().as_ptr() as *const std::os::raw::c_char;
     Ok((string, ptr))
