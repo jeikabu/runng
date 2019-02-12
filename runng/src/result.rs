@@ -1,3 +1,5 @@
+//! Return values and error handling
+
 use futures::sync::oneshot;
 use runng_sys::*;
 use std::{error, fmt, io, result};
