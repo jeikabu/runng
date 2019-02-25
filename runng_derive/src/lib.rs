@@ -136,7 +136,7 @@ fn gen_get_impl(name: &syn::Ident, prefix: &str, member: &syn::Ident) -> TokenSt
                 unsafe {
                     let mut value: *mut ::std::os::raw::c_char = std::ptr::null_mut();
                     let res = #getopt_string (self.#member, option.as_cptr(), &mut value);
-                    Error::from_i32(res)?;
+                    nng_int_to_result(res)?;
                     Ok(NngString::new(value))
                 }
             }
@@ -163,33 +163,33 @@ fn gen_set_impl(name: &syn::Ident, prefix: &str, member: &syn::Ident) -> TokenSt
         impl SetOpts for #name {
             fn setopt_bool(&mut self, option: NngOption, value: bool) -> Result<()> {
                 unsafe {
-                    Error::from_i32(#setopt_bool(self.#member, option.as_cptr(), value))
+                    nng_int_to_result(#setopt_bool(self.#member, option.as_cptr(), value))
                 }
             }
             fn setopt_int(&mut self, option: NngOption, value: i32) -> Result<()> {
                 unsafe {
-                    Error::from_i32(#setopt_int(self.#member, option.as_cptr(), value))
+                    nng_int_to_result(#setopt_int(self.#member, option.as_cptr(), value))
                 }
             }
             fn setopt_ms(&mut self, option: NngOption, value: i32) -> Result<()> {
                 unsafe {
-                    Error::from_i32(#setopt_ms(self.#member, option.as_cptr(), value))
+                    nng_int_to_result(#setopt_ms(self.#member, option.as_cptr(), value))
                 }
             }
             fn setopt_size(&mut self, option: NngOption, value: usize) -> Result<()> {
                 unsafe {
-                    Error::from_i32(#setopt_size(self.#member, option.as_cptr(), value))
+                    nng_int_to_result(#setopt_size(self.#member, option.as_cptr(), value))
                 }
             }
             fn setopt_uint64(&mut self, option: NngOption, value: u64) -> Result<()> {
                 unsafe {
-                    Error::from_i32(#setopt_uint64(self.#member, option.as_cptr(), value))
+                    nng_int_to_result(#setopt_uint64(self.#member, option.as_cptr(), value))
                 }
             }
             fn setopt_string(&mut self, option: NngOption, value: &str) -> Result<()> {
                 unsafe {
                     let (_, value) = to_cstr(value)?;
-                    Error::from_i32(#setopt_string(self.#member, option.as_cptr(), value))
+                    nng_int_to_result(#setopt_string(self.#member, option.as_cptr(), value))
                 }
             }
         }
@@ -202,7 +202,7 @@ fn _derive_nng_msg() -> TokenStream {
     let add_methods = methods.map(|(member, method, utype)| {
         quote! {
             pub fn #member(&mut self, data: #utype) -> Result<()> {
-                unsafe { Error::from_i32(#method(self.msg(), data)) }
+                unsafe { nng_int_to_result(#method(self.msg(), data)) }
             }
         }
     });

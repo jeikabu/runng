@@ -24,7 +24,8 @@ impl NngPipe {
     pub(crate) fn create(message: &NngMsg) -> Option<Self> {
         unsafe {
             let pipe = nng_msg_get_pipe(message.msg());
-            if (pipe.id as i32) < 0 {
+            let id = nng_pipe_id(pipe);
+            if id <= 0 {
                 None
             } else {
                 Some(NngPipe { pipe })
@@ -75,6 +76,6 @@ impl NngPipe {
     /// Closes the pipe.  See [nng_pipe_close](https://nanomsg.github.io/nng/man/v1.1.0/nng_pipe_close.3).
     /// This will cause associated aio/ctx functions that were using the pipe to fail.
     pub unsafe fn close(self) -> Result<()> {
-        Error::from_i32(nng_pipe_close(self.pipe))
+        nng_int_to_result(nng_pipe_close(self.pipe))
     }
 }

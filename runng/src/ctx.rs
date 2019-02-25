@@ -23,12 +23,17 @@ pub struct NngCtx {
 impl NngCtx {
     /// Creates a new context using the specified socket.  See [nng_ctx_open](https://nanomsg.github.io/nng/man/v1.1.0/nng_ctx_open.3).
     pub fn create(socket: NngSocket) -> Result<Self> {
-        let mut ctx = nng_ctx { id: 0 };
+        let mut ctx = nng_ctx::default();
         let res = unsafe { nng_ctx_open(&mut ctx, socket.nng_socket()) };
-        Error::from_i32(res)?;
+        nng_int_to_result(res)?;
         let aio = NngAio::new(socket);
         let ctx = NngCtx { ctx, aio };
         Ok(ctx)
+    }
+
+    /// See [nng_ctx_id](https://nanomsg.github.io/nng/man/v1.1.0/nng_ctx_id.3).
+    pub fn id(&self) -> i32 {
+        unsafe { nng_ctx_id(self.ctx) }
     }
 }
 
@@ -50,8 +55,9 @@ impl Aio for NngCtx {
 impl Drop for NngCtx {
     fn drop(&mut self) {
         unsafe {
-            if self.ctx.id != 0 {
-                trace!("NngCtx.drop {:x}", self.ctx.id);
+            let id = self.id();
+            if id > 0 {
+                trace!("NngCtx.drop {:x}", id);
                 nng_ctx_close(self.ctx);
             }
         }

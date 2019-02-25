@@ -1,4 +1,4 @@
-# Runng
+# RuNNG
 
 Rust [NNG (Nanomsg-Next-Generation)](https://github.com/nanomsg/nng):
 
@@ -10,9 +10,9 @@ Rust [NNG (Nanomsg-Next-Generation)](https://github.com/nanomsg/nng):
 [![docs.rs](https://docs.rs/runng/badge.svg)](https://docs.rs/crate/runng/)
 
 
-||||
+|Repository|Crate|Details|
 |-|-|-
-| __runng-sys__ | [![runng-sys crate](https://img.shields.io/crates/v/runng-sys.svg)](https://crates.io/crates/runng-sys) | bindings to native NNG library
+| [__runng-sys__](https://github.com/jeikabu/nng-rust) | [![runng-sys crate](https://img.shields.io/crates/v/runng-sys.svg)](https://crates.io/crates/runng-sys) | bindings to native NNG library
 | __runng__ | [![runng crate](https://img.shields.io/crates/v/runng.svg)](https://crates.io/crates/runng) | high-level wrapper for NNG
 | [__runng_thrift__](https://github.com/jeikabu/runng_thrift) | [![runng-thrift crate](https://img.shields.io/crates/v/runng-thrift.svg)](https://crates.io/crates/runng-thrift) | NNG as [Apache Thrift](https://github.com/apache/thrift) transport
 | [__runng_examples__](https://github.com/jeikabu/runng_examples) | | Additional runng examples
@@ -21,9 +21,7 @@ Rust [NNG (Nanomsg-Next-Generation)](https://github.com/nanomsg/nng):
 
 In `Cargo.toml`:
 ```toml
-runng = "0.1"
-# OR
-runng-sys = "1.1.1-rc"
+runng = "0.2"
 ```
 
 Requirements:
@@ -37,5 +35,3 @@ Requirements:
 1. Update submodules: `git submodule update --init --recursive`
 1. Install requirements
 1. `cargo build`
-
-To build optional packages: `cargo build --all`

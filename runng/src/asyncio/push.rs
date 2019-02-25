@@ -100,7 +100,7 @@ unsafe extern "C" fn publish_callback(arg: AioCallbackArg) {
         PushState::Ready => panic!(),
         PushState::Sending => {
             let nng_aio = ctx.aio.nng_aio();
-            let res = Error::from_i32(nng_aio_result(nng_aio));
+            let res = nng_int_to_result(nng_aio_result(nng_aio));
             if let Err(ref err) = res {
                 debug!("Push failed: {:?}", err);
                 // Nng requires that we retrieve the message and free it

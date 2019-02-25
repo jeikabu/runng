@@ -2,8 +2,10 @@ use crate::common::{create_stop_message, get_url, not_stop_message, sleep_fast};
 use futures::{future::Future, Stream};
 use log::info;
 use rand::Rng;
-use runng::{asyncio::*, factory::latest::ProtocolFactory, memory, msg::NngMsg, socket, socket::*};
-use runng_sys::*;
+use runng::{
+    asyncio::*, factory::latest::ProtocolFactory, memory, msg::NngMsg, socket, socket::*, Error,
+    NngErrno,
+};
 use std::{
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -81,7 +83,7 @@ where
     loop {
         let res = socket.sendmsg_flags(msg, socket::Flags::NONBLOCK);
         if let Err(senderror) = res {
-            if senderror.error == nng_errno_enum::NNG_EAGAIN {
+            if senderror.error == Error::Errno(NngErrno::EAGAIN) {
                 msg = senderror.into_inner();
                 sleep_fast();
             } else {
@@ -102,7 +104,7 @@ where
         let msg = socket.recvmsg_flags(flags);
         match msg {
             Ok(msg) => return msg,
-            Err(runng::Error::Errno(nng_errno_enum::NNG_EAGAIN)) => sleep_fast(),
+            Err(Error::Errno(NngErrno::EAGAIN)) => sleep_fast(),
             Err(err) => panic!(err),
         }
     }

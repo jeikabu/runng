@@ -33,7 +33,7 @@ where
     O: Fn(&mut nng_socket) -> i32,
     S: Fn(NngSocket) -> T,
 {
-    let mut socket = nng_socket { id: 0 };
+    let mut socket = nng_socket::default();
     let res = open_func(&mut socket);
     Error::zero_map(res, || {
         let socket = NngSocket::new(socket);
@@ -47,6 +47,6 @@ pub(crate) fn subscribe(socket: nng_socket, topic: &[u8]) -> Result<()> {
         let topic_ptr = topic.as_ptr() as *const ::std::os::raw::c_void;
         let topic_size = std::mem::size_of_val(topic);
         let res = nng_setopt(socket, opt, topic_ptr, topic_size);
-        Error::from_i32(res)
+        nng_int_to_result(res)
     }
 }
