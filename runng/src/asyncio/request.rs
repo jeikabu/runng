@@ -98,7 +98,7 @@ unsafe extern "C" fn request_callback(arg: AioCallbackArg) {
     match ctx.state {
         RequestState::Ready => panic!(),
         RequestState::Sending => {
-            let res = Error::from_i32(nng_aio_result(aionng));
+            let res = nng_int_to_result(nng_aio_result(aionng));
             match res {
                 Err(res) => {
                     // Nng requries we resume ownership of the message
@@ -116,7 +116,7 @@ unsafe extern "C" fn request_callback(arg: AioCallbackArg) {
         }
         RequestState::Receiving => {
             let sender = ctx.sender.take().unwrap();
-            let res = Error::from_i32(nng_aio_result(aionng));
+            let res = nng_int_to_result(nng_aio_result(aionng));
             match res {
                 Err(res) => {
                     ctx.state = RequestState::Ready;

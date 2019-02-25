@@ -17,7 +17,7 @@ impl NngListener {
     /// See [nng_listener_create](https://nanomsg.github.io/nng/man/v1.1.0/nng_listener_create.3).
     pub(crate) fn create(socket: NngSocket, url: &str) -> Result<Self> {
         unsafe {
-            let mut listener = nng_listener { id: 0 };
+            let mut listener = nng_listener::default();
             let (_cstring, url) = to_cstr(url)?;
             let res = nng_listener_create(&mut listener, socket.nng_socket(), url);
             Error::zero_map(res, || NngListener { listener, socket })
@@ -28,7 +28,7 @@ impl NngListener {
     pub fn start(&self) -> Result<()> {
         // TODO: Use different type for started vs non-started dialer?  According to nng docs options can generally only
         // be set before the dialer is started.
-        unsafe { Error::from_i32(nng_listener_start(self.listener, 0)) }
+        unsafe { nng_int_to_result(nng_listener_start(self.listener, 0)) }
     }
 }
 

@@ -13,8 +13,8 @@ use std::{result, sync::Arc};
 bitflags! {
     #[derive(Default)]
     pub struct Flags: i32 {
-        const NONBLOCK = nng_flag_enum::NNG_FLAG_NONBLOCK as i32;
-        const ALLOC = nng_flag_enum::NNG_FLAG_ALLOC as i32;
+        const NONBLOCK = NNG_FLAG_NONBLOCK as i32;
+        const ALLOC = NNG_FLAG_ALLOC as i32;
     }
 }
 
@@ -45,7 +45,7 @@ impl NngSocket {
         argument: pipe::PipeNotifyCallbackArg,
     ) -> Result<()> {
         unsafe {
-            Error::from_i32(nng_pipe_notify(
+            nng_int_to_result(nng_pipe_notify(
                 self.nng_socket(),
                 event as i32,
                 Some(callback),
@@ -105,7 +105,7 @@ impl GetOpts for NngSocket {
         unsafe {
             let mut value: *mut ::std::os::raw::c_char = std::ptr::null_mut();
             let res = nng_getopt_string(self.nng_socket(), option.as_cptr(), &mut value);
-            Error::from_i32(res)?;
+            nng_int_to_result(res)?;
             Ok(NngString::new(value))
         }
     }
@@ -113,20 +113,20 @@ impl GetOpts for NngSocket {
 
 impl SetOpts for NngSocket {
     fn setopt_bool(&mut self, option: NngOption, value: bool) -> Result<()> {
-        unsafe { Error::from_i32(nng_setopt_bool(self.nng_socket(), option.as_cptr(), value)) }
+        unsafe { nng_int_to_result(nng_setopt_bool(self.nng_socket(), option.as_cptr(), value)) }
     }
     fn setopt_int(&mut self, option: NngOption, value: i32) -> Result<()> {
-        unsafe { Error::from_i32(nng_setopt_int(self.nng_socket(), option.as_cptr(), value)) }
+        unsafe { nng_int_to_result(nng_setopt_int(self.nng_socket(), option.as_cptr(), value)) }
     }
     fn setopt_ms(&mut self, option: NngOption, value: nng_duration) -> Result<()> {
-        unsafe { Error::from_i32(nng_setopt_ms(self.nng_socket(), option.as_cptr(), value)) }
+        unsafe { nng_int_to_result(nng_setopt_ms(self.nng_socket(), option.as_cptr(), value)) }
     }
     fn setopt_size(&mut self, option: NngOption, value: usize) -> Result<()> {
-        unsafe { Error::from_i32(nng_setopt_size(self.nng_socket(), option.as_cptr(), value)) }
+        unsafe { nng_int_to_result(nng_setopt_size(self.nng_socket(), option.as_cptr(), value)) }
     }
     fn setopt_uint64(&mut self, option: NngOption, value: u64) -> Result<()> {
         unsafe {
-            Error::from_i32(nng_setopt_uint64(
+            nng_int_to_result(nng_setopt_uint64(
                 self.nng_socket(),
                 option.as_cptr(),
                 value,
@@ -136,7 +136,7 @@ impl SetOpts for NngSocket {
     fn setopt_string(&mut self, option: NngOption, value: &str) -> Result<()> {
         unsafe {
             let (_, value) = to_cstr(value)?;
-            Error::from_i32(nng_setopt_string(
+            nng_int_to_result(nng_setopt_string(
                 self.nng_socket(),
                 option.as_cptr(),
                 value,
@@ -221,7 +221,7 @@ pub trait Dial: Socket {
 
 #[derive(Debug)]
 pub struct SendError<T> {
-    pub error: nng_errno_enum,
+    pub error: Error,
     pub message: T,
 }
 
@@ -242,7 +242,7 @@ pub trait SendMsg: Socket {
         unsafe {
             let ptr = data.as_mut_ptr() as *mut std::os::raw::c_void;
             let res = nng_send(self.nng_socket(), ptr, data.len(), flags.bits());
-            Error::from_i32(res)
+            nng_int_to_result(res)
         }
     }
     /// Sends data in "zero-copy" mode.  See `NNG_FLAG_ALLOC`.
@@ -258,8 +258,8 @@ pub trait SendMsg: Socket {
         unsafe {
             let (ptr, size) = data.take();
             let res = nng_send(self.nng_socket(), ptr, size, flags);
-            let error = nng_errno_enum::from_i32(res);
-            if let Some(error) = error {
+            let error = nng_int_to_result(res);
+            if let Err(error) = error {
                 let message = memory::Alloc::create_raw(ptr, size);
                 Err(SendError { error, message })
             } else {
@@ -270,10 +270,7 @@ pub trait SendMsg: Socket {
     /// Send a message.  See [nng_sendmsg](https://nanomsg.github.io/nng/man/v1.1.0/nng_sendmsg.3).
     fn sendmsg(&self, msg: msg::NngMsg) -> Result<()> {
         let res = self.sendmsg_flags(msg, Default::default());
-        match res {
-            Ok(()) => Ok(()),
-            Err(res) => Err(Error::Errno(res.error)),
-        }
+        res.map_err(|err| err.error)
     }
     /// Send a message.  See [nng_sendmsg](https://nanomsg.github.io/nng/man/v1.1.0/nng_sendmsg.3).
     fn sendmsg_flags(
@@ -285,8 +282,8 @@ pub trait SendMsg: Socket {
             let ptr = msg.take();
             assert!(!ptr.is_null());
             let res = nng_sendmsg(self.nng_socket(), ptr, flags.bits());
-            let error = nng_errno_enum::from_i32(res);
-            if let Some(error) = error {
+            let error = nng_int_to_result(res);
+            if let Err(error) = error {
                 let message = msg::NngMsg::new_msg(ptr);
                 Err(SendError { error, message })
             } else {
@@ -312,7 +309,7 @@ pub trait RecvMsg: Socket {
             let mut size: usize = 0;
             let ptr_ptr = (&mut ptr) as *mut _ as *mut core::ffi::c_void;
             let res = nng_recv(self.nng_socket(), ptr_ptr, &mut size, flags);
-            let res = Error::from_i32(res);
+            let res = nng_int_to_result(res);
             match res {
                 Ok(()) => Ok(memory::Alloc::create_raw(ptr, size)),
                 Err(res) => Err(res),
@@ -361,11 +358,11 @@ impl Drop for InnerSocket {
     fn drop(&mut self) {
         unsafe {
             debug!("Socket close: {:?}", self.socket);
-            let res = Error::from_i32(nng_close(self.socket));
+            let res = nng_int_to_result(nng_close(self.socket));
             match res {
                 Ok(()) => {}
                 // Can't panic here.  Thrift's TIoChannel::split() clones the socket handle so we may get ECLOSED
-                Err(Error::Errno(nng_errno_enum::NNG_ECLOSED)) => {}
+                Err(Error::Errno(NngErrno::ECLOSED)) => {}
                 Err(res) => {
                     debug!("nng_close {:?}", res);
                     panic!("nng_close {:?}", res);

@@ -128,12 +128,11 @@ unsafe extern "C" fn reply_callback(arg: AioCallbackArg) {
     match ctx.state {
         ReplyState::Idle => panic!(),
         ReplyState::Receiving => {
-            let res = Error::from_i32(nng_aio_result(aio_nng));
+            let res = nng_int_to_result(nng_aio_result(aio_nng));
             match res {
                 Err(res) => {
                     match res {
-                        Error::Errno(nng_errno_enum::NNG_ECLOSED)
-                        | Error::Errno(nng_errno_enum::NNG_ECANCELED) => {
+                        Error::Errno(NngErrno::ECLOSED) | Error::Errno(NngErrno::ECANCELED) => {
                             debug!("reply_callback {:?}", res);
                         }
                         _ => {
@@ -154,7 +153,7 @@ unsafe extern "C" fn reply_callback(arg: AioCallbackArg) {
         }
         ReplyState::Wait => panic!(),
         ReplyState::Sending => {
-            let res = Error::from_i32(nng_aio_result(aio_nng));
+            let res = nng_int_to_result(nng_aio_result(aio_nng));
             if res.is_err() {
                 // Nng requires we resume ownership of the message
                 let _ = NngMsg::new_msg(nng_aio_get_msg(aio_nng));

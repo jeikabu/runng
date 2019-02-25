@@ -42,7 +42,7 @@ impl NngAio {
             //https://doc.rust-lang.org/stable/book/first-edition/ffi.html#callbacks-from-c-code-to-rust-functions
             let res = nng_aio_alloc(&mut aio, Some(callback), arg);
             self.aio = aio;
-            Error::from_i32(res)
+            nng_int_to_result(res)
         }
     }
 

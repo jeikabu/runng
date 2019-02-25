@@ -17,7 +17,7 @@ impl NngDialer {
     /// See [nng_dialer_create](https://nanomsg.github.io/nng/man/v1.1.0/nng_dialer_create.3).
     pub(crate) fn create(socket: NngSocket, url: &str) -> Result<Self> {
         unsafe {
-            let mut dialer = nng_dialer { id: 0 };
+            let mut dialer = nng_dialer::default();
             let (_cstring, url) = to_cstr(url)?;
             Error::zero_map(
                 nng_dialer_create(&mut dialer, socket.nng_socket(), url),
@@ -29,7 +29,7 @@ impl NngDialer {
     // TODO: Use different type for started vs non-started dialer?  According to nng docs options can generally only
     // be set before the dialer is started.
     pub fn start(&self) -> Result<()> {
-        unsafe { Error::from_i32(nng_dialer_start(self.dialer, 0)) }
+        unsafe { nng_int_to_result(nng_dialer_start(self.dialer, 0)) }
     }
 }
 

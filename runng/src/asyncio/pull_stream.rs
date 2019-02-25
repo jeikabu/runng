@@ -91,14 +91,13 @@ unsafe extern "C" fn pull_callback(arg: AioCallbackArg) {
         PullState::Receiving => {
             let aio = ctx.aio.nng_aio();
             let aio_res = nng_aio_result(aio);
-            let res = Error::from_i32(aio_res);
+            let res = nng_int_to_result(aio_res);
             match res {
                 Err(res) => {
                     match res {
                         // nng_aio_close() calls nng_aio_stop which nng_aio_abort(NNG_ECANCELED) and waits.
                         // If we call start_receive() it will fail with ECANCELED and we infinite loop...
-                        Error::Errno(nng_errno_enum::NNG_ECLOSED)
-                        | Error::Errno(nng_errno_enum::NNG_ECANCELED) => {
+                        Error::Errno(NngErrno::ECLOSED) | Error::Errno(NngErrno::ECANCELED) => {
                             debug!("pull_callback {:?}", res);
                         }
                         _ => {
