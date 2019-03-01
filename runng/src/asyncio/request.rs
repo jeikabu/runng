@@ -1,7 +1,7 @@
 //! Async request/reply
 
 use crate::{
-    aio::{AioCallbackArg, NngAio},
+    aio::{AioArgPtr, NngAio},
     asyncio::*,
     ctx::NngCtx,
     msg::NngMsg,
@@ -26,7 +26,7 @@ struct RequestContextAioArg {
 }
 
 impl RequestContextAioArg {
-    pub fn create(socket: NngSocket) -> Result<Box<Self>> {
+    pub fn create(socket: NngSocket) -> Result<AioArg<Self>> {
         let ctx = NngCtx::create(socket)?;
         let arg = Self {
             ctx,
@@ -65,7 +65,7 @@ impl Aio for RequestContextAioArg {
 /// Asynchronous context for request socket.
 #[derive(Debug)]
 pub struct RequestAsyncHandle {
-    aio_arg: Box<RequestContextAioArg>,
+    aio_arg: AioArg<RequestContextAioArg>,
 }
 
 impl AsyncContext for RequestAsyncHandle {
@@ -90,7 +90,7 @@ impl AsyncRequest for RequestAsyncHandle {
     }
 }
 
-unsafe extern "C" fn request_callback(arg: AioCallbackArg) {
+unsafe extern "C" fn request_callback(arg: AioArgPtr) {
     let ctx = &mut *(arg as *mut RequestContextAioArg);
     let aionng = ctx.ctx.aio().nng_aio();
     let ctxnng = ctx.ctx.ctx();

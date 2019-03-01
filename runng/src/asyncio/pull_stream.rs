@@ -1,7 +1,7 @@
 //! Async push/pull ("pipeline")
 
 use crate::{
-    aio::{AioCallbackArg, NngAio},
+    aio::{AioArgPtr, NngAio},
     asyncio::*,
     msg::NngMsg,
     protocol::{subscribe, Subscribe},
@@ -24,7 +24,7 @@ struct PullContextAioArg {
 }
 
 impl PullContextAioArg {
-    pub fn create(socket: NngSocket, sender: mpsc::Sender<Result<NngMsg>>) -> Result<Box<Self>> {
+    pub fn create(socket: NngSocket, sender: mpsc::Sender<Result<NngMsg>>) -> Result<AioArg<Self>> {
         let aio = NngAio::new(socket);
         let arg = Self {
             aio,
@@ -54,7 +54,7 @@ impl Aio for PullContextAioArg {
 /// Asynchronous context for pull socket.
 #[derive(Debug)]
 pub struct PullAsyncStream {
-    aio_arg: Box<PullContextAioArg>,
+    aio_arg: AioArg<PullContextAioArg>,
     receiver: Option<mpsc::Receiver<Result<NngMsg>>>,
 }
 
@@ -83,7 +83,7 @@ impl AsyncPull for PullAsyncStream {
     }
 }
 
-unsafe extern "C" fn pull_callback(arg: AioCallbackArg) {
+unsafe extern "C" fn pull_callback(arg: AioArgPtr) {
     let ctx = &mut *(arg as *mut PullContextAioArg);
     trace!("pull_callback::{:?}", ctx.state);
     match ctx.state {

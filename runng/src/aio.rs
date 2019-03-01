@@ -2,7 +2,7 @@
 
 use crate::*;
 use runng_sys::*;
-use std::ptr;
+use std::{pin, ptr};
 
 /// Type which exposes a `NngAio`.
 pub trait Aio {
@@ -23,8 +23,11 @@ pub struct NngAio {
 
 unsafe impl Send for NngAio {}
 
-pub type AioCallbackArg = *mut ::std::os::raw::c_void;
-pub type AioCallback = unsafe extern "C" fn(arg1: AioCallbackArg);
+/// Type that is safe to pass as an argument to `nng_aio`.
+pub type AioArg<T> = pin::Pin<Box<T>>;
+/// `AioArg` as a raw pointer.
+pub type AioArgPtr = *mut ::std::os::raw::c_void;
+pub type AioCallback = unsafe extern "C" fn(arg1: AioArgPtr);
 
 impl NngAio {
     /// Create new `NngAio`.  Must call `init()`.
@@ -36,7 +39,7 @@ impl NngAio {
     }
 
     /// Finish initialization of `nng_aio`.  See [nng_aio_alloc](https://nanomsg.github.io/nng/man/v1.1.0/nng_aio_alloc.3).
-    pub fn init(&mut self, callback: AioCallback, arg: AioCallbackArg) -> Result<()> {
+    pub fn init(&mut self, callback: AioCallback, arg: AioArgPtr) -> Result<()> {
         unsafe {
             let mut aio: *mut nng_aio = ptr::null_mut();
             //https://doc.rust-lang.org/stable/book/first-edition/ffi.html#callbacks-from-c-code-to-rust-functions
@@ -46,15 +49,15 @@ impl NngAio {
         }
     }
 
-    pub(crate) fn register_aio<T>(arg: T, callback: AioCallback) -> Result<Box<T>>
+    pub(crate) fn register_aio<T>(arg: T, callback: AioCallback) -> Result<AioArg<T>>
     where
         T: Aio,
     {
         let mut arg = Box::new(arg);
         // This mess is needed to convert Box<_> to c_void
-        let arg_ptr = arg.as_mut() as *mut _ as AioCallbackArg;
+        let arg_ptr = arg.as_mut() as *mut _ as AioArgPtr;
         arg.aio_mut().init(callback, arg_ptr)?;
-        Ok(arg)
+        Ok(pin::Pin::from(arg))
     }
 
     /// Obtain underlying `nng_aio`.
