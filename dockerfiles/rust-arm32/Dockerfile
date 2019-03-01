@@ -1,4 +1,4 @@
-# jeikabu/debian-rust:arm32v7-stretch-1.32.0
+# jeikabu/debian-rust:arm32v7-stretch-1.33.0
 # Rust on ARM32
 
 FROM multiarch/debian-debootstrap:armhf-stretch
@@ -6,11 +6,10 @@ FROM multiarch/debian-debootstrap:armhf-stretch
 RUN apt-get update && apt-get install -y \
     build-essential \
     ca-certificates \
-    clang \
     cmake \
     curl
 
-ARG RUST_VER=1.32.0
+ARG RUST_VER=1.33.0
 
 # Make sure rustup and cargo are in PATH
 ENV PATH "~/.cargo/bin:$PATH"
