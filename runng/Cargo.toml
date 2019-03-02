@@ -28,7 +28,17 @@ futures = "0.1"
 log = "0.4"
 rand = "0.6"
 runng_derive = { version = "0.1", path = "../runng_derive" }
-runng-sys = { version = "1.1.1-rc", path = "../runng_sys", package = "nng-sys", features = ["build-bindgen"] }
+runng-sys = { version = "1.1.1-rc", path = "../runng_sys", package = "nng-sys" }
+
+# To enable bindgen only when building for PC, I'd like to have:
+#[target.'cfg(target_arch = "x86_64")'.dependencies]
+#runng-sys = { version = "1.1.1-rc", path = "../runng_sys", package = "nng-sys", features = ["build-bindgen"] }
+#[target.'cfg(target_arch = "aarch64")'.dependencies]
+#runng-sys = { version = "1.1.1-rc", path = "../runng_sys", package = "nng-sys" }
+#
+# But that doesn't work, `features` are set regardless of target arch.  
+# Instead, could ignore the `build-bindgen` feature but that complicates everything:
+#cfg!(any(target_arch = "arm", target_arch = "aarch64"))
 
 [dev-dependencies]
 env_logger = "0.6"
