@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::{
-    aio::{AioCallbackArg, NngAio},
+    aio::{AioArgPtr, NngAio},
     msg::NngMsg,
     *,
 };
@@ -17,7 +17,7 @@ struct PullAioArg {
 }
 
 impl PullAioArg {
-    pub fn create(socket: NngSocket) -> Result<Box<Self>> {
+    pub fn create(socket: NngSocket) -> Result<AioArg<Self>> {
         let aio = NngAio::new(socket);
         let queue = Mutex::new(WorkQueue::default());
         let arg = Self { aio, queue };
@@ -46,7 +46,7 @@ impl Aio for PullAioArg {
 
 #[derive(Debug)]
 pub struct PullAsyncHandle {
-    aio_arg: Box<PullAioArg>,
+    aio_arg: AioArg<PullAioArg>,
 }
 
 impl AsyncContext for PullAsyncHandle {
@@ -75,7 +75,7 @@ impl ReadAsync for PullAsyncHandle {
     }
 }
 
-unsafe extern "C" fn read_callback(arg: AioCallbackArg) {
+unsafe extern "C" fn read_callback(arg: AioArgPtr) {
     let ctx = &mut *(arg as *mut PullAioArg);
     let aio = ctx.aio.nng_aio();
     let aio_res = nng_aio_result(aio);

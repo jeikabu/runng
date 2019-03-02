@@ -1,7 +1,7 @@
 //! Async publish/subscribe
 
 use crate::{
-    aio::{AioCallbackArg, NngAio},
+    aio::{AioArgPtr, NngAio},
     asyncio::*,
     msg::NngMsg,
     *,
@@ -24,7 +24,7 @@ struct PushContextAioArg {
 }
 
 impl PushContextAioArg {
-    pub fn create(socket: NngSocket) -> Result<Box<Self>> {
+    pub fn create(socket: NngSocket) -> Result<AioArg<Self>> {
         let aio = NngAio::new(socket);
         let arg = Self {
             aio,
@@ -66,7 +66,7 @@ impl Aio for PushContextAioArg {
 /// Asynchronous context for publish socket.
 #[derive(Debug)]
 pub struct PushAsyncHandle {
-    aio_arg: Box<PushContextAioArg>,
+    aio_arg: AioArg<PushContextAioArg>,
 }
 
 impl AsyncContext for PushAsyncHandle {
@@ -92,7 +92,7 @@ impl AsyncPush for PushAsyncHandle {
     }
 }
 
-unsafe extern "C" fn publish_callback(arg: AioCallbackArg) {
+unsafe extern "C" fn publish_callback(arg: AioArgPtr) {
     let ctx = &mut *(arg as *mut PushContextAioArg);
 
     trace!("callback Push:{:?}", ctx.state);

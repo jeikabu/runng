@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::{
-    aio::{Aio, AioCallbackArg, NngAio},
+    aio::{Aio, AioArgPtr, NngAio},
     ctx::NngCtx,
     msg::NngMsg,
     *,
@@ -28,7 +28,7 @@ struct ReplyContextAioArg {
 }
 
 impl ReplyContextAioArg {
-    pub fn create(socket: NngSocket) -> Result<Box<Self>> {
+    pub fn create(socket: NngSocket) -> Result<AioArg<Self>> {
         let ctx = NngCtx::create(socket)?;
         let queue = Mutex::new(WorkQueue::default());
         let arg = Self {
@@ -83,7 +83,7 @@ impl Aio for ReplyContextAioArg {
 /// Asynchronous context for reply socket.
 #[derive(Debug)]
 pub struct ReplyAsyncHandle {
-    aio_arg: Box<ReplyContextAioArg>,
+    aio_arg: AioArg<ReplyContextAioArg>,
 }
 
 impl AsyncContext for ReplyAsyncHandle {
@@ -121,7 +121,7 @@ impl ReplyAsync for ReplyAsyncHandle {
     }
 }
 
-unsafe extern "C" fn reply_callback(arg: AioCallbackArg) {
+unsafe extern "C" fn reply_callback(arg: AioArgPtr) {
     let ctx = &mut *(arg as *mut ReplyContextAioArg);
     let aio_nng = ctx.ctx.aio().nng_aio();
     trace!("reply_callback::{:?}", ctx.state);
