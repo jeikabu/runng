@@ -61,6 +61,7 @@ pub enum NngErrno {
 impl NngErrno {
     // TODO: replace this with std::num::TryFromIntError once stabilized:
     // https://doc.rust-lang.org/std/convert/trait.TryFrom.html
+    #[allow(clippy::cyclomatic_complexity)]
     fn try_from(value: i32) -> result::Result<Self, TryFromIntError> {
         match value {
             value if value == NngErrno::EINTR as i32 => Ok(NngErrno::EINTR),

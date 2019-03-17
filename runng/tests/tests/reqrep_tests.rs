@@ -15,46 +15,6 @@ use std::{
 };
 
 #[test]
-fn example_basic() -> runng::Result<()> {
-    let url = get_url();
-
-    let factory = ProtocolFactory::default();
-    let rep = factory.replier_open()?.listen(&url)?;
-    let req = factory.requester_open()?.dial(&url)?;
-    req.sendmsg(NngMsg::create()?)?;
-    rep.recv()?;
-
-    Ok(())
-}
-
-#[test]
-fn example_async() -> runng::Result<()> {
-    let url = get_url();
-
-    let factory = ProtocolFactory::default();
-    let mut rep_ctx = factory
-        .replier_open()?
-        .listen(&url)?
-        .create_async_stream(1)?;
-
-    let mut req_ctx = factory.requester_open()?.dial(&url)?.create_async()?;
-    let req_future = req_ctx.send(NngMsg::create()?);
-    rep_ctx
-        .receive()
-        .unwrap()
-        .take(1)
-        .for_each(|_request| {
-            let msg = NngMsg::create().unwrap();
-            rep_ctx.reply(msg).wait().unwrap().unwrap();
-            Ok(())
-        })
-        .wait()?;
-    req_future.wait().unwrap()?;
-
-    Ok(())
-}
-
-#[test]
 fn zerocopy() -> runng::Result<()> {
     let url = get_url();
 
@@ -127,7 +87,7 @@ fn nonblock() -> runng::Result<()> {
         let request = receive_loop(&rep);
         req.recvmsg_flags(socket::Flags::NONBLOCK);
         send_loop(&rep, request);
-        let reply = receive_loop(&req);
+        let _reply = receive_loop(&req);
         //assert_eq!(data, reply);
     }
 

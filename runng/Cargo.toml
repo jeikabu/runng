@@ -42,4 +42,5 @@ runng-sys = { version = "1.1.1-rc", path = "../runng_sys", package = "nng-sys" }
 
 [dev-dependencies]
 env_logger = "0.6"
+failure = "0.1"
 futures-timer = "0.1"

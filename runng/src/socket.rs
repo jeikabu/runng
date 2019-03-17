@@ -297,7 +297,7 @@ pub trait SendMsg: Socket {
 pub trait RecvMsg: Socket {
     /// Receive data.  See [nng_recv](https://nanomsg.github.io/nng/man/v1.1.0/nng_recv.3).
     fn recv(&self) -> Result<()> {
-        Ok(())
+        unimplemented!()
     }
     fn recv_zerocopy(&self) -> Result<memory::Alloc> {
         self.recv_zerocopy_flags(Default::default())
@@ -357,7 +357,7 @@ struct InnerSocket {
 impl Drop for InnerSocket {
     fn drop(&mut self) {
         unsafe {
-            debug!("Socket close: {:?}", self.socket);
+            trace!("Socket close: {:?}", self.socket);
             let res = nng_int_to_result(nng_close(self.socket));
             match res {
                 Ok(()) => {}

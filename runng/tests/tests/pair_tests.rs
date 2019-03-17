@@ -1,17 +1,27 @@
-use crate::common::{create_stop_message, get_url, not_stop_message};
+use crate::common::*;
 use futures::{
-    future::{Either, Future, IntoFuture},
+    future::{Future, IntoFuture},
     stream::Stream,
+    sync::oneshot,
 };
 use futures_timer::Delay;
+use log::debug;
 use runng::{
     asyncio::*,
     factory::latest::ProtocolFactory,
     msg::NngMsg,
     options::{NngOption, SetOpts},
     socket::*,
+    NngErrno,
 };
-use std::{thread, time::Duration};
+use std::{
+    sync::{
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        Arc,
+    },
+    thread,
+    time::Duration,
+};
 
 fn forward(
     ctx: &mut PairStreamHandle,
@@ -70,7 +80,7 @@ fn pair() -> runng::Result<()> {
     Ok(())
 }
 
-#[ignore]
+//#[ignore]
 #[test]
 fn pair1_poly() -> runng::Result<()> {
     let url = get_url();
@@ -79,30 +89,38 @@ fn pair1_poly() -> runng::Result<()> {
     // Enable pair ver 1 socket "polyamorous" mode; multiple dialers can share a socket
     let mut a = factory.pair_open()?;
     a.socket_mut().setopt_bool(NngOption::PAIR1_POLY, true)?;
+    a.socket_mut().setopt_ms(NngOption::RECVTIMEO, 100)?;
+    a.socket_mut().setopt_ms(NngOption::SENDTIMEO, 100)?;
     let mut b = factory.pair_open()?;
     // Only listener needs PAIR1_POLY
     //b.socket_mut().setopt_bool(NngOption::PAIR1_POLY, true)?;
-    b.socket_mut().setopt_ms(NngOption::SENDTIMEO, 50)?;
+    b.socket_mut().setopt_ms(NngOption::RECVTIMEO, 100)?;
+    b.socket_mut().setopt_ms(NngOption::SENDTIMEO, 100)?;
+
+    let puller_ready = Arc::new(AtomicBool::default());
+    let done = Arc::new(AtomicBool::default());
 
     let mut threads = vec![];
     {
         let url = url.clone();
+        let done = done.clone();
         let thread = thread::spawn(move || -> runng::Result<()> {
-            let mut ctx = a.listen(&url)?.create_async_stream(1)?;
-            ctx.receive()
-                .unwrap()
-                .take_while(not_stop_message)
-                .for_each(|msg| {
-                    let msg = msg.unwrap();
-                    // Duplicate message so it has same content (sender will check for identifier)
-                    let mut response = msg.dup().unwrap();
-                    // Response message's pipe must be set to that of the received message
-                    let pipe = msg.get_pipe().unwrap();
-                    response.set_pipe(&pipe);
-                    ctx.send(response).wait().unwrap().unwrap();
-                    Ok(())
-                })
-                .wait()?;
+            let mut ctx = a.listen(&url)?.create_async()?;
+            while !done.load(Ordering::Relaxed) {
+                match ctx.receive().wait() {
+                    Ok(Ok(msg)) => {
+                        // Duplicate message so it has same content (sender will check for identifier)
+                        let mut response = msg.dup().unwrap();
+                        // Response message's pipe must be set to that of the received message
+                        let pipe = msg.get_pipe().unwrap();
+                        response.set_pipe(&pipe);
+                        ctx.send(response).wait().unwrap().unwrap();
+                    }
+                    Ok(Err(runng::Error::Errno(NngErrno::ETIMEDOUT))) => break,
+                    Ok(Err(err)) => panic!(err),
+                    _ => break,
+                }
+            }
             Ok(())
         });
         threads.push(thread);
@@ -112,53 +130,55 @@ fn pair1_poly() -> runng::Result<()> {
     thread::sleep(Duration::from_millis(50));
 
     const NUM_DIALERS: u32 = 2;
+    let count = Arc::new(AtomicUsize::new(0));
     for i in 0..NUM_DIALERS {
         let url = url.clone();
         let socket = b.clone();
+        let count = count.clone();
+        let done = done.clone();
         let thread = thread::spawn(move || -> runng::Result<()> {
-            let mut ctx = socket.dial(&url)?.create_async_stream(1)?;
-            // Send message containing identifier
-            let mut msg = NngMsg::create()?;
-            msg.append_u32(i)?;
-            ctx.send(msg).wait().unwrap()?;
-            // Receive reply and make sure it has same identifier
-            let res = ctx
-                .receive()
-                .unwrap()
-                .into_future()
-                .select2(Delay::new(Duration::from_secs(1)))
-                .then(|res| match res {
-                    Ok(Either::A((msg_stream, _timeout))) => Ok(msg_stream),
-                    Ok(Either::B((_timeout_error, _))) => Err(()),
-                    _ => Err(()),
-                })
-                .wait();
-            let res = if let Ok((msg, _stream)) = res {
-                let mut msg = msg.unwrap().unwrap();
-                let _reply = msg.trim_u32().unwrap();
-                //TODO: this logic may not be correct.  The listener may not be able to send a reply to the sender via the pipe
-                //https://github.com/nanomsg/nng/issues/862
-                // if i == reply {
-                //     Ok(())
-                // } else {
-                //     Err(())
-                // }
-                Ok(())
-            } else {
-                Err(())
-            };
-            ctx.send(create_stop_message()).wait()??;
-            // FIXME: when reexamine Result handling, impl From should permit `into()` to be used
-            if res.is_ok() {
-                Ok(())
-            } else {
-                Err(runng::Error::UnknownErrno(-1))
+            let mut ctx = socket.dial(&url)?.create_async()?;
+            while !done.load(Ordering::Relaxed) {
+                // Send message containing identifier
+                let mut msg = NngMsg::create()?;
+                msg.append_u32(i)?;
+                match ctx.send(msg).wait() {
+                    Ok(Ok(())) => {}
+                    Ok(Err(runng::Error::Errno(NngErrno::ETIMEDOUT))) => break,
+                    Ok(Err(err)) => panic!(err),
+                    Err(oneshot::Canceled) => panic!(),
+                }
+
+                match ctx.receive().wait() {
+                    Ok(Ok(mut msg)) => {
+                        let _reply = msg.trim_u32()?;
+                        count.fetch_add(1, Ordering::Relaxed);
+
+                        //TODO: this logic may not be correct.  The listener may not be able to send a reply to the sender via the pipe
+                        //https://github.com/nanomsg/nng/issues/862
+                        // if i == reply {
+                        //     Ok(())
+                        // } else {
+                        //     Err(())
+                        // }
+                    }
+                    Ok(Err(runng::Error::Errno(NngErrno::ETIMEDOUT))) => break,
+                    Ok(Err(err)) => panic!(err),
+                    _ => break,
+                }
             }
+
+            Ok(())
         });
         threads.push(thread);
     }
+
+    sleep_test();
+    done.store(true, Ordering::Relaxed);
+
     threads
         .into_iter()
         .for_each(|thread| thread.join().unwrap().unwrap());
+    assert!(count.load(Ordering::Relaxed) > NUM_DIALERS as usize);
     Ok(())
 }

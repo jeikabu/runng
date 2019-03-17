@@ -3,6 +3,8 @@ mod common;
 #[cfg(test)]
 mod tests {
 
+    mod broker_tests;
+    mod future_tests;
     mod msg_tests;
     mod options_tests;
     mod pair_tests;
@@ -39,18 +41,18 @@ mod tests {
                     );
                     req_dialer.start()?;
                     requester.sendmsg(msg::NngMsg::create()?)?;
-                    let _request = replier.recv()?;
+                    let _request = replier.recvmsg()?;
                     // Drop the dialer
                 }
                 // requester still works
                 requester.sendmsg(msg::NngMsg::create()?)?;
-                let _request = replier.recv()?;
+                let _request = replier.recvmsg()?;
                 // Drop the listener
             }
             // Replier still works
             let requester = factory.requester_open()?.dial(&url)?;
             requester.sendmsg(msg::NngMsg::create()?)?;
-            let _request = replier.recv()?;
+            let _request = replier.recvmsg()?;
         }
 
         Ok(())
