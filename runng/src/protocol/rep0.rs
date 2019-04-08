@@ -31,8 +31,8 @@ impl Socket for Rep0 {
 
 impl Listen for Rep0 {}
 impl Dial for Rep0 {}
-impl RecvMsg for Rep0 {}
-impl SendMsg for Rep0 {}
+impl RecvSocket for Rep0 {}
+impl SendSocket for Rep0 {}
 
 impl AsyncSocket for Rep0 {
     type ContextType = ReplyAsyncHandle;

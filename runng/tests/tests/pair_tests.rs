@@ -50,7 +50,7 @@ fn pair() -> runng::Result<()> {
     let a_thread = thread::spawn(move || -> runng::Result<()> {
         let mut ctx = a.create_async_stream(1)?;
         // Send the first (0th) message
-        let mut msg = NngMsg::create()?;
+        let mut msg = NngMsg::new()?;
         msg.append_u32(0)?;
         ctx.send(msg).wait()??;
         let _stream = ctx
@@ -88,14 +88,14 @@ fn pair1_poly() -> runng::Result<()> {
 
     // Enable pair ver 1 socket "polyamorous" mode; multiple dialers can share a socket
     let mut a = factory.pair_open()?;
-    a.socket_mut().setopt_bool(NngOption::PAIR1_POLY, true)?;
-    a.socket_mut().setopt_ms(NngOption::RECVTIMEO, 100)?;
-    a.socket_mut().setopt_ms(NngOption::SENDTIMEO, 100)?;
+    a.socket_mut().set_bool(NngOption::PAIR1_POLY, true)?;
+    a.socket_mut().set_ms(NngOption::RECVTIMEO, 100)?;
+    a.socket_mut().set_ms(NngOption::SENDTIMEO, 100)?;
     let mut b = factory.pair_open()?;
     // Only listener needs PAIR1_POLY
-    //b.socket_mut().setopt_bool(NngOption::PAIR1_POLY, true)?;
-    b.socket_mut().setopt_ms(NngOption::RECVTIMEO, 100)?;
-    b.socket_mut().setopt_ms(NngOption::SENDTIMEO, 100)?;
+    //b.socket_mut().set_bool(NngOption::PAIR1_POLY, true)?;
+    b.socket_mut().set_ms(NngOption::RECVTIMEO, 100)?;
+    b.socket_mut().set_ms(NngOption::SENDTIMEO, 100)?;
 
     let puller_ready = Arc::new(AtomicBool::default());
     let done = Arc::new(AtomicBool::default());
@@ -140,7 +140,7 @@ fn pair1_poly() -> runng::Result<()> {
             let mut ctx = socket.dial(&url)?.create_async()?;
             while !done.load(Ordering::Relaxed) {
                 // Send message containing identifier
-                let mut msg = NngMsg::create()?;
+                let mut msg = NngMsg::new()?;
                 msg.append_u32(i)?;
                 match ctx.send(msg).wait() {
                     Ok(Ok(())) => {}

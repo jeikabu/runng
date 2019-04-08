@@ -1,6 +1,6 @@
 use crate::common::*;
 use failure::Error;
-use futures::future::{Future, IntoFuture};
+use futures::future::Future;
 use log::debug;
 use runng::{
     asyncio::*,
@@ -16,7 +16,6 @@ use std::{
         Arc,
     },
     thread,
-    time::Duration,
 };
 
 #[test]
@@ -26,9 +25,7 @@ fn simple() -> Result<(), Error> {
     let out_url = get_url();
 
     let mut broker_in = Pull0::open()?;
-    broker_in
-        .socket_mut()
-        .setopt_ms(NngOption::RECVTIMEO, 100)?;
+    broker_in.socket_mut().set_ms(NngOption::RECVTIMEO, 100)?;
     let broker_in = broker_in.listen(&in_url)?;
     let broker_out = Push0::open()?.listen(&out_url)?;
 
@@ -62,7 +59,7 @@ fn simple() -> Result<(), Error> {
         let (done, send_count) = server_args;
         let mut ctx = Push0::open()?.dial(&in_url)?.create_async()?;
         while !done.load(Ordering::Relaxed) {
-            let msg = NngMsg::create()?;
+            let msg = NngMsg::new()?;
             ctx.send(msg).wait()??;
             send_count.fetch_add(1, Ordering::Relaxed);
             sleep_brief();
@@ -74,7 +71,7 @@ fn simple() -> Result<(), Error> {
     let client_thread = thread::spawn(move || -> Result<(), Error> {
         let (done, recv_count) = client_args;
         let mut ctx = Pull0::open()?.dial(&out_url)?;
-        ctx.socket_mut().setopt_ms(NngOption::RECVTIMEO, 100)?;
+        ctx.socket_mut().set_ms(NngOption::RECVTIMEO, 100)?;
         let mut ctx = ctx.create_async()?;
         while !done.load(Ordering::Relaxed) {
             match ctx.receive().wait() {

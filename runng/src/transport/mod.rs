@@ -1,4 +1,6 @@
-//! NNG transports.  See [Section 7](https://nanomsg.github.io/nng/man/v1.1.0/index.html#_section_7_protocols_and_transports).
+//! Transports like TCP, named pipes, etc.
+//!
+//! See [Section 7](https://nanomsg.github.io/nng/man/v1.1.0/index.html#_section_7_protocols_and_transports).
 
 use crate::*;
 

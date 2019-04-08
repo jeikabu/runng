@@ -7,12 +7,12 @@ use quote::quote;
 use syn::{Ident, Lit, Meta, MetaNameValue};
 
 #[proc_macro_derive(NngGetOpts, attributes(prefix, nng_member))]
-pub fn derive_nng_get_opts(tokens: TokenStream) -> TokenStream {
+pub fn derive_nng_socket_get_opts(tokens: TokenStream) -> TokenStream {
     derive_nng_opts(tokens, gen_get_impl)
 }
 
 #[proc_macro_derive(NngSetOpts, attributes(prefix, nng_member))]
-pub fn derive_nng_set_opts(tokens: TokenStream) -> TokenStream {
+pub fn derive_nng_socket_set_opts(tokens: TokenStream) -> TokenStream {
     derive_nng_opts(tokens, gen_set_impl)
 }
 
@@ -86,58 +86,70 @@ where
 }
 
 fn gen_get_impl(name: &syn::Ident, prefix: &str, member: &syn::Ident) -> TokenStream {
-    let getopt_bool = prefix.to_string() + "getopt_bool";
-    let getopt_bool = syn::Ident::new(&getopt_bool, syn::export::Span::call_site());
-    let getopt_int = prefix.to_string() + "getopt_int";
-    let getopt_int = syn::Ident::new(&getopt_int, syn::export::Span::call_site());
-    let getopt_ms = prefix.to_string() + "getopt_ms";
-    let getopt_ms = syn::Ident::new(&getopt_ms, syn::export::Span::call_site());
-    let getopt_size = prefix.to_string() + "getopt_size";
-    let getopt_size = syn::Ident::new(&getopt_size, syn::export::Span::call_site());
-    let getopt_uint64 = prefix.to_string() + "getopt_uint64";
-    let getopt_uint64 = syn::Ident::new(&getopt_uint64, syn::export::Span::call_site());
-    let getopt_string = prefix.to_string() + "getopt_string";
-    let getopt_string = syn::Ident::new(&getopt_string, syn::export::Span::call_site());
+    let get_bool = prefix.to_string() + "get_bool";
+    let get_bool = syn::Ident::new(&get_bool, syn::export::Span::call_site());
+    let get_int = prefix.to_string() + "get_int";
+    let get_int = syn::Ident::new(&get_int, syn::export::Span::call_site());
+    let get_ms = prefix.to_string() + "get_ms";
+    let get_ms = syn::Ident::new(&get_ms, syn::export::Span::call_site());
+    let get_size = prefix.to_string() + "get_size";
+    let get_size = syn::Ident::new(&get_size, syn::export::Span::call_site());
+    let get_uint64 = prefix.to_string() + "get_uint64";
+    let get_uint64 = syn::Ident::new(&get_uint64, syn::export::Span::call_site());
+    let get_string = prefix.to_string() + "get_string";
+    let get_string = syn::Ident::new(&get_string, syn::export::Span::call_site());
 
     let gen = quote! {
         impl GetOpts for #name {
-            fn getopt_bool(&self, option: NngOption) -> Result<bool> {
+            /// Get `bool` option.
+            /// See #get_bool
+            fn get_bool(&self, option: NngOption) -> Result<bool> {
                 unsafe {
                     let mut value: bool = Default::default();
-                    Error::zero_map( #getopt_bool (self.#member, option.as_cptr(), &mut value), || value)
+                    Error::zero_map( #get_bool (self.#member, option.as_cptr(), &mut value), || value)
                 }
             }
-            fn getopt_int(&self, option: NngOption) -> Result<i32> {
+            /// Get `i32` option.
+            /// See #get_int
+            fn get_int(&self, option: NngOption) -> Result<i32> {
                 unsafe {
                     let mut value: i32 = Default::default();
-                    Error::zero_map( #getopt_int (self.#member, option.as_cptr(), &mut value), || value)
+                    Error::zero_map( #get_int (self.#member, option.as_cptr(), &mut value), || value)
                 }
             }
-            fn getopt_ms(&self, option: NngOption) -> Result<i32> {
+            /// Get `nng_duration` option.
+            /// See #get_ms
+            fn get_ms(&self, option: NngOption) -> Result<i32> {
                 unsafe {
                     let mut value: i32 = Default::default();
-                    Error::zero_map( #getopt_ms (self.#member, option.as_cptr(), &mut value), || value)
+                    Error::zero_map( #get_ms (self.#member, option.as_cptr(), &mut value), || value)
                 }
             }
-            fn getopt_size(&self, option: NngOption) -> Result<usize>
+            /// Get `usize` option.
+            /// See #get_size
+            fn get_size(&self, option: NngOption) -> Result<usize>
             {
                 unsafe {
                     let mut value: usize = Default::default();
-                    Error::zero_map( #getopt_size (self.#member, option.as_cptr(), &mut value), || value)
+                    Error::zero_map( #get_size (self.#member, option.as_cptr(), &mut value), || value)
                 }
             }
-            fn getopt_uint64(&self, option: NngOption) -> Result<u64> {
+            /// Get `u64` option.
+            /// See #get_uint64
+            fn get_uint64(&self, option: NngOption) -> Result<u64> {
                 unsafe {
                     let mut value: u64 = Default::default();
-                    Error::zero_map( #getopt_uint64 (self.#member, option.as_cptr(), &mut value), || value)
+                    Error::zero_map( #get_uint64 (self.#member, option.as_cptr(), &mut value), || value)
                 }
             }
-            fn getopt_string(&self, option: NngOption) -> Result<NngString> {
+            /// Get `NngString` option.
+            /// See #get_string
+            fn get_string(&self, option: NngOption) -> Result<NngString> {
                 unsafe {
                     let mut value: *mut ::std::os::raw::c_char = std::ptr::null_mut();
-                    let res = #getopt_string (self.#member, option.as_cptr(), &mut value);
+                    let res = #get_string (self.#member, option.as_cptr(), &mut value);
                     nng_int_to_result(res)?;
-                    Ok(NngString::new(value))
+                    Ok(NngString::from_raw(value))
                 }
             }
         }
@@ -146,50 +158,57 @@ fn gen_get_impl(name: &syn::Ident, prefix: &str, member: &syn::Ident) -> TokenSt
 }
 
 fn gen_set_impl(name: &syn::Ident, prefix: &str, member: &syn::Ident) -> TokenStream {
-    let setopt_bool = prefix.to_string() + "setopt_bool";
-    let setopt_bool = syn::Ident::new(&setopt_bool, syn::export::Span::call_site());
-    let setopt_int = prefix.to_string() + "setopt_int";
-    let setopt_int = syn::Ident::new(&setopt_int, syn::export::Span::call_site());
-    let setopt_ms = prefix.to_string() + "setopt_ms";
-    let setopt_ms = syn::Ident::new(&setopt_ms, syn::export::Span::call_site());
-    let setopt_size = prefix.to_string() + "setopt_size";
-    let setopt_size = syn::Ident::new(&setopt_size, syn::export::Span::call_site());
-    let setopt_uint64 = prefix.to_string() + "setopt_uint64";
-    let setopt_uint64 = syn::Ident::new(&setopt_uint64, syn::export::Span::call_site());
-    let setopt_string = prefix.to_string() + "setopt_string";
-    let setopt_string = syn::Ident::new(&setopt_string, syn::export::Span::call_site());
+    let set_bool = prefix.to_string() + "set_bool";
+    let set_bool = syn::Ident::new(&set_bool, syn::export::Span::call_site());
+    let set_int = prefix.to_string() + "set_int";
+    let set_int = syn::Ident::new(&set_int, syn::export::Span::call_site());
+    let set_ms = prefix.to_string() + "set_ms";
+    let set_ms = syn::Ident::new(&set_ms, syn::export::Span::call_site());
+    let set_size = prefix.to_string() + "set_size";
+    let set_size = syn::Ident::new(&set_size, syn::export::Span::call_site());
+    let set_uint64 = prefix.to_string() + "set_uint64";
+    let set_uint64 = syn::Ident::new(&set_uint64, syn::export::Span::call_site());
+    let set_string = prefix.to_string() + "set_string";
+    let set_string = syn::Ident::new(&set_string, syn::export::Span::call_site());
 
     let gen = quote! {
         impl SetOpts for #name {
-            fn setopt_bool(&mut self, option: NngOption, value: bool) -> Result<()> {
+            /// Set `bool` [NngOption](./struct.NngOption.html).
+            /// See #set_bool
+            fn set_bool(&mut self, option: NngOption, value: bool) -> Result<()> {
                 unsafe {
-                    nng_int_to_result(#setopt_bool(self.#member, option.as_cptr(), value))
+                    nng_int_to_result(#set_bool(self.#member, option.as_cptr(), value))
                 }
             }
-            fn setopt_int(&mut self, option: NngOption, value: i32) -> Result<()> {
+            /// See #set_int
+            fn set_int(&mut self, option: NngOption, value: i32) -> Result<()> {
                 unsafe {
-                    nng_int_to_result(#setopt_int(self.#member, option.as_cptr(), value))
+                    nng_int_to_result(#set_int(self.#member, option.as_cptr(), value))
                 }
             }
-            fn setopt_ms(&mut self, option: NngOption, value: i32) -> Result<()> {
+            /// See #set_ms
+            fn set_ms(&mut self, option: NngOption, value: i32) -> Result<()> {
                 unsafe {
-                    nng_int_to_result(#setopt_ms(self.#member, option.as_cptr(), value))
+                    nng_int_to_result(#set_ms(self.#member, option.as_cptr(), value))
                 }
             }
-            fn setopt_size(&mut self, option: NngOption, value: usize) -> Result<()> {
+            /// See #set_size
+            fn set_size(&mut self, option: NngOption, value: usize) -> Result<()> {
                 unsafe {
-                    nng_int_to_result(#setopt_size(self.#member, option.as_cptr(), value))
+                    nng_int_to_result(#set_size(self.#member, option.as_cptr(), value))
                 }
             }
-            fn setopt_uint64(&mut self, option: NngOption, value: u64) -> Result<()> {
+            /// See #set_uint64
+            fn set_uint64(&mut self, option: NngOption, value: u64) -> Result<()> {
                 unsafe {
-                    nng_int_to_result(#setopt_uint64(self.#member, option.as_cptr(), value))
+                    nng_int_to_result(#set_uint64(self.#member, option.as_cptr(), value))
                 }
             }
-            fn setopt_string(&mut self, option: NngOption, value: &str) -> Result<()> {
+            /// See #set_string
+            fn set_string(&mut self, option: NngOption, value: &str) -> Result<()> {
                 unsafe {
                     let (_, value) = to_cstr(value)?;
-                    nng_int_to_result(#setopt_string(self.#member, option.as_cptr(), value))
+                    nng_int_to_result(#set_string(self.#member, option.as_cptr(), value))
                 }
             }
         }

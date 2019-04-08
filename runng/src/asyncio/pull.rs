@@ -1,11 +1,7 @@
-//! Async read
+//! Async read.
 
 use super::*;
-use crate::{
-    aio::{AioArgPtr, NngAio},
-    msg::NngMsg,
-    *,
-};
+use crate::{msg::NngMsg, *};
 use futures::{future, future::Future, sync::oneshot};
 use runng_sys::*;
 use std::sync::Mutex;
@@ -14,23 +10,20 @@ use std::sync::Mutex;
 struct PullAioArg {
     aio: NngAio,
     queue: Mutex<WorkQueue>,
+    socket: NngSocket,
 }
 
 impl PullAioArg {
-    pub fn create(socket: NngSocket) -> Result<AioArg<Self>> {
-        let aio = NngAio::new(socket);
+    pub fn new(socket: NngSocket) -> Result<AioArg<Self>> {
         let queue = Mutex::new(WorkQueue::default());
-        let arg = Self { aio, queue };
-        let context = NngAio::register_aio(arg, read_callback);
-        if let Ok(ref context) = context {
-            context.receive();
-        }
-        context
+        let context = NngAio::new(|aio| Self { aio, queue, socket }, read_callback)?;
+        context.receive();
+        Ok(context)
     }
 
     fn receive(&self) {
         unsafe {
-            nng_recv_aio(self.aio.nng_socket(), self.aio.nng_aio());
+            nng_recv_aio(self.socket.nng_socket(), self.aio.nng_aio());
         }
     }
 }
@@ -44,14 +37,15 @@ impl Aio for PullAioArg {
     }
 }
 
+/// Async pull context for push/pull pattern.
 #[derive(Debug)]
 pub struct PullAsyncHandle {
     aio_arg: AioArg<PullAioArg>,
 }
 
 impl AsyncContext for PullAsyncHandle {
-    fn create(socket: NngSocket) -> Result<Self> {
-        let aio_arg = PullAioArg::create(socket)?;
+    fn new(socket: NngSocket) -> Result<Self> {
+        let aio_arg = PullAioArg::new(socket)?;
         Ok(Self { aio_arg })
     }
 }
@@ -97,7 +91,7 @@ unsafe extern "C" fn read_callback(arg: AioArgPtr) {
             ctx.queue.lock().unwrap().push_back(Err(res));
         }
         Ok(()) => {
-            let msg = NngMsg::new_msg(nng_aio_get_msg(aio));
+            let msg = NngMsg::from_raw(nng_aio_get_msg(aio));
             ctx.receive();
             ctx.queue.lock().unwrap().push_back(Ok(msg));
         }

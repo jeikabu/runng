@@ -31,7 +31,7 @@ impl Socket for Push0 {
 
 impl Dial for Push0 {}
 impl Listen for Push0 {}
-impl SendMsg for Push0 {}
+impl SendSocket for Push0 {}
 
 impl AsyncSocket for Push0 {
     type ContextType = PushAsyncHandle;

@@ -1,12 +1,7 @@
 //! Async request/reply
 
 use super::*;
-use crate::{
-    aio::{Aio, AioArgPtr, NngAio},
-    ctx::NngCtx,
-    msg::NngMsg,
-    *,
-};
+use crate::{ctx::NngCtx, msg::NngMsg, *};
 use futures::sync::oneshot;
 use runng_sys::*;
 use std::sync::Mutex;
@@ -21,27 +16,32 @@ enum ReplyState {
 
 #[derive(Debug)]
 struct ReplyContextAioArg {
+    aio: NngAio,
     ctx: NngCtx,
-    state: ReplyState,
     queue: Mutex<WorkQueue>,
     reply_sender: Option<oneshot::Sender<Result<()>>>,
+    socket: NngSocket,
+    state: ReplyState,
 }
 
 impl ReplyContextAioArg {
-    pub fn create(socket: NngSocket) -> Result<AioArg<Self>> {
-        let ctx = NngCtx::create(socket)?;
+    pub fn new(socket: NngSocket) -> Result<AioArg<Self>> {
+        let ctx = NngCtx::new(socket.clone())?;
         let queue = Mutex::new(WorkQueue::default());
-        let arg = Self {
-            ctx,
-            state: ReplyState::Idle,
-            queue,
-            reply_sender: None,
-        };
-        let mut context = NngAio::register_aio(arg, reply_callback);
-        if let Ok(ref mut context) = context {
-            context.receive();
-        }
-        context
+        let mut context = NngAio::new(
+            |aio| Self {
+                aio,
+                ctx,
+                queue,
+                reply_sender: None,
+                socket,
+                state: ReplyState::Idle,
+            },
+            reply_callback,
+        )?;
+
+        context.receive();
+        Ok(context)
     }
 
     fn receive(&mut self) {
@@ -50,7 +50,7 @@ impl ReplyContextAioArg {
         }
         self.state = ReplyState::Receiving;
         unsafe {
-            nng_ctx_recv(self.ctx.ctx(), self.ctx.aio().nng_aio());
+            nng_ctx_recv(self.ctx.ctx(), self.aio.nng_aio());
         }
     }
 
@@ -61,7 +61,7 @@ impl ReplyContextAioArg {
 
         self.reply_sender = Some(sender);
         unsafe {
-            let aio = self.ctx.aio().nng_aio();
+            let aio = self.aio.nng_aio();
 
             self.state = ReplyState::Sending;
             // Nng assumes ownership of the message
@@ -73,22 +73,22 @@ impl ReplyContextAioArg {
 
 impl Aio for ReplyContextAioArg {
     fn aio(&self) -> &NngAio {
-        self.ctx.aio()
+        &self.aio
     }
     fn aio_mut(&mut self) -> &mut NngAio {
-        self.ctx.aio_mut()
+        &mut self.aio
     }
 }
 
-/// Asynchronous context for reply socket.
+/// Async reply context for request/reply pattern.
 #[derive(Debug)]
 pub struct ReplyAsyncHandle {
     aio_arg: AioArg<ReplyContextAioArg>,
 }
 
 impl AsyncContext for ReplyAsyncHandle {
-    fn create(socket: NngSocket) -> Result<Self> {
-        let aio_arg = ReplyContextAioArg::create(socket)?;
+    fn new(socket: NngSocket) -> Result<Self> {
+        let aio_arg = ReplyContextAioArg::new(socket)?;
         Ok(Self { aio_arg })
     }
 }
@@ -123,7 +123,7 @@ impl ReplyAsync for ReplyAsyncHandle {
 
 unsafe extern "C" fn reply_callback(arg: AioArgPtr) {
     let ctx = &mut *(arg as *mut ReplyContextAioArg);
-    let aio_nng = ctx.ctx.aio().nng_aio();
+    let aio_nng = ctx.aio.nng_aio();
     trace!("reply_callback::{:?}", ctx.state);
     match ctx.state {
         ReplyState::Idle => panic!(),
@@ -144,7 +144,7 @@ unsafe extern "C" fn reply_callback(arg: AioArgPtr) {
                     ctx.queue.lock().unwrap().push_back(Err(res));
                 }
                 Ok(()) => {
-                    let msg = NngMsg::new_msg(nng_aio_get_msg(aio_nng));
+                    let msg = NngMsg::from_raw(nng_aio_get_msg(aio_nng));
                     // Reset state before signaling completion
                     ctx.state = ReplyState::Wait;
                     ctx.queue.lock().unwrap().push_back(Ok(msg));
@@ -156,7 +156,7 @@ unsafe extern "C" fn reply_callback(arg: AioArgPtr) {
             let res = nng_int_to_result(nng_aio_result(aio_nng));
             if res.is_err() {
                 // Nng requires we resume ownership of the message
-                let _ = NngMsg::new_msg(nng_aio_get_msg(aio_nng));
+                let _ = NngMsg::from_raw(nng_aio_get_msg(aio_nng));
             }
 
             let sender = ctx.reply_sender.take().unwrap();

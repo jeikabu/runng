@@ -5,6 +5,7 @@ mod tests {
 
     mod broker_tests;
     mod future_tests;
+    mod mem_tests;
     mod msg_tests;
     mod options_tests;
     mod pair_tests;
@@ -12,6 +13,7 @@ mod tests {
     mod pushpull_tests;
     mod reqrep_tests;
     mod stats_tests;
+    mod stream_tests;
 
     use crate::common::get_url;
     use futures::{future, future::Future, Stream};
@@ -34,24 +36,24 @@ mod tests {
                     assert_eq!(
                         url,
                         req_dialer
-                            .getopt_string(NngOption::URL)
+                            .get_string(NngOption::URL)
                             .unwrap()
                             .to_str()
                             .unwrap()
                     );
                     req_dialer.start()?;
-                    requester.sendmsg(msg::NngMsg::create()?)?;
+                    requester.sendmsg(msg::NngMsg::new()?)?;
                     let _request = replier.recvmsg()?;
                     // Drop the dialer
                 }
                 // requester still works
-                requester.sendmsg(msg::NngMsg::create()?)?;
+                requester.sendmsg(msg::NngMsg::new()?)?;
                 let _request = replier.recvmsg()?;
                 // Drop the listener
             }
             // Replier still works
             let requester = factory.requester_open()?.dial(&url)?;
-            requester.sendmsg(msg::NngMsg::create()?)?;
+            requester.sendmsg(msg::NngMsg::new()?)?;
             let _request = replier.recvmsg()?;
         }
 
@@ -97,7 +99,7 @@ mod tests {
             let mut pub_ctx = publisher.create_async()?;
 
             // Beginning of message body contains topic
-            let mut msg = msg::NngMsg::create()?;
+            let mut msg = msg::NngMsg::new()?;
             msg.append_u32(0)?; // topic
             msg.append_u32(1)?;
 
@@ -108,7 +110,7 @@ mod tests {
             }
 
             // Send stop message
-            let mut msg = msg::NngMsg::create()?;
+            let mut msg = msg::NngMsg::new()?;
             msg.append_u32(0)?; // topic
             pub_ctx.send(msg).wait().unwrap()?;
             Ok(())
@@ -186,14 +188,14 @@ mod tests {
         thread::spawn(move || -> runng::Result<()> {
             let mut pub_ctx = publisher.create_async()?;
             for _ in 0..10 {
-                let mut msg = msg::NngMsg::create()?;
+                let mut msg = msg::NngMsg::new()?;
                 msg.append_u32(0)?; // topic
                 msg.append_u32(1)?;
                 pub_ctx.send(msg).wait().unwrap()?;
                 thread::sleep(Duration::from_millis(200));
             }
             // Send stop message
-            let mut msg = msg::NngMsg::create()?;
+            let mut msg = msg::NngMsg::new()?;
             msg.append_u32(0)?; // topic
             pub_ctx.send(msg).wait().unwrap()?;
 

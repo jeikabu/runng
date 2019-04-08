@@ -8,19 +8,37 @@ pub struct Alloc {
     size: usize,
 }
 
+// TODO: ideally we'd replace `*mut XXX` with Unique<>, but seems that will never stabilize:
+// https://github.com/rust-lang/rust/issues/27730
+// Implement Send/Sync for now...
+unsafe impl Send for Alloc {}
+unsafe impl Sync for Alloc {}
+
 impl Alloc {
-    pub fn create(size: usize) -> Option<Alloc> {
+    pub fn with_capacity(size: usize) -> Option<Alloc> {
         unsafe {
             let ptr = nng_alloc(size);
             if ptr.is_null() {
                 None
             } else {
-                Some(Alloc::create_raw(ptr, size))
+                Some(Alloc::from_raw_parts(ptr, size))
             }
         }
     }
 
-    pub(crate) unsafe fn create_raw(ptr: *mut c_void, size: usize) -> Alloc {
+    pub fn new<T: Into<Vec<u8>>>(t: T) -> Option<Self> {
+        let bytes = t.into();
+        let mut alloc = Alloc::with_capacity(bytes.len())?;
+        alloc.as_mut_slice().copy_from_slice(&bytes);
+        Some(alloc)
+    }
+
+    /// Creates a new `Alloc` from a pointer and a length.
+    ///
+    /// # Safety
+    ///
+    /// Takes ownership of `ptr` and releases it when dropped.
+    pub(crate) unsafe fn from_raw_parts(ptr: *mut c_void, size: usize) -> Alloc {
         Alloc { ptr, size }
     }
 
@@ -60,7 +78,7 @@ impl AsMut<[u8]> for Alloc {
 impl Clone for Alloc {
     fn clone(&self) -> Self {
         let src = self.as_slice();
-        let mut clone = Alloc::create(src.len()).unwrap();
+        let mut clone = Alloc::with_capacity(src.len()).unwrap();
         let dest = clone.as_mut_slice();
         dest.copy_from_slice(src);
         clone

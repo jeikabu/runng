@@ -13,7 +13,7 @@ Features:
 Simple:
 ```rust
 use runng::{
-    Dial, Listen, RecvMsg, SendMsg,
+    Dial, Listen, RecvSocket, SendSocket,
     factory::latest::ProtocolFactory,
     msg::NngMsg,
     protocol::*,
@@ -24,8 +24,8 @@ fn simple_reqrep() -> Result<(), runng::Error> {
     let factory = ProtocolFactory::default();
     let rep = factory.replier_open()?.listen(&url)?;
     let req = factory.requester_open()?.dial(&url)?;
-    req.sendmsg(NngMsg::create()?)?;
-    rep.recv()?;
+    req.sendmsg(NngMsg::new()?)?;
+    rep.recvmsg()?;
 
     Ok(())
 }
@@ -52,9 +52,9 @@ fn async_reqrep() -> Result<(), runng::Error> {
     let mut rep_ctx = factory.replier_open()?.listen(&url)?.create_async()?;
 
     let mut req_ctx = factory.requester_open()?.dial(&url)?.create_async()?;
-    let req_future = req_ctx.send(NngMsg::create()?);
+    let req_future = req_ctx.send(NngMsg::new()?);
     let _request = rep_ctx.receive().wait()?;
-    rep_ctx.reply(NngMsg::create()?).wait()??;
+    rep_ctx.reply(NngMsg::new()?).wait()??;
     req_future.wait().unwrap()?;
 
     Ok(())
@@ -65,13 +65,12 @@ Additional examples [in `examples/` folder](https://github.com/jeikabu/runng/tre
 
 */
 
-pub mod aio;
 pub mod asyncio;
 pub mod ctx;
 pub mod dialer;
 pub mod factory;
 pub mod listener;
-pub mod memory;
+pub mod mem;
 pub mod msg;
 pub mod options;
 pub mod pipe;
@@ -81,9 +80,9 @@ pub mod socket;
 pub mod stats;
 pub mod transport;
 
-pub use self::aio::*;
 pub use self::ctx::*;
 pub use self::factory::*;
+pub use self::mem::NngString;
 pub use self::options::*;
 pub use self::result::*;
 pub use self::socket::*;

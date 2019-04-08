@@ -8,14 +8,12 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 static NUM_ADDPRE: AtomicUsize = AtomicUsize::new(0);
 static NUM_ADDPOST: AtomicUsize = AtomicUsize::new(0);
 static NUM_REMPOST: AtomicUsize = AtomicUsize::new(0);
-static NUM_BAD: AtomicUsize = AtomicUsize::new(0);
 
-extern "C" fn notify_callback(_pipe: nng_pipe, event: i32, _arg: PipeNotifyCallbackArg) {
-    match nng_pipe_ev::try_from(event) {
-        Ok(NNG_PIPE_EV_ADD_PRE) => NUM_ADDPRE.fetch_add(1, Ordering::Relaxed),
-        Ok(NNG_PIPE_EV_ADD_POST) => NUM_ADDPOST.fetch_add(1, Ordering::Relaxed),
-        Ok(NNG_PIPE_EV_REM_POST) => NUM_REMPOST.fetch_add(1, Ordering::Relaxed),
-        _ => NUM_BAD.fetch_add(1, Ordering::Relaxed),
+extern "C" fn notify_callback(_pipe: nng_pipe, event: nng_pipe_ev, _arg: PipeNotifyCallbackArg) {
+    match event {
+        NNG_PIPE_EV_ADD_PRE => NUM_ADDPRE.fetch_add(1, Ordering::Relaxed),
+        NNG_PIPE_EV_ADD_POST => NUM_ADDPOST.fetch_add(1, Ordering::Relaxed),
+        NNG_PIPE_EV_REM_POST => NUM_REMPOST.fetch_add(1, Ordering::Relaxed),
     };
 }
 
@@ -45,7 +43,6 @@ fn notify() -> runng::Result<()> {
     assert_eq!(NUM_ADDPRE.load(Ordering::Relaxed), 1);
     assert_eq!(NUM_ADDPOST.load(Ordering::Relaxed), 1);
     assert_eq!(NUM_REMPOST.load(Ordering::Relaxed), 1);
-    assert_eq!(NUM_BAD.load(Ordering::Relaxed), 0);
     Ok(())
 }
 
@@ -56,10 +53,10 @@ fn dialer_listener() -> runng::Result<()> {
     let factory = ProtocolFactory::default();
     let rep = factory.replier_open()?.listen(&url)?;
     let req = factory.requester_open()?.dial(&url)?;
-    req.sendmsg(NngMsg::create()?)?;
+    req.sendmsg(NngMsg::new()?)?;
     let msg = rep.recvmsg()?;
     let rep_pipe = msg.get_pipe().unwrap();
-    rep.sendmsg(NngMsg::create()?)?;
+    rep.sendmsg(NngMsg::new()?)?;
     let msg = req.recvmsg()?;
     let req_pipe = msg.get_pipe().unwrap();
 

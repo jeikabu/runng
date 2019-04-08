@@ -2,6 +2,7 @@
 
 use futures::sync::oneshot;
 use runng_sys::*;
+use std::convert::TryFrom;
 use std::{error, fmt, result};
 
 pub type Result<T> = result::Result<T, Error>;
@@ -58,11 +59,11 @@ pub enum NngErrno {
     // ETRANERR(int),
 }
 
-impl NngErrno {
-    // TODO: replace this with std::num::TryFromIntError once stabilized:
-    // https://doc.rust-lang.org/std/convert/trait.TryFrom.html
+impl TryFrom<i32> for NngErrno {
+    type Error = EnumFromIntError;
+
     #[allow(clippy::cyclomatic_complexity)]
-    fn try_from(value: i32) -> result::Result<Self, TryFromIntError> {
+    fn try_from(value: i32) -> result::Result<Self, Self::Error> {
         match value {
             value if value == NngErrno::EINTR as i32 => Ok(NngErrno::EINTR),
             value if value == NngErrno::ENOMEM as i32 => Ok(NngErrno::ENOMEM),
@@ -95,7 +96,7 @@ impl NngErrno {
             value if value == NngErrno::EAMBIGUOUS as i32 => Ok(NngErrno::EAMBIGUOUS),
             value if value == NngErrno::EBADTYPE as i32 => Ok(NngErrno::EBADTYPE),
             value if value == NngErrno::EINTERNAL as i32 => Ok(NngErrno::EINTERNAL),
-            _ => Err(TryFromIntError),
+            _ => Err(EnumFromIntError(value)),
         }
     }
 }
@@ -114,13 +115,20 @@ pub enum Error {
 }
 
 impl Error {
-    // TODO: replace this with std::num::TryFromIntError once stabilized:
-    // https://doc.rust-lang.org/std/convert/trait.TryFrom.html
-    fn try_from(value: i32) -> result::Result<Self, TryFromIntError> {
+    /// If `value` is zero returns `Ok(result())`.  Otherwise converts `value` to an `Error` and returns that.
+    pub fn zero_map<T, F: FnOnce() -> T>(value: i32, result: F) -> Result<T> {
+        nng_int_to_result(value).map(|_| result())
+    }
+}
+
+impl TryFrom<i32> for Error {
+    type Error = EnumFromIntError;
+
+    fn try_from(value: i32) -> result::Result<Self, Self::Error> {
         const ESYSERR: i32 = runng_sys::NNG_ESYSERR as i32;
         const ETRANERR: i32 = runng_sys::NNG_ETRANERR as i32;
         if value == 0 {
-            Err(TryFromIntError)
+            Err(EnumFromIntError(value))
         } else if let Ok(error) = NngErrno::try_from(value) {
             Ok(Error::Errno(error))
         } else if value & ESYSERR != 0 {
@@ -130,10 +138,6 @@ impl Error {
         } else {
             Ok(Error::UnknownErrno(value))
         }
-    }
-    /// If `value` is zero returns `Ok(result())`.  Otherwise converts `value` to an `Error` and returns that.
-    pub fn zero_map<T, F: FnOnce() -> T>(value: i32, result: F) -> Result<T> {
-        nng_int_to_result(value).map(|_| result())
     }
 }
 

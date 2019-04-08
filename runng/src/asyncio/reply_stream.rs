@@ -1,12 +1,6 @@
 //! Async request/reply
 
-use crate::{
-    aio::{Aio, AioArgPtr, NngAio},
-    asyncio::*,
-    ctx::NngCtx,
-    msg::NngMsg,
-    *,
-};
+use crate::{asyncio::*, ctx::NngCtx, msg::NngMsg, *};
 use futures::sync::{mpsc, oneshot};
 use runng_sys::*;
 
@@ -19,6 +13,7 @@ enum ReplyState {
 
 #[derive(Debug)]
 struct ReplyContextAioArg {
+    aio: NngAio,
     ctx: NngCtx,
     state: ReplyState,
     request_sender: mpsc::Sender<Result<NngMsg>>,
@@ -26,18 +21,21 @@ struct ReplyContextAioArg {
 }
 
 impl ReplyContextAioArg {
-    pub fn create(
+    pub fn new(
         socket: NngSocket,
         request_sender: mpsc::Sender<Result<NngMsg>>,
     ) -> Result<AioArg<Self>> {
-        let ctx = NngCtx::create(socket)?;
-        let arg = Self {
-            ctx,
-            state: ReplyState::Receiving,
-            request_sender,
-            reply_sender: None,
-        };
-        NngAio::register_aio(arg, reply_callback)
+        let ctx = NngCtx::new(socket)?;
+        NngAio::new(
+            |aio| Self {
+                aio,
+                ctx,
+                state: ReplyState::Receiving,
+                request_sender,
+                reply_sender: None,
+            },
+            reply_callback,
+        )
     }
 
     fn start_receive(&mut self) {
@@ -46,7 +44,7 @@ impl ReplyContextAioArg {
         }
         self.state = ReplyState::Receiving;
         unsafe {
-            nng_ctx_recv(self.ctx.ctx(), self.ctx.aio().nng_aio());
+            nng_ctx_recv(self.ctx.ctx(), self.aio.nng_aio());
         }
     }
 
@@ -57,7 +55,7 @@ impl ReplyContextAioArg {
 
         self.reply_sender = Some(sender);
         unsafe {
-            let aio = self.ctx.aio().nng_aio();
+            let aio = self.aio.nng_aio();
 
             self.state = ReplyState::Sending;
             // Nng assumes ownership of the message
@@ -69,10 +67,10 @@ impl ReplyContextAioArg {
 
 impl Aio for ReplyContextAioArg {
     fn aio(&self) -> &NngAio {
-        self.ctx.aio()
+        &self.aio
     }
     fn aio_mut(&mut self) -> &mut NngAio {
-        self.ctx.aio_mut()
+        &mut self.aio
     }
 }
 
@@ -84,9 +82,9 @@ pub struct ReplyStreamHandle {
 }
 
 impl AsyncStreamContext for ReplyStreamHandle {
-    fn create(socket: NngSocket, buffer: usize) -> Result<Self> {
+    fn new(socket: NngSocket, buffer: usize) -> Result<Self> {
         let (sender, receiver) = mpsc::channel(buffer);
-        let aio_arg = ReplyContextAioArg::create(socket, sender)?;
+        let aio_arg = ReplyContextAioArg::new(socket, sender)?;
         let receiver = Some(receiver);
         let ctx = Self { aio_arg, receiver };
         Ok(ctx)
@@ -119,7 +117,7 @@ impl AsyncReply for ReplyStreamHandle {
 
 unsafe extern "C" fn reply_callback(arg: AioArgPtr) {
     let ctx = &mut *(arg as *mut ReplyContextAioArg);
-    let aio_nng = ctx.ctx.aio().nng_aio();
+    let aio_nng = ctx.aio.nng_aio();
     trace!("reply_callback::{:?}", ctx.state);
     match ctx.state {
         ReplyState::Receiving => {
@@ -139,7 +137,7 @@ unsafe extern "C" fn reply_callback(arg: AioArgPtr) {
                     try_signal_complete(&mut ctx.request_sender, Err(res));
                 }
                 Ok(()) => {
-                    let msg = NngMsg::new_msg(nng_aio_get_msg(aio_nng));
+                    let msg = NngMsg::from_raw(nng_aio_get_msg(aio_nng));
                     // Reset state before signaling completion
                     ctx.state = ReplyState::Wait;
                     try_signal_complete(&mut ctx.request_sender, Ok(msg));
@@ -151,7 +149,7 @@ unsafe extern "C" fn reply_callback(arg: AioArgPtr) {
             let res = nng_int_to_result(nng_aio_result(aio_nng));
             if res.is_err() {
                 // Nng requires we resume ownership of the message
-                let _ = NngMsg::new_msg(nng_aio_get_msg(aio_nng));
+                let _ = NngMsg::from_raw(nng_aio_get_msg(aio_nng));
             }
 
             let sender = ctx.reply_sender.take().unwrap();

@@ -1,8 +1,5 @@
 use crate::common::*;
-use futures::{
-    future::{Future, IntoFuture},
-    Stream,
-};
+use futures::{future::Future, Stream};
 use log::debug;
 use rand::RngCore;
 use runng::{
@@ -25,15 +22,15 @@ use std::{
 
 fn create_pusher(url: &str) -> runng::Result<protocol::Push0> {
     let mut sock = protocol::Push0::open()?;
-    sock.socket_mut().setopt_ms(NngOption::RECVTIMEO, 100)?;
-    sock.socket_mut().setopt_ms(NngOption::SENDTIMEO, 100)?;
+    sock.socket_mut().set_ms(NngOption::RECVTIMEO, 100)?;
+    sock.socket_mut().set_ms(NngOption::SENDTIMEO, 100)?;
     sock.listen(&url)
 }
 
 fn create_puller(url: &str) -> runng::Result<protocol::Pull0> {
     let mut sock = protocol::Pull0::open()?;
-    sock.socket_mut().setopt_ms(NngOption::RECVTIMEO, 100)?;
-    sock.socket_mut().setopt_ms(NngOption::SENDTIMEO, 100)?;
+    sock.socket_mut().set_ms(NngOption::RECVTIMEO, 100)?;
+    sock.socket_mut().set_ms(NngOption::SENDTIMEO, 100)?;
     sock.dial(&url)
 }
 
@@ -59,7 +56,7 @@ fn pull_stream() -> runng::Result<()> {
 
         let mut count = 1;
         while !done.load(Ordering::Relaxed) {
-            let mut msg = NngMsg::create()?;
+            let mut msg = NngMsg::new()?;
             msg.append_u32(count)?;
             count += 1;
             push_ctx.send(msg).wait().unwrap()?;
@@ -124,7 +121,7 @@ fn read() -> runng::Result<()> {
         // Send messages
         let mut count = 1;
         while !done.load(Ordering::Relaxed) {
-            let mut msg = NngMsg::create()?;
+            let mut msg = NngMsg::new()?;
             msg.append_u32(count)?;
             count += 1;
             push_ctx.send(msg).wait().unwrap()?;
@@ -189,7 +186,7 @@ fn bad_puller() -> runng::Result<()> {
         // Send messages
         let mut count = 1;
         while !done.load(Ordering::Relaxed) {
-            let mut msg = NngMsg::create()?;
+            let mut msg = NngMsg::new()?;
             msg.append_u32(count)?;
             push_ctx.send(msg).wait().unwrap()?;
             count += 1;

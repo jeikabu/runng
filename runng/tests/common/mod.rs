@@ -24,7 +24,7 @@ pub fn get_url() -> String {
 }
 
 pub fn create_stop_message() -> NngMsg {
-    NngMsg::create().unwrap()
+    NngMsg::new().unwrap()
 }
 
 pub fn not_stop_message(res: &runng::Result<NngMsg>) -> impl Future<Item = bool, Error = ()> {
@@ -47,7 +47,7 @@ pub fn sleep_test() {
 }
 
 pub fn rand_msg() -> runng::Result<NngMsg> {
-    let mut msg = NngMsg::with_size(128)?;
+    let mut msg = NngMsg::with_capacity(128)?;
     rand::thread_rng().fill(msg.as_mut_slice());
     Ok(msg)
 }
