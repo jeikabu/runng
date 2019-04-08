@@ -45,7 +45,7 @@ fn stats_example() -> Result<()> {
 use crate::*;
 use log::trace;
 use runng_sys::*;
-use std::{ffi::CStr, marker, result};
+use std::{convert::TryFrom, convert::TryInto, ffi::CStr, marker, result};
 
 pub trait NngStat {
     /// Obtain underlying [`nng_stat`](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat.5).
@@ -133,10 +133,10 @@ impl<'root> NngStatChild<'root> {
     }
 
     /// See [nng_stat_type](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_type.3).
-    pub fn stat_type(&self) -> result::Result<nng_stat_type_enum, TryFromIntError> {
+    pub fn stat_type(&self) -> result::Result<nng_stat_type_enum, EnumFromIntError> {
         unsafe {
             let val = nng_stat_type(self.nng_stat());
-            nng_stat_type_enum::try_from(val)
+            val.try_into()
         }
     }
 
@@ -159,7 +159,7 @@ impl<'root> NngStatChild<'root> {
     }
 
     /// See [nng_stat_unit](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_unit.3).
-    pub fn unit(&self) -> result::Result<nng_unit_enum, TryFromIntError> {
+    pub fn unit(&self) -> result::Result<nng_unit_enum, EnumFromIntError> {
         unsafe {
             let val = nng_stat_unit(self.nng_stat());
             nng_unit_enum::try_from(val)

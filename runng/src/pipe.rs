@@ -8,7 +8,7 @@ use runng_derive::NngGetOpts;
 use runng_sys::*;
 
 pub type PipeNotifyCallback =
-    unsafe extern "C" fn(pipe: nng_pipe, event: i32, arg1: PipeNotifyCallbackArg);
+    unsafe extern "C" fn(pipe: nng_pipe, event: nng_pipe_ev, arg1: PipeNotifyCallbackArg);
 pub type PipeNotifyCallbackArg = *mut ::std::os::raw::c_void;
 
 /// Wraps `nng_pipe`.  See [nng_pipe](https://nanomsg.github.io/nng/man/v1.1.0/nng_pipe.5).

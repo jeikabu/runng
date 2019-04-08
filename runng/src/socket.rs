@@ -47,7 +47,7 @@ impl NngSocket {
         unsafe {
             nng_int_to_result(nng_pipe_notify(
                 self.nng_socket(),
-                event as i32,
+                event,
                 Some(callback),
                 argument,
             ))
