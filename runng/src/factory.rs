@@ -1,3 +1,5 @@
+//! Factories for specific sets of protocols.
+
 pub mod latest {
     use crate::*;
 

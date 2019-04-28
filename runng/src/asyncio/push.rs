@@ -1,11 +1,6 @@
-//! Async publish/subscribe
+//! Async push and publish.
 
-use crate::{
-    aio::{AioArgPtr, NngAio},
-    asyncio::*,
-    msg::NngMsg,
-    *,
-};
+use crate::{asyncio::*, msg::NngMsg, *};
 use futures::sync::oneshot;
 use log::debug;
 use runng_sys::*;
@@ -21,17 +16,20 @@ struct PushContextAioArg {
     aio: NngAio,
     state: PushState,
     sender: Option<oneshot::Sender<Result<()>>>,
+    socket: NngSocket,
 }
 
 impl PushContextAioArg {
-    pub fn create(socket: NngSocket) -> Result<AioArg<Self>> {
-        let aio = NngAio::new(socket);
-        let arg = Self {
-            aio,
-            state: PushState::Ready,
-            sender: None,
-        };
-        NngAio::register_aio(arg, publish_callback)
+    pub fn new(socket: NngSocket) -> Result<AioArg<Self>> {
+        NngAio::new(
+            |aio| Self {
+                aio,
+                state: PushState::Ready,
+                sender: None,
+                socket,
+            },
+            publish_callback,
+        )
     }
 
     pub fn send(&mut self, msg: NngMsg, sender: oneshot::Sender<Result<()>>) {
@@ -49,7 +47,7 @@ impl PushContextAioArg {
             }
             let nng_aio = self.aio.nng_aio();
             nng_aio_set_msg(nng_aio, msg);
-            nng_send_aio(self.aio.nng_socket(), nng_aio);
+            nng_send_aio(self.socket.nng_socket(), nng_aio);
         }
     }
 }
@@ -63,7 +61,7 @@ impl Aio for PushContextAioArg {
     }
 }
 
-/// Asynchronous context for publish socket.
+/// Async push context for push/pull pattern.
 #[derive(Debug)]
 pub struct PushAsyncHandle {
     aio_arg: AioArg<PushContextAioArg>,
@@ -71,8 +69,8 @@ pub struct PushAsyncHandle {
 
 impl AsyncContext for PushAsyncHandle {
     /// Create an asynchronous context using the specified socket.
-    fn create(socket: NngSocket) -> Result<Self> {
-        let aio_arg = PushContextAioArg::create(socket)?;
+    fn new(socket: NngSocket) -> Result<Self> {
+        let aio_arg = PushContextAioArg::new(socket)?;
         Ok(Self { aio_arg })
     }
 }
@@ -104,7 +102,7 @@ unsafe extern "C" fn publish_callback(arg: AioArgPtr) {
             if let Err(ref err) = res {
                 debug!("Push failed: {:?}", err);
                 // Nng requires that we retrieve the message and free it
-                let _ = NngMsg::new_msg(nng_aio_get_msg(nng_aio));
+                let _ = NngMsg::from_raw(nng_aio_get_msg(nng_aio));
             }
             // Reset state before signaling completion
             ctx.state = PushState::Ready;

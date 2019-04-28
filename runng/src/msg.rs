@@ -1,3 +1,5 @@
+//! Messages.
+
 use crate::*;
 use runng_derive::NngMsgOpts;
 use runng_sys::*;
@@ -11,18 +13,25 @@ pub struct NngMsg {
 
 impl NngMsg {
     /// Create a message.  See [nng_msg_alloc](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg_alloc.3).
-    pub fn create() -> Result<Self> {
-        NngMsg::with_size(0)
+    pub fn new() -> Result<Self> {
+        NngMsg::with_capacity(0)
     }
 
     /// Create a message with body length `size_bytes`.  See [nng_msg_alloc](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg_alloc.3).
-    pub fn with_size(size_bytes: usize) -> Result<Self> {
-        let mut msg: *mut nng_msg = ptr::null_mut();
-        let res = unsafe { nng_msg_alloc(&mut msg, size_bytes) };
-        Error::zero_map(res, || NngMsg::new_msg(msg))
+    pub fn with_capacity(size_bytes: usize) -> Result<Self> {
+        unsafe {
+            let mut msg: *mut nng_msg = ptr::null_mut();
+            let res = nng_msg_alloc(&mut msg, size_bytes);
+            Error::zero_map(res, || NngMsg::from_raw(msg))
+        }
     }
 
-    pub fn new_msg(msg: *mut nng_msg) -> NngMsg {
+    /// Create a message using pointer from NNG.
+    ///
+    /// # Safety
+    ///
+    /// Takes ownership of `msg` and releases it when dropped.
+    pub unsafe fn from_raw(msg: *mut nng_msg) -> NngMsg {
         NngMsg { msg }
     }
 
@@ -138,9 +147,11 @@ impl NngMsg {
     }
 
     pub fn dup(&self) -> Result<NngMsg> {
-        let mut msg: *mut nng_msg = ptr::null_mut();
-        let res = unsafe { nng_msg_dup(&mut msg, self.msg()) };
-        Error::zero_map(res, || NngMsg::new_msg(msg))
+        unsafe {
+            let mut msg: *mut nng_msg = ptr::null_mut();
+            let res = nng_msg_dup(&mut msg, self.msg());
+            Error::zero_map(res, || NngMsg::from_raw(msg))
+        }
     }
 
     pub fn clear(&mut self) {
@@ -150,7 +161,7 @@ impl NngMsg {
     }
 
     pub fn get_pipe(&self) -> Option<pipe::NngPipe> {
-        pipe::NngPipe::create(self)
+        pipe::NngPipe::new(self)
     }
 
     pub fn set_pipe(&mut self, pipe: &pipe::NngPipe) {
@@ -178,6 +189,9 @@ impl Clone for NngMsg {
     }
 }
 
+// TODO: ideally we'd replace `*mut XXX` with Unique<>, but seems that will never stabilize:
+// https://github.com/rust-lang/rust/issues/27730
+// Implement Send/Sync for now...
 unsafe impl Send for NngMsg {}
 unsafe impl Sync for NngMsg {}
 

@@ -31,7 +31,7 @@ impl Socket for Pull0 {
 
 impl Dial for Pull0 {}
 impl Listen for Pull0 {}
-impl RecvMsg for Pull0 {}
+impl RecvSocket for Pull0 {}
 
 impl AsyncSocket for Pull0 {
     type ContextType = PullAsyncHandle;

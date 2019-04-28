@@ -21,9 +21,11 @@ impl Sub0 {
 }
 
 impl Subscribe for Sub0 {
-    /// Subscribe to a topic.
     fn subscribe(&self, topic: &[u8]) -> Result<()> {
         unsafe { subscribe(self.socket.nng_socket(), topic) }
+    }
+    fn unsubscribe(&self, topic: &[u8]) -> Result<()> {
+        unsafe { unsubscribe(self.socket.nng_socket(), topic) }
     }
 }
 
@@ -38,8 +40,12 @@ impl Socket for Sub0 {
 
 impl Dial for Sub0 {}
 impl Listen for Sub0 {}
-impl RecvMsg for Sub0 {}
+impl RecvSocket for Sub0 {}
+
+impl AsyncSocket for Sub0 {
+    type ContextType = SubscribeAsyncHandle;
+}
 
 impl AsyncStream for Sub0 {
-    type ContextType = SubscribeAsyncHandle;
+    type ContextType = SubscribeAsyncStream;
 }

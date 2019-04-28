@@ -1,63 +1,37 @@
-//! NNG options.  See [nng_options](https://nanomsg.github.io/nng/man/v1.1.0/nng_options.5).
+//! NNG options.
 
-use crate::*;
-use std::{ffi::CStr, os::raw::c_char, result};
+use crate::{mem::NngString, *};
+use std::os::raw::c_char;
 
-/// Wraps strings that should be released with `nng_strfree`.  See [nng_strfree](https://nanomsg.github.io/nng/man/v1.1.0/nng_strfree.3).
-#[derive(Debug)]
-pub struct NngString {
-    pointer: *mut c_char,
-}
-
-impl NngString {
-    pub fn new(pointer: *mut c_char) -> NngString {
-        NngString { pointer }
-    }
-    pub fn to_str(&self) -> result::Result<&str, std::str::Utf8Error> {
-        unsafe { CStr::from_ptr(self.pointer).to_str() }
-    }
-}
-
-impl PartialEq for NngString {
-    fn eq(&self, other: &NngString) -> bool {
-        unsafe { CStr::from_ptr(self.pointer) == CStr::from_ptr(other.pointer) }
-    }
-}
-
-impl Drop for NngString {
-    fn drop(&mut self) {
-        unsafe {
-            nng_strfree(self.pointer);
-        }
-    }
-}
-
-/// Trait for types which support getting NNG options.
+/// Types which support getting NNG options.
+/// Also see [`SetOpts`](trait.SetOpts.html).
 pub trait GetOpts {
-    fn getopt_bool(&self, option: NngOption) -> Result<bool>;
-    fn getopt_int(&self, option: NngOption) -> Result<i32>;
-    fn getopt_ms(&self, option: NngOption) -> Result<nng_duration>;
-    fn getopt_size(&self, option: NngOption) -> Result<usize>;
-    fn getopt_uint64(&self, option: NngOption) -> Result<u64>;
-    fn getopt_string(&self, option: NngOption) -> Result<NngString>;
+    fn get_bool(&self, option: NngOption) -> Result<bool>;
+    fn get_int(&self, option: NngOption) -> Result<i32>;
+    fn get_ms(&self, option: NngOption) -> Result<nng_duration>;
+    fn get_size(&self, option: NngOption) -> Result<usize>;
+    fn get_uint64(&self, option: NngOption) -> Result<u64>;
+    fn get_string(&self, option: NngOption) -> Result<NngString>;
 }
 
-/// Trait for types which support setting NNG options.
+/// Types which support setting NNG options.
+/// Also see [`GetOpts`](trait.GetOpts.html).
 pub trait SetOpts {
-    fn setopt_bool(&mut self, option: NngOption, value: bool) -> Result<()>;
-    fn setopt_int(&mut self, option: NngOption, value: i32) -> Result<()>;
-    fn setopt_ms(&mut self, option: NngOption, value: nng_duration) -> Result<()>;
-    fn setopt_size(&mut self, option: NngOption, value: usize) -> Result<()>;
-    fn setopt_uint64(&mut self, option: NngOption, value: u64) -> Result<()>;
-    fn setopt_string(&mut self, option: NngOption, value: &str) -> Result<()>;
+    fn set_bool(&mut self, option: NngOption, value: bool) -> Result<()>;
+    fn set_int(&mut self, option: NngOption, value: i32) -> Result<()>;
+    fn set_ms(&mut self, option: NngOption, value: nng_duration) -> Result<()>;
+    fn set_size(&mut self, option: NngOption, value: usize) -> Result<()>;
+    fn set_uint64(&mut self, option: NngOption, value: u64) -> Result<()>;
+    fn set_string(&mut self, option: NngOption, value: &str) -> Result<()>;
 }
 
-/// Wraps nng option names.  See [nng_options](https://nanomsg.github.io/nng/man/v1.1.0/nng_options.5).
+/// Wraps NNG option names for [GetOpts](trait.GetOpts.html) and [SetOpts](trait.SetOpts.html).
+/// See [nng_options](https://nanomsg.github.io/nng/man/v1.1.0/nng_options.5).
 #[derive(Debug, PartialEq)]
 pub struct NngOption(&'static [u8]);
 
 impl NngOption {
-    /// Return option name as `const char*` suitable for passing to C functions.
+    /// Return option name suitable for passing to C functions.
     pub fn as_cptr(&self) -> *const c_char {
         self.0.as_ptr() as *const c_char
     }
@@ -89,11 +63,7 @@ impl NngOption {
     pub const TLS_VERIFIED: NngOption = NngOption(NNG_OPT_TLS_VERIFIED);
     pub const TCP_NODELAY: NngOption = NngOption(NNG_OPT_TCP_NODELAY);
     pub const TCP_KEEPALIVE: NngOption = NngOption(NNG_OPT_TCP_KEEPALIVE);
-    pub const PAIR1_POLY: NngOption = NngOption(NNG_OPT_PAIR1_POLY);
-    pub const SUB_SUBSCRIBE: NngOption = NngOption(NNG_OPT_SUB_SUBSCRIBE);
-    pub const SUB_UNSUBSCRIBE: NngOption = NngOption(NNG_OPT_SUB_UNSUBSCRIBE);
-    pub const REQ_RESENDTIME: NngOption = NngOption(NNG_OPT_REQ_RESENDTIME);
-    pub const SURVEYOR_SURVEYTIME: NngOption = NngOption(NNG_OPT_SURVEYOR_SURVEYTIME);
+    pub const TCP_BOUND_PORT: NngOption = NngOption(NNG_OPT_TCP_BOUND_PORT);
     pub const IPC_SECURITY_DESCRIPTOR: NngOption = NngOption(NNG_OPT_IPC_SECURITY_DESCRIPTOR);
     pub const IPC_PERMISSIONS: NngOption = NngOption(NNG_OPT_IPC_PERMISSIONS);
     pub const IPC_PEER_UID: NngOption = NngOption(NNG_OPT_IPC_PEER_UID);
@@ -102,6 +72,17 @@ impl NngOption {
     pub const IPC_PEER_ZONEID: NngOption = NngOption(NNG_OPT_IPC_PEER_ZONEID);
     pub const WS_REQUEST_HEADERS: NngOption = NngOption(NNG_OPT_WS_REQUEST_HEADERS);
     pub const WS_RESPONSE_HEADERS: NngOption = NngOption(NNG_OPT_WS_RESPONSE_HEADERS);
+    pub const WS_RESPONSE_HEADER: NngOption = NngOption(NNG_OPT_WS_RESPONSE_HEADER);
+    pub const WS_REQUEST_HEADER: NngOption = NngOption(NNG_OPT_WS_REQUEST_HEADER);
+    pub const WS_REQUEST_URI: NngOption = NngOption(NNG_OPT_WS_REQUEST_URI);
+    pub const WS_SENDMAXFRAME: NngOption = NngOption(NNG_OPT_WS_SENDMAXFRAME);
+    pub const WS_RECVMAXFRAME: NngOption = NngOption(NNG_OPT_WS_RECVMAXFRAME);
+    pub const WS_PROTOCOL: NngOption = NngOption(NNG_OPT_WS_PROTOCOL);
+    pub const PAIR1_POLY: NngOption = NngOption(NNG_OPT_PAIR1_POLY);
+    pub const SUB_SUBSCRIBE: NngOption = NngOption(NNG_OPT_SUB_SUBSCRIBE);
+    pub const SUB_UNSUBSCRIBE: NngOption = NngOption(NNG_OPT_SUB_UNSUBSCRIBE);
+    pub const REQ_RESENDTIME: NngOption = NngOption(NNG_OPT_REQ_RESENDTIME);
+    pub const SURVEYOR_SURVEYTIME: NngOption = NngOption(NNG_OPT_SURVEYOR_SURVEYTIME);
     pub const WSS_REQUEST_HEADERS: NngOption = NngOption(NNG_OPT_WSS_REQUEST_HEADERS);
     pub const WSS_RESPONSE_HEADERS: NngOption = NngOption(NNG_OPT_WSS_RESPONSE_HEADERS);
     pub const ZT_HOME: NngOption = NngOption(NNG_OPT_ZT_HOME);

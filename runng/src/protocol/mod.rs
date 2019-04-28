@@ -21,10 +21,19 @@ pub use self::sub0::*;
 use crate::*;
 use runng_sys::*;
 
+/// Type of subscribe half in publish/subscribe pattern.
 pub trait Subscribe {
+    /// Subscribe to a topic.
     fn subscribe(&self, topic: &[u8]) -> Result<()>;
+    /// Subscribe to a topic.
     fn subscribe_str(&self, topic: &str) -> Result<()> {
         self.subscribe(topic.as_bytes())
+    }
+    /// Unsubscribe from a topic.
+    fn unsubscribe(&self, topic: &[u8]) -> Result<()>;
+    /// Unsubscribe from a topic.
+    fn unsubscribe_str(&self, topic: &str) -> Result<()> {
+        self.unsubscribe(topic.as_bytes())
     }
 }
 
@@ -46,7 +55,17 @@ pub(crate) fn subscribe(socket: nng_socket, topic: &[u8]) -> Result<()> {
         let opt = NNG_OPT_SUB_SUBSCRIBE.as_ptr() as *const ::std::os::raw::c_char;
         let topic_ptr = topic.as_ptr() as *const ::std::os::raw::c_void;
         let topic_size = std::mem::size_of_val(topic);
-        let res = nng_setopt(socket, opt, topic_ptr, topic_size);
+        let res = nng_socket_set(socket, opt, topic_ptr, topic_size);
+        nng_int_to_result(res)
+    }
+}
+
+pub(crate) fn unsubscribe(socket: nng_socket, topic: &[u8]) -> Result<()> {
+    unsafe {
+        let opt = NNG_OPT_SUB_UNSUBSCRIBE.as_ptr() as *const ::std::os::raw::c_char;
+        let topic_ptr = topic.as_ptr() as *const ::std::os::raw::c_void;
+        let topic_size = std::mem::size_of_val(topic);
+        let res = nng_socket_set(socket, opt, topic_ptr, topic_size);
         nng_int_to_result(res)
     }
 }

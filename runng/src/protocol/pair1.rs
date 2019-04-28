@@ -1,4 +1,4 @@
-//! Pair protocol
+//! Pair protocol.
 
 use super::*;
 use crate::asyncio::*;
@@ -31,8 +31,8 @@ impl Socket for Pair1 {
 
 impl Dial for Pair1 {}
 impl Listen for Pair1 {}
-impl SendMsg for Pair1 {}
-impl RecvMsg for Pair1 {}
+impl SendSocket for Pair1 {}
+impl RecvSocket for Pair1 {}
 
 impl AsyncSocket for Pair1 {
     type ContextType = PairAsyncHandle;

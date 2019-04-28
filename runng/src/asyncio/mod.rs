@@ -1,5 +1,6 @@
-//! NNG protocols.  See [Section 7](https://nanomsg.github.io/nng/man/v1.1.0/index.html#_section_7_protocols_and_transports).
+//! Asynchronous I/O with `nng_aio`.
 
+pub mod aio;
 pub mod pair;
 pub mod pair_stream;
 pub mod pull;
@@ -8,7 +9,10 @@ pub mod push;
 pub mod reply;
 pub mod reply_stream;
 pub mod request;
+pub mod simple;
+pub mod stream;
 
+pub use self::aio::*;
 pub use self::pair::*;
 pub use self::pair_stream::*;
 pub use self::pull::*;
@@ -17,23 +21,25 @@ pub use self::push::*;
 pub use self::reply::*;
 pub use self::reply_stream::*;
 pub use self::request::*;
-
-use futures::{sync::mpsc, Sink};
+pub use self::simple::*;
+pub use self::stream::*;
 
 use crate::{msg::NngMsg, *};
-use futures::{future, future::Future, sync::oneshot};
+use futures::{future, future::Future, sync::mpsc, sync::oneshot, Sink};
+use log::debug;
+use runng_sys::*;
 use std::collections::VecDeque;
 
 /// Context for asynchrounous I/O.
 pub trait AsyncContext: Sized {
     /// Create a new asynchronous context using specified socket.
-    fn create(socket: NngSocket) -> Result<Self>;
+    fn new(socket: NngSocket) -> Result<Self>;
 }
 
 pub trait AsyncStreamContext: Sized {
     /// Create a new asynchronous context using specified socket.
-    fn create(socket: NngSocket, buffer: usize) -> Result<Self>;
-    //fn create_unbounded(socket: NngSocket) -> Result<Self>;
+    fn new(socket: NngSocket, buffer: usize) -> Result<Self>;
+    //fn new_unbounded(socket: NngSocket) -> Result<Self>;
 }
 
 /// A `Socket` that can be turned into a context for asynchronous I/O.
@@ -59,7 +65,7 @@ pub trait AsyncSocket: Socket {
     /// Turns the `Socket` into an asynchronous context
     fn create_async(&self) -> Result<Self::ContextType> {
         let socket = self.socket().clone();
-        let ctx = Self::ContextType::create(socket)?;
+        let ctx = Self::ContextType::new(socket)?;
         Ok(ctx)
     }
 }
@@ -71,7 +77,7 @@ pub trait AsyncStream: Socket {
     /// Turns the `Socket` into an asynchronous context
     fn create_async_stream(&self, buffer: usize) -> Result<Self::ContextType> {
         let socket = self.socket().clone();
-        let ctx = Self::ContextType::create(socket, buffer)?;
+        let ctx = Self::ContextType::new(socket, buffer)?;
         Ok(ctx)
     }
 }
@@ -100,7 +106,7 @@ impl WorkQueue {
         if let Some(sender) = self.waiting.pop_front() {
             sender
                 .send(message)
-                .unwrap_or_else(|_msg| debug!("Dropping message"));
+                .unwrap_or_else(|err| debug!("Dropping message: {:?}", err));
         } else {
             self.ready.push_back(message);
         }
@@ -111,4 +117,19 @@ trait NngSink: Sink<SinkItem = Result<NngMsg>, SinkError = mpsc::SendError<Resul
 impl<T: Sink<SinkItem = Result<NngMsg>, SinkError = mpsc::SendError<Result<NngMsg>>>> NngSink
     for T
 {
+}
+
+/// Represents asynchronous I/O operation performed by NngAio handle.
+/// All methods will be called from native threads, impls must be thread-safe.
+pub trait AioWork {
+    fn begin(&self, aio: &NngAio);
+    fn finish(&mut self, aio: &NngAio);
+}
+
+/// Trait object asynchronous I/O operation
+pub type AioWorkRequest = Box<dyn AioWork>;
+
+/// Queue of pending asynchronous I/O operations.
+pub trait AioWorkQueue {
+    fn push_back(&mut self, obj: AioWorkRequest);
 }

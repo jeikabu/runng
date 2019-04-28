@@ -30,7 +30,7 @@ impl Socket for Pub0 {
 
 impl Dial for Pub0 {}
 impl Listen for Pub0 {}
-impl SendMsg for Pub0 {}
+impl SendSocket for Pub0 {}
 
 impl AsyncSocket for Pub0 {
     type ContextType = PushAsyncHandle;

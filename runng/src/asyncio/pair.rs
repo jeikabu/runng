@@ -3,7 +3,7 @@
 use crate::{asyncio::*, msg::NngMsg, *};
 use futures::{future::Future, sync::oneshot};
 
-/// Asynchronous context for request socket.
+/// Async pair context for pair protocol.
 #[derive(Debug)]
 pub struct PairAsyncHandle {
     push: PushAsyncHandle,
@@ -11,9 +11,9 @@ pub struct PairAsyncHandle {
 }
 
 impl AsyncContext for PairAsyncHandle {
-    fn create(socket: NngSocket) -> Result<Self> {
-        let push = PushAsyncHandle::create(socket.clone())?;
-        let pull = PullAsyncHandle::create(socket)?;
+    fn new(socket: NngSocket) -> Result<Self> {
+        let push = PushAsyncHandle::new(socket.clone())?;
+        let pull = PullAsyncHandle::new(socket)?;
         let ctx = Self { push, pull };
         Ok(ctx)
     }

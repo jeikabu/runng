@@ -11,7 +11,7 @@ fn equality() -> runng::Result<()> {
 
     // Different body are not equal
     {
-        let mut other = NngMsg::with_size(128)?;
+        let mut other = NngMsg::with_capacity(128)?;
         rand::thread_rng().fill(other.as_mut_slice());
         assert_ne!(msg, other);
     }
@@ -32,8 +32,8 @@ fn equality() -> runng::Result<()> {
 
     // Empty messages are equal
     {
-        let empty0 = NngMsg::create()?;
-        let empty1 = NngMsg::create()?;
+        let empty0 = NngMsg::new()?;
+        let empty1 = NngMsg::new()?;
         assert_eq!(empty0, empty1);
     }
     Ok(())

@@ -8,7 +8,7 @@ The lifetime of the children is bound to that of the root.  This won't compile:
 use runng::stats::*;
 let mut child: Option<NngStatChild> = None;
 {
-    let root = NngStatRoot::create().unwrap();
+    let root = NngStatRoot::new().unwrap();
     child = root.child();
 }
 println!("Name = {}", child.unwrap().name().unwrap());
@@ -73,7 +73,7 @@ pub struct NngStatRoot {
 
 impl NngStatRoot {
     /// Get statistics snapshot.  See [nng_stats_get](https://nanomsg.github.io/nng/man/v1.1.0/nng_stats_get.3).
-    pub fn create() -> Result<NngStatRoot> {
+    pub fn new() -> Result<NngStatRoot> {
         unsafe {
             let mut node: *mut nng_stat = std::ptr::null_mut();
             let res = nng_stats_get(&mut node);

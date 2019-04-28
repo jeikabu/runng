@@ -11,9 +11,9 @@ pub struct PairStreamHandle {
 }
 
 impl AsyncStreamContext for PairStreamHandle {
-    fn create(socket: NngSocket, buffer: usize) -> Result<Self> {
-        let push = PushAsyncHandle::create(socket.clone())?;
-        let pull = PullAsyncStream::create(socket, buffer)?;
+    fn new(socket: NngSocket, buffer: usize) -> Result<Self> {
+        let push = PushAsyncHandle::new(socket.clone())?;
+        let pull = PullAsyncStream::new(socket, buffer)?;
         let ctx = Self { push, pull };
         Ok(ctx)
     }

@@ -21,7 +21,7 @@ pub struct NngPipe {
 
 impl NngPipe {
     /// Get pipe associated with a message, if one exists.  See [nng_msg_get_pipe](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg_get_pipe.3).
-    pub(crate) fn create(message: &NngMsg) -> Option<Self> {
+    pub(crate) fn new(message: &NngMsg) -> Option<Self> {
         unsafe {
             let pipe = nng_msg_get_pipe(message.msg());
             let id = nng_pipe_id(pipe);

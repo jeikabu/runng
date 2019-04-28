@@ -1,4 +1,4 @@
-//! Dialer
+//! Dialers connect to listeners.
 
 use crate::*;
 use runng_derive::{NngGetOpts, NngSetOpts};
@@ -15,7 +15,7 @@ pub struct NngDialer {
 
 impl NngDialer {
     /// See [nng_dialer_create](https://nanomsg.github.io/nng/man/v1.1.0/nng_dialer_create.3).
-    pub(crate) fn create(socket: NngSocket, url: &str) -> Result<Self> {
+    pub(crate) fn new(socket: NngSocket, url: &str) -> Result<Self> {
         unsafe {
             let mut dialer = nng_dialer::default();
             let (_cstring, url) = to_cstr(url)?;

@@ -19,7 +19,7 @@ fn init_stats() -> runng::Result<(protocol::push0::Push0, protocol::pull0::Pull0
 fn stats_example() -> runng::Result<()> {
     let (_pusher, _puller) = init_stats()?;
 
-    let stats = NngStatRoot::create()?;
+    let stats = NngStatRoot::new()?;
     let child = stats.child().unwrap();
     for stat in child.iter() {
         debug!("{}", stat.name().unwrap());

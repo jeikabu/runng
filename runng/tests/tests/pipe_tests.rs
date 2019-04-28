@@ -53,10 +53,10 @@ fn dialer_listener() -> runng::Result<()> {
     let factory = ProtocolFactory::default();
     let rep = factory.replier_open()?.listen(&url)?;
     let req = factory.requester_open()?.dial(&url)?;
-    req.sendmsg(NngMsg::create()?)?;
+    req.sendmsg(NngMsg::new()?)?;
     let msg = rep.recvmsg()?;
     let rep_pipe = msg.get_pipe().unwrap();
-    rep.sendmsg(NngMsg::create()?)?;
+    rep.sendmsg(NngMsg::new()?)?;
     let msg = req.recvmsg()?;
     let req_pipe = msg.get_pipe().unwrap();
 

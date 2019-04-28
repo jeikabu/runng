@@ -1,8 +1,6 @@
 use crate::common::*;
-use failure::Error;
 use futures::future::{Future, IntoFuture};
 use log::debug;
-use rand::RngCore;
 use runng::{asyncio::*, factory::latest::ProtocolFactory, msg::NngMsg, protocol::*, socket::*};
 use std::{
     sync::{
@@ -37,7 +35,7 @@ fn pushpull_timeout() -> runng::Result<()> {
         // Send messages
         let mut count = 1;
         while !done.load(Ordering::Relaxed) {
-            let mut msg = NngMsg::create()?;
+            let mut msg = NngMsg::new()?;
             msg.append_u32(count)?;
             push_ctx.send(msg).wait().unwrap()?;
             count += 1;
