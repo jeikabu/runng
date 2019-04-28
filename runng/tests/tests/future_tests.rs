@@ -1,8 +1,6 @@
 use crate::common::*;
-use failure::Error;
 use futures::future::{Future, IntoFuture};
 use log::debug;
-use rand::RngCore;
 use runng::{asyncio::*, factory::latest::ProtocolFactory, msg::NngMsg, protocol::*, socket::*};
 use std::{
     sync::{

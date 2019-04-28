@@ -4,7 +4,6 @@ use futures::{
     stream::Stream,
     sync::oneshot,
 };
-use futures_timer::Delay;
 use log::debug;
 use runng::{
     asyncio::*,

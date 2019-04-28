@@ -114,7 +114,7 @@ fn nonblock() -> runng::Result<()> {
     let url = get_url();
 
     let factory = ProtocolFactory::default();
-    let flags = socket::Flags::NONBLOCK;
+    let flags = socket::SocketFlags::NONBLOCK;
     let rep = factory.replier_open()?.listen_flags(&url, flags)?;
     let req = factory.requester_open()?.dial_flags(&url, flags)?;
     std::thread::sleep(std::time::Duration::from_millis(50));

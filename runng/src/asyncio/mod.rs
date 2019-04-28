@@ -106,7 +106,7 @@ impl WorkQueue {
         if let Some(sender) = self.waiting.pop_front() {
             sender
                 .send(message)
-                .unwrap_or_else(|_msg| debug!("Dropping message"));
+                .unwrap_or_else(|err| debug!("Dropping message: {:?}", err));
         } else {
             self.ready.push_back(message);
         }

@@ -42,6 +42,10 @@ impl Dial for Sub0 {}
 impl Listen for Sub0 {}
 impl RecvSocket for Sub0 {}
 
-impl AsyncStream for Sub0 {
+impl AsyncSocket for Sub0 {
     type ContextType = SubscribeAsyncHandle;
+}
+
+impl AsyncStream for Sub0 {
+    type ContextType = SubscribeAsyncStream;
 }

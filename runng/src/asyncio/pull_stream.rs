@@ -48,7 +48,7 @@ impl Aio for PullContextAioArg {
     }
 }
 
-/// Asynchronous context for pull socket.
+/// Asynchronous context for pull socket that can receive a stream of messages.
 #[derive(Debug)]
 pub struct PullAsyncStream {
     aio_arg: AioArg<PullContextAioArg>,
@@ -118,17 +118,17 @@ unsafe extern "C" fn pull_callback(arg: AioArgPtr) {
 
 /// Asynchronous context for subscribe socket.
 #[derive(Debug)]
-pub struct SubscribeAsyncHandle {
+pub struct SubscribeAsyncStream {
     ctx: PullAsyncStream,
 }
 
-impl AsyncPull for SubscribeAsyncHandle {
+impl AsyncPull for SubscribeAsyncStream {
     fn receive(&mut self) -> Option<mpsc::Receiver<Result<NngMsg>>> {
         self.ctx.receive()
     }
 }
 
-impl AsyncStreamContext for SubscribeAsyncHandle {
+impl AsyncStreamContext for SubscribeAsyncStream {
     /// Create an asynchronous context using the specified socket.
     fn new(socket: NngSocket, buffer: usize) -> Result<Self> {
         let ctx = PullAsyncStream::new(socket, buffer)?;
@@ -137,13 +137,13 @@ impl AsyncStreamContext for SubscribeAsyncHandle {
     }
 }
 
-impl InternalSocket for SubscribeAsyncHandle {
+impl InternalSocket for SubscribeAsyncStream {
     fn socket(&self) -> &NngSocket {
         &self.ctx.aio_arg.socket
     }
 }
 
-impl Subscribe for SubscribeAsyncHandle {
+impl Subscribe for SubscribeAsyncStream {
     fn subscribe(&self, topic: &[u8]) -> Result<()> {
         unsafe { subscribe(self.socket().nng_socket(), topic) }
     }

@@ -69,6 +69,25 @@ impl ReadAsync for PullAsyncHandle {
     }
 }
 
+/// Asynchronous context for subscribe socket.
+#[derive(Debug)]
+pub struct SubscribeAsyncHandle {
+    ctx: PullAsyncHandle,
+}
+
+impl AsyncContext for SubscribeAsyncHandle {
+    fn new(socket: NngSocket) -> Result<Self> {
+        let ctx = PullAsyncHandle::new(socket)?;
+        Ok(Self { ctx })
+    }
+}
+
+impl ReadAsync for SubscribeAsyncHandle {
+    fn receive(&mut self) -> Box<dyn Future<Item = Result<NngMsg>, Error = oneshot::Canceled>> {
+        self.ctx.receive()
+    }
+}
+
 unsafe extern "C" fn read_callback(arg: AioArgPtr) {
     let ctx = &mut *(arg as *mut PullAioArg);
     let aio = ctx.aio.nng_aio();
@@ -92,8 +111,9 @@ unsafe extern "C" fn read_callback(arg: AioArgPtr) {
         }
         Ok(()) => {
             let msg = NngMsg::from_raw(nng_aio_get_msg(aio));
-            ctx.receive();
             ctx.queue.lock().unwrap().push_back(Ok(msg));
+            // Don't start next read until after notifying this one is complete.
+            ctx.receive();
         }
     }
 }

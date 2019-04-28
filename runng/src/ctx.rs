@@ -4,7 +4,7 @@ use crate::*;
 use log::trace;
 use runng_sys::*;
 
-/// Type which exposes a `NngCtx`.
+/// Type which exposes a [`NngCtx`](struct.NngCtx.html).
 pub trait Ctx {
     /// Obtain under-lying `NngCtx`.
     fn ctx(&self) -> nng_ctx;

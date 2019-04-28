@@ -10,6 +10,7 @@ mod tests {
     mod options_tests;
     mod pair_tests;
     mod pipe_tests;
+    mod pubsub_tests;
     mod pushpull_tests;
     mod reqrep_tests;
     mod stats_tests;

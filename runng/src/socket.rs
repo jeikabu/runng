@@ -11,10 +11,19 @@ use runng_sys::*;
 use std::{fmt, result, sync::Arc};
 
 bitflags! {
+    /// Flags used with [`SendSocket`](trait.SendSocket.html) and [`RecvSocket`](trait.RecvSocket.html).
     #[derive(Default)]
     pub struct Flags: i32 {
         const NONBLOCK = NNG_FLAG_NONBLOCK as i32;
         const ALLOC = NNG_FLAG_ALLOC as i32;
+    }
+}
+
+bitflags! {
+    /// Flags used with [`Listen`](trait.Listen.html) and [`Dial`](trait.Dial.html).
+    #[derive(Default)]
+    pub struct SocketFlags: i32 {
+        const NONBLOCK = NNG_FLAG_NONBLOCK as i32;
     }
 }
 
@@ -188,9 +197,9 @@ impl Clone for NngSocket {
     }
 }
 
-/// Type which exposes a `NngSocket`.
+/// Type which exposes a [`NngSocket`](struct.NngSocket.html).
 pub trait Socket: Sized {
-    // Obtain underlying `NngSocket`.
+    /// Obtain underlying `NngSocket`.
     fn socket(&self) -> &NngSocket;
     fn socket_mut(&mut self) -> &mut NngSocket;
     /// Obtain underlying `nng_socket`.
@@ -207,10 +216,9 @@ pub trait Listen: Socket {
     }
 
     /// Listen for connections to specified URL.  See [nng_listen](https://nanomsg.github.io/nng/man/v1.1.0/nng_listen.3).
-    fn listen_flags(self, url: &str, flags: Flags) -> Result<Self> {
+    fn listen_flags(self, url: &str, flags: SocketFlags) -> Result<Self> {
         unsafe {
             let (_cstring, ptr) = to_cstr(url)?;
-            debug_assert!(!flags.contains(Flags::ALLOC));
             let res = nng_listen(self.nng_socket(), ptr, std::ptr::null_mut(), flags.bits());
             Error::zero_map(res, || self)
         }
@@ -229,10 +237,9 @@ pub trait Dial: Socket {
     }
 
     /// Dial socket specified by URL.  See [nng_dial](https://nanomsg.github.io/nng/man/v1.1.0/nng_dial.3)
-    fn dial_flags(self, url: &str, flags: Flags) -> Result<Self> {
+    fn dial_flags(self, url: &str, flags: SocketFlags) -> Result<Self> {
         unsafe {
             let (_cstring, ptr) = to_cstr(url)?;
-            debug_assert!(!flags.contains(Flags::ALLOC));
             let res = nng_dial(self.nng_socket(), ptr, std::ptr::null_mut(), flags.bits());
             Error::zero_map(res, || self)
         }
@@ -270,7 +277,7 @@ pub trait SendSocket: Socket {
         self.send_flags(data, Default::default())
     }
 
-    /// Send data.  See [nng_send](https://nanomsg.github.io/nng/man/v1.1.0/nng_send.3).
+    /// Send data with [`Flags`](struct.Flags.html).  See [nng_send](https://nanomsg.github.io/nng/man/v1.1.0/nng_send.3).
     fn send_flags(&self, data: &[u8], flags: Flags) -> Result<()> {
         unsafe {
             let ptr = data.as_ptr() as *mut std::os::raw::c_void;
@@ -284,7 +291,7 @@ pub trait SendSocket: Socket {
         self.send_zerocopy_flags(data, Flags::ALLOC)
     }
 
-    /// Send data in "zero-copy" mode.  See `NNG_FLAG_ALLOC`.
+    /// Send data in "zero-copy" mode with [`Flags`](struct.Flags.html).  See `NNG_FLAG_ALLOC`.
     fn send_zerocopy_flags(
         &self,
         data: mem::Alloc,
@@ -302,13 +309,13 @@ pub trait SendSocket: Socket {
         }
     }
 
-    /// Send a message.  See [nng_sendmsg](https://nanomsg.github.io/nng/man/v1.1.0/nng_sendmsg.3).
+    /// Send a [`NngMsg`](../msg/struct.NngMsg.html).  See [nng_sendmsg](https://nanomsg.github.io/nng/man/v1.1.0/nng_sendmsg.3).
     fn sendmsg(&self, msg: msg::NngMsg) -> Result<()> {
         let res = self.sendmsg_flags(msg, Default::default());
         res.map_err(|err| err.error)
     }
 
-    /// Send a message.  See [nng_sendmsg](https://nanomsg.github.io/nng/man/v1.1.0/nng_sendmsg.3).
+    /// Send a [`NngMsg`](../msg/struct.NngMsg.html) with [`Flags`](struct.Flags.html).  See [nng_sendmsg](https://nanomsg.github.io/nng/man/v1.1.0/nng_sendmsg.3).
     fn sendmsg_flags(
         &self,
         msg: msg::NngMsg,
@@ -335,6 +342,8 @@ pub trait RecvSocket: Socket {
         self.recv_flags(buffer, Default::default())
     }
 
+    /// Receive data with [`Flags`](struct.Flags.html).
+    /// Lifetime of return value is same as input buffer.
     fn recv_flags<'a>(&self, buffer: &'a mut [u8], flags: Flags) -> Result<&'a [u8]> {
         unsafe {
             let ptr = buffer.as_mut_ptr() as *mut core::ffi::c_void;
@@ -350,6 +359,7 @@ pub trait RecvSocket: Socket {
         self.recv_zerocopy_flags(Default::default())
     }
 
+    /// Receive data in "zero-copy" mode with [`Flags`](struct.Flags.html).
     fn recv_zerocopy_flags(&self, flags: Flags) -> Result<mem::Alloc> {
         let flags = (flags | Flags::ALLOC).bits();
         unsafe {
@@ -362,12 +372,12 @@ pub trait RecvSocket: Socket {
         }
     }
 
-    /// Receive a message: `recvmsg_flags(..., 0)`
+    /// Receive a [`NngMsg`](../msg/struct.NngMsg.html): `recvmsg_flags(..., 0)`
     fn recvmsg(&self) -> Result<msg::NngMsg> {
         self.recvmsg_flags(Default::default())
     }
 
-    /// Receive a message.  See [nng_recvmsg](https://nanomsg.github.io/nng/man/v1.1.0/nng_recvmsg.3).
+    /// Receive a [`NngMsg`](../msg/struct.NngMsg.html) with [`Flags`](struct.Flags.html).  See [nng_recvmsg](https://nanomsg.github.io/nng/man/v1.1.0/nng_recvmsg.3).
     fn recvmsg_flags(&self, flags: Flags) -> Result<msg::NngMsg> {
         unsafe {
             let mut recv_ptr: *mut nng_msg = std::ptr::null_mut();
