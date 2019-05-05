@@ -51,40 +51,74 @@ impl AsyncContext for PullAsyncHandle {
 }
 
 pub trait ReadAsync {
-    // FIXME: Can change this to -> impl Future later?
-    fn receive(&mut self) -> Box<dyn Future<Item = Result<NngMsg>, Error = oneshot::Canceled>>;
+    fn receive(&mut self) -> AsyncMsg;
 }
 
 impl ReadAsync for PullAsyncHandle {
-    fn receive(&mut self) -> Box<dyn Future<Item = Result<NngMsg>, Error = oneshot::Canceled>> {
+    fn receive(&mut self) -> AsyncMsg {
         let mut queue = self.aio_arg.queue.lock().unwrap();
-        // If a value is ready return it immediately.  Otherwise
-        if let Some(item) = queue.ready.pop_front() {
-            Box::new(future::ok(item))
-        } else {
-            let (sender, receiver) = oneshot::channel();
-            queue.waiting.push_back(sender);
-            Box::new(receiver)
+        queue.pop_front()
+    }
+}
+
+#[derive(Debug)]
+pub struct SubAioArg {
+    aio: NngAio,
+    ctx: NngCtx,
+    queue: Mutex<WorkQueue>,
+    socket: NngSocket,
+}
+
+impl SubAioArg {
+    pub fn new(socket: NngSocket) -> Result<AioArg<Self>> {
+        let ctx = NngCtx::new(socket.clone())?;
+        let queue = Mutex::new(WorkQueue::default());
+        let context = NngAio::new(
+            |aio| Self {
+                aio,
+                ctx,
+                queue,
+                socket,
+            },
+            read_callback,
+        )?;
+        context.receive();
+        Ok(context)
+    }
+
+    fn receive(&self) {
+        unsafe {
+            nng_recv_aio(self.socket.nng_socket(), self.aio.nng_aio());
         }
+    }
+}
+
+impl Aio for SubAioArg {
+    fn aio(&self) -> &NngAio {
+        &self.aio
+    }
+    fn aio_mut(&mut self) -> &mut NngAio {
+        &mut self.aio
     }
 }
 
 /// Asynchronous context for subscribe socket.
 #[derive(Debug)]
 pub struct SubscribeAsyncHandle {
-    ctx: PullAsyncHandle,
+    aio_arg: AioArg<SubAioArg>,
 }
 
 impl AsyncContext for SubscribeAsyncHandle {
     fn new(socket: NngSocket) -> Result<Self> {
-        let ctx = PullAsyncHandle::new(socket)?;
-        Ok(Self { ctx })
+        let aio_arg = SubAioArg::new(socket)?;
+        Ok(Self { aio_arg })
     }
 }
 
 impl ReadAsync for SubscribeAsyncHandle {
-    fn receive(&mut self) -> Box<dyn Future<Item = Result<NngMsg>, Error = oneshot::Canceled>> {
-        self.ctx.receive()
+    fn receive(&mut self) -> AsyncMsg {
+        let mut queue = self.aio_arg.queue.lock().unwrap();
+        queue.pop_front()
     }
 }
 

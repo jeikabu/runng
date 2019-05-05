@@ -34,7 +34,6 @@ fn create_sub(url: &str) -> runng::Result<protocol::Sub0> {
     sock.socket_mut().set_ms(NngOption::RECVTIMEO, 100)?;
     // Sub socket doesn't support RECVBUF, messages are just dropped.
     //sock.socket_mut().set_int(NngOption::RECVBUF, 1000)?;
-    sock.subscribe(&[]).unwrap();
     sock.dial(&url)
 }
 
@@ -59,7 +58,7 @@ fn bad_sub() -> runng::Result<()> {
         }
 
         // Send messages
-        let mut count = 1;
+        let mut count = 0;
         while !done.load(Ordering::Relaxed) {
             let mut msg = NngMsg::new()?;
             msg.append_u32(count)?;
@@ -71,35 +70,35 @@ fn bad_sub() -> runng::Result<()> {
                 err => panic!("Unexpected: {:?}", err),
             }
             // Pub/sub drops messages, so need to sleep
-            sleep_brief();
+            sleep_fast();
         }
         Ok(())
     });
 
     // Puller
     let subscriber = create_sub(&url)?;
+    subscriber.subscribe(&[]).unwrap();
     let recv_count = Arc::new(AtomicUsize::new(0));
     let lost_count = Arc::new(AtomicUsize::new(0));
     let sub_vars = (done.clone(), recv_count.clone(), lost_count.clone());
     let sub_thread = thread::spawn(move || -> runng::Result<()> {
         let (done, recv_count, lost_count) = sub_vars;
         let mut ctx = subscriber.create_async()?;
-        let mut recv_msg_id = 0;
+        let mut expect_msg_id = 0;
         sub_ready.store(true, Ordering::Relaxed);
         while !done.load(Ordering::Relaxed) {
             match ctx.receive().wait() {
                 Ok(Ok(mut msg)) => {
                     let id = msg.trim_u32()?;
                     debug!("recv: {}", id);
-                    let expect_id = recv_msg_id + 1;
-                    if id != expect_id {
-                        debug!("Lost a message!  Expected {}, got {}", expect_id, id);
-                        lost_count.fetch_add((id - expect_id) as usize, Ordering::Relaxed);
+                    if id != expect_msg_id {
+                        debug!("Lost a message!  Expected {}, got {}", expect_msg_id, id);
+                        lost_count.fetch_add((id - expect_msg_id) as usize, Ordering::Relaxed);
                         // Once the test has failed, just let it exit
                         done.store(true, Ordering::Relaxed);
                         break;
                     }
-                    recv_msg_id = id;
+                    expect_msg_id = id + 1;
                     recv_count.fetch_add(1, Ordering::Relaxed);
                 }
                 // If get read timeout loop back around and retry in case it was spurious
@@ -128,6 +127,106 @@ fn bad_sub() -> runng::Result<()> {
 
     push_thread.join().unwrap()?;
     sub_thread.join().unwrap()?;
+
+    assert!(recv_count.load(Ordering::Relaxed) > 1);
+    assert_eq!(0, lost_count.load(Ordering::Relaxed));
+
+    Ok(())
+}
+
+#[test]
+fn contexts() -> runng::Result<()> {
+    let url = get_url();
+    let factory = ProtocolFactory::default();
+
+    let sub_ready = Arc::new(AtomicBool::default());
+    let done = Arc::new(AtomicBool::default());
+    let pub_vars = (done.clone(), sub_ready.clone());
+
+    // Publisher
+    let pusher = create_pub(&url)?;
+    let pub_thread = thread::spawn(move || -> runng::Result<()> {
+        let (done, sub_ready) = pub_vars;
+        let mut push_ctx = pusher.create_async()?;
+
+        // Wait for puller (or end of test)
+        while !sub_ready.load(Ordering::Relaxed) && !done.load(Ordering::Relaxed) {
+            sleep_brief();
+        }
+
+        // Send messages
+        let mut count = 0u32;
+        while !done.load(Ordering::Relaxed) {
+            let mut msg = NngMsg::new()?;
+            msg.append_u16(count as u16 % 2)?; // Topic
+            msg.append_u32(count)?;
+            match push_ctx.send(msg).wait().unwrap() {
+                // Only increment the count on success so if send fails we retry.
+                Ok(_) => count += 1,
+                // If get timeout just retry
+                Err(runng::Error::Errno(NngErrno::ETIMEDOUT)) => {}
+                err => panic!("Unexpected: {:?}", err),
+            }
+            // Pub/sub drops messages, so need to sleep
+            sleep_fast();
+        }
+        Ok(())
+    });
+
+    // Subscribers
+    let recv_count = Arc::new(AtomicUsize::new(0));
+    let lost_count = Arc::new(AtomicUsize::new(0));
+    let mut subscribers = vec![];
+    for i in 0u16..2 {
+        let subscriber = create_sub(&url)?;
+        subscriber.subscribe(&i.to_be_bytes()).unwrap();
+        let sub_vars = (
+            done.clone(),
+            sub_ready.clone(),
+            recv_count.clone(),
+            lost_count.clone(),
+        );
+        let thread = thread::spawn(move || -> runng::Result<()> {
+            let (done, sub_ready, recv_count, lost_count) = sub_vars;
+            let mut ctx = subscriber.create_async()?;
+            let mut expect_msg_id: u32 = i.into();
+            sub_ready.store(true, Ordering::Relaxed);
+            while !done.load(Ordering::Relaxed) {
+                match ctx.receive().wait() {
+                    Ok(Ok(mut msg)) => {
+                        let topic = msg.trim_u16()?;
+                        let id = msg.trim_u32()?;
+                        debug!("recv: {} {} {}", i, topic, id);
+                        if id != expect_msg_id {
+                            debug!(
+                                "Lost a message!  {} Expected {}, got {}",
+                                i, expect_msg_id, id
+                            );
+                            lost_count.fetch_add((id - expect_msg_id) as usize, Ordering::Relaxed);
+                            // Once the test has failed, just let it exit
+                            done.store(true, Ordering::Relaxed);
+                            break;
+                        }
+                        expect_msg_id = id + 2;
+                        recv_count.fetch_add(1, Ordering::Relaxed);
+                    }
+                    // If get read timeout loop back around and retry in case it was spurious
+                    Ok(Err(runng::Error::Errno(NngErrno::ETIMEDOUT))) => debug!("Read timeout"),
+                    err => panic!("Unexpected: {:?}", err),
+                }
+            }
+            Ok(())
+        });
+        subscribers.push(thread);
+    }
+
+    sleep_test();
+    done.store(true, Ordering::Relaxed);
+
+    pub_thread.join().unwrap()?;
+    subscribers
+        .into_iter()
+        .for_each(|thread| thread.join().unwrap().unwrap());
 
     assert!(recv_count.load(Ordering::Relaxed) > 1);
     assert_eq!(0, lost_count.load(Ordering::Relaxed));
