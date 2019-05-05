@@ -95,6 +95,8 @@ fn try_signal_complete(sender: &mut mpsc::Sender<Result<NngMsg>>, message: Resul
     }
 }
 
+pub type AsyncMsg = Box<dyn Future<Item = Result<NngMsg>, Error = oneshot::Canceled>>;
+
 #[derive(Debug, Default)]
 struct WorkQueue {
     waiting: VecDeque<oneshot::Sender<Result<NngMsg>>>,
@@ -109,6 +111,17 @@ impl WorkQueue {
                 .unwrap_or_else(|err| debug!("Dropping message: {:?}", err));
         } else {
             self.ready.push_back(message);
+        }
+    }
+
+    fn pop_front(&mut self) -> AsyncMsg {
+        // If a value is ready return it immediately.  Otherwise
+        if let Some(item) = self.ready.pop_front() {
+            Box::new(future::ok(item))
+        } else {
+            let (sender, receiver) = oneshot::channel();
+            self.waiting.push_back(sender);
+            Box::new(receiver)
         }
     }
 }
