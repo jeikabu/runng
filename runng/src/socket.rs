@@ -245,6 +245,19 @@ pub trait Dial: Socket {
         }
     }
 
+    fn dial_mut(&mut self, url: &str) -> Result<()> {
+        unsafe {
+            let (_cstring, ptr) = to_cstr(url)?;
+            let res = nng_dial(
+                self.nng_socket(),
+                ptr,
+                std::ptr::null_mut(),
+                SocketFlags::default().bits(),
+            );
+            nng_int_to_result(res)
+        }
+    }
+
     fn dialer_create(&self, url: &str) -> Result<NngDialer> {
         NngDialer::new(self.socket().clone(), url)
     }

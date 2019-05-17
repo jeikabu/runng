@@ -17,6 +17,9 @@ pub mod latest {
     pub struct ProtocolFactory {}
 
     impl ProtocolFactory {
+        pub fn bus_open(&self) -> Result<protocol::Bus0> {
+            protocol::Bus0::open()
+        }
         pub fn requester_open(&self) -> Result<protocol::Req0> {
             protocol::Req0::open()
         }
@@ -49,6 +52,9 @@ pub mod compat {
     pub struct ProtocolFactory {}
 
     impl ProtocolFactory {
+        pub fn bus_open(&self) -> Result<protocol::Bus0> {
+            protocol::Bus0::open()
+        }
         pub fn requester_open(&self) -> Result<protocol::Req0> {
             protocol::Req0::open()
         }

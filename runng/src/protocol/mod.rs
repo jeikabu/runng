@@ -1,5 +1,6 @@
 //! NNG protocols.  See [Section 7](https://nanomsg.github.io/nng/man/v1.1.0/index.html#_section_7_protocols_and_transports).
 
+pub mod bus0;
 pub mod pair0;
 pub mod pair1;
 pub mod pub0;
@@ -9,6 +10,7 @@ pub mod rep0;
 pub mod req0;
 pub mod sub0;
 
+pub use self::bus0::*;
 pub use self::pair0::*;
 pub use self::pair1::*;
 pub use self::pub0::*;

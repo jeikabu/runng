@@ -1,6 +1,7 @@
 //! Asynchronous I/O with `nng_aio`.
 
 pub mod aio;
+pub mod bus;
 pub mod pair;
 pub mod pair_stream;
 pub mod pull;
@@ -13,6 +14,7 @@ pub mod simple;
 pub mod stream;
 
 pub use self::aio::*;
+pub use self::bus::*;
 pub use self::pair::*;
 pub use self::pair_stream::*;
 pub use self::pull::*;
