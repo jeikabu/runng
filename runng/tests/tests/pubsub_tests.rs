@@ -116,8 +116,7 @@ fn bad_sub() -> runng::Result<()> {
             let puller = factory.puller_open()?.dial(&url)?;
             let mut read_ctx = puller.create_async()?;
             let recv_future = read_ctx.receive();
-            let rand_sleep = ((rand::thread_rng().next_u64() & 0x7) + 1) * 2;
-            thread::sleep(Duration::from_millis(rand_sleep));
+            rand_sleep(2, 16);
         }
         Ok(())
     });

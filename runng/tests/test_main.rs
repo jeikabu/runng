@@ -4,6 +4,7 @@ mod common;
 mod tests {
 
     mod broker_tests;
+    mod bus_tests;
     mod future_tests;
     mod mem_tests;
     mod msg_tests;

@@ -8,6 +8,7 @@ use runng::msg::NngMsg;
 use std::{
     sync::atomic::{AtomicUsize, Ordering},
     thread, time,
+    time::Duration,
 };
 
 pub fn init_logging() {
@@ -50,6 +51,11 @@ pub fn rand_msg() -> runng::Result<NngMsg> {
     let mut msg = NngMsg::with_capacity(128)?;
     rand::thread_rng().fill(msg.as_mut_slice());
     Ok(msg)
+}
+
+pub fn rand_sleep(low: u64, high: u64) {
+    let range = rand::thread_rng().gen_range(low, high);
+    thread::sleep(Duration::from_millis(range));
 }
 
 pub enum TimeoutResult<F: Future> {

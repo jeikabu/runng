@@ -2,7 +2,6 @@
 
 use super::*;
 use crate::{msg::NngMsg, *};
-use futures::{future, future::Future, sync::oneshot};
 use runng_sys::*;
 use std::sync::Mutex;
 
