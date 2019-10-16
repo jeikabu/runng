@@ -1,5 +1,4 @@
 use crate::common::*;
-use futures::future::{Future, IntoFuture};
 use log::debug;
 use runng::{asyncio::*, factory::latest::ProtocolFactory, msg::NngMsg, protocol::*, socket::*};
 use std::{
@@ -37,7 +36,7 @@ fn pushpull_timeout() -> runng::Result<()> {
         while !done.load(Ordering::Relaxed) {
             let mut msg = NngMsg::new()?;
             msg.append_u32(count)?;
-            push_ctx.send(msg).wait().unwrap()?;
+            block_on(push_ctx.send(msg)).unwrap()?;
             count += 1;
             sleep_brief();
         }
@@ -55,27 +54,26 @@ fn pushpull_timeout() -> runng::Result<()> {
         let mut recv_msg_id = 0;
         puller_ready.store(true, Ordering::Relaxed);
         while !done.load(Ordering::Relaxed) {
-            let recv_future = read_ctx.receive().into_future();
+            let recv_fut = read_ctx.receive();
             let duration = Duration::from_millis(100);
-            timeout(recv_future, duration)
-                .then(|res| match res {
-                    Ok(TimeoutResult::Ok(msg)) => {
-                        let id = msg.unwrap().trim_u32().unwrap();
-                        let expect_id = recv_msg_id + 1;
-                        if id != expect_id {
-                            debug!("Lost a message!  Expected {}, got {}", expect_id, id);
-                            lost_count.fetch_add((id - expect_id) as usize, Ordering::Relaxed);
-                        }
-                        recv_msg_id = id;
-                        recv_count.fetch_add(1, Ordering::Relaxed);
-                        Ok(())
+            let fut = timeout(recv_fut, duration).then(|res| match res {
+                TimeoutResult::Ok(msg) => {
+                    let id = msg.unwrap().unwrap().trim_u32().unwrap();
+                    let expect_id = recv_msg_id + 1;
+                    if id != expect_id {
+                        debug!("Lost a message!  Expected {}, got {}", expect_id, id);
+                        lost_count.fetch_add((id - expect_id) as usize, Ordering::Relaxed);
                     }
-                    _ => {
-                        debug!("Error");
-                        Err(())
-                    }
-                })
-                .wait();
+                    recv_msg_id = id;
+                    recv_count.fetch_add(1, Ordering::Relaxed);
+                    future::ok(())
+                }
+                _ => {
+                    debug!("Error");
+                    future::err(())
+                }
+            });
+            block_on(fut);
         }
         Ok(())
     });

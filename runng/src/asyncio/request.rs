@@ -1,9 +1,8 @@
 //! Async request/reply
 
-use crate::{asyncio::*, ctx::NngCtx, msg::NngMsg, *};
-use futures::sync::oneshot;
+use super::*;
+use crate::ctx::NngCtx;
 use log::{debug, info};
-use runng_sys::*;
 
 #[derive(Debug, PartialEq)]
 enum RequestState {

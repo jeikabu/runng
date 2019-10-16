@@ -1,10 +1,11 @@
 use env_logger::{Builder, Env};
-use futures::{
-    future,
-    future::{Either, Future},
+pub use futures::{
+    executor::block_on,
+    future::{self, Either, Future},
 };
+pub use futures_util::{future::FutureExt, stream::StreamExt};
 use rand::Rng;
-use runng::msg::NngMsg;
+pub use runng::{asyncio, msg::NngMsg, protocol, NngErrno};
 use std::{
     sync::atomic::{AtomicUsize, Ordering},
     thread, time,
@@ -28,11 +29,12 @@ pub fn create_stop_message() -> NngMsg {
     NngMsg::new().unwrap()
 }
 
-pub fn not_stop_message(res: &runng::Result<NngMsg>) -> impl Future<Item = bool, Error = ()> {
-    match res {
-        Ok(msg) => future::ok(!msg.is_empty()),
-        Err(_) => future::ok(false),
-    }
+pub fn not_stop_message(res: &runng::Result<NngMsg>) -> impl Future<Output = bool> {
+    future::ready(if let Ok(msg) = res {
+        !msg.is_empty()
+    } else {
+        false
+    })
 }
 
 pub fn sleep_fast() {
@@ -59,18 +61,17 @@ pub fn rand_sleep(low: u64, high: u64) {
 }
 
 pub enum TimeoutResult<F: Future> {
-    Ok(F::Item),
+    Ok(F::Output),
     Timeout(F),
 }
 
-pub fn timeout<F: Future>(
+pub fn timeout<F: Future + std::marker::Unpin>(
     future: F,
     duration: std::time::Duration,
-) -> impl Future<Item = TimeoutResult<F>, Error = ()> {
+) -> impl Future<Output = TimeoutResult<F>> {
     let timeout = futures_timer::Delay::new(duration);
-    future.select2(timeout).then(|res| match res {
-        Ok(Either::A((item, _timeout_future))) => future::ok(TimeoutResult::Ok(item)),
-        Ok(Either::B((_timeout_error, future))) => future::ok(TimeoutResult::Timeout(future)),
-        _ => future::err(()),
+    future::select(future, timeout).then(|either| match either {
+        Either::Left((item, _timeout_future)) => future::ready(TimeoutResult::Ok(item)),
+        Either::Right((_timeout_error, future)) => future::ready(TimeoutResult::Timeout(future)),
     })
 }

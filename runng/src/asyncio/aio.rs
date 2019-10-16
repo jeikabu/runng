@@ -1,8 +1,7 @@
 //! Wrapper for `nng_aio`.
 
-use crate::*;
+use super::*;
 use log::debug;
-use runng_sys::*;
 use std::{pin, ptr};
 
 /// Type which exposes an [`NngAio`](struct.NngAio.html).

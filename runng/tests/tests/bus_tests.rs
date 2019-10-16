@@ -1,17 +1,11 @@
 use crate::common::*;
-use futures::{
-    future::{Future, IntoFuture},
-    sync::oneshot,
-};
+use futures::channel::oneshot;
 use log::{debug, trace};
 use runng::{
     asyncio::*,
     factory::latest::ProtocolFactory,
-    msg::NngMsg,
     options::{NngOption, SetOpts},
-    protocol,
     socket::*,
-    NngErrno,
 };
 use std::{
     sync::{
@@ -161,7 +155,7 @@ fn create_peer_async(
                 if id == 0 {
                     break;
                 }
-                match ctx.receive().wait() {
+                match block_on(ctx.receive()) {
                     Ok(Ok(mut msg)) => {
                         let recv_id = msg.trim_u32()?;
                         trace!("Recv {} {}", id, recv_id);
@@ -175,7 +169,7 @@ fn create_peer_async(
             }
             let mut msg = NngMsg::new()?;
             msg.append_u32(id)?;
-            ctx.send(msg).wait()??;
+            block_on(ctx.send(msg))??;
             trace!("Sent {} {}", url, id);
         }
 

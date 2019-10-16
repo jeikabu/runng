@@ -1,7 +1,6 @@
 //! Async pair
 
-use crate::{asyncio::*, msg::NngMsg, *};
-use futures::{future::Future, sync::oneshot};
+use super::*;
 
 /// Async pair context for pair protocol.
 #[derive(Debug)]
@@ -26,7 +25,7 @@ impl AsyncPush for PairAsyncHandle {
 }
 
 impl ReadAsync for PairAsyncHandle {
-    fn receive(&mut self) -> Box<dyn Future<Item = Result<NngMsg>, Error = oneshot::Canceled>> {
+    fn receive(&mut self) -> AsyncMsg {
         self.pull.receive()
     }
 }

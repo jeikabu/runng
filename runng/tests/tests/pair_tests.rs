@@ -1,17 +1,11 @@
 use crate::common::*;
-use futures::{
-    future::{Future, IntoFuture},
-    stream::Stream,
-    sync::oneshot,
-};
+use futures::{channel::oneshot, stream::Stream};
 use log::debug;
 use runng::{
     asyncio::*,
     factory::latest::ProtocolFactory,
-    msg::NngMsg,
     options::{NngOption, SetOpts},
     socket::*,
-    NngErrno,
 };
 use std::{
     sync::{
@@ -25,17 +19,15 @@ use std::{
 fn forward(
     ctx: &mut PairStreamHandle,
     msg: runng::Result<NngMsg>,
-) -> impl IntoFuture<Item = (), Error = ()> {
+) -> oneshot::Receiver<runng::Result<()>> {
     // Increment value.  If larger than some value send a stop message and return Err to stop for_each().  Otherwise forward it.
     let mut msg = msg.unwrap();
     let value = msg.trim_u32().unwrap() + 1;
     if value > 100 {
-        ctx.send(create_stop_message()).wait().unwrap().unwrap();
-        Err(())
+        ctx.send(create_stop_message())
     } else {
         msg.append_u32(value).unwrap();
-        ctx.send(msg).wait().unwrap().unwrap();
-        Ok(())
+        ctx.send(msg)
     }
 }
 
@@ -51,26 +43,35 @@ fn pair() -> runng::Result<()> {
         // Send the first (0th) message
         let mut msg = NngMsg::new()?;
         msg.append_u32(0)?;
-        ctx.send(msg).wait()??;
-        let _stream = ctx
+        block_on(ctx.send(msg))??;
+        let stream_fut = ctx
             .receive()
             .unwrap()
             .take_while(not_stop_message)
             // Receive a message and send it to other pair
-            .for_each(|msg| forward(&mut ctx, msg))
-            .wait()
-            .unwrap();
+            .for_each(|msg| {
+                forward(&mut ctx, msg).then(|res| {
+                    res.unwrap().unwrap();
+                    future::ready(())
+                })
+            });
+        block_on(stream_fut);
         Ok(())
     });
     let b_thread = thread::spawn(move || -> runng::Result<()> {
         let mut ctx = b.create_async_stream(1)?;
-        ctx.receive()
+        let fut = ctx
+            .receive()
             .unwrap()
             .take_while(not_stop_message)
             // Receive a message and send it to other pair
-            .for_each(|msg| forward(&mut ctx, msg))
-            .wait()
-            .expect_err("Err means stop processing stream");
+            .for_each(|msg| {
+                forward(&mut ctx, msg).then(|res| {
+                    res.unwrap().unwrap();
+                    future::ready(())
+                })
+            });
+        block_on(fut);
         Ok(())
     });
 
@@ -106,14 +107,14 @@ fn pair1_poly() -> runng::Result<()> {
         let thread = thread::spawn(move || -> runng::Result<()> {
             let mut ctx = a.listen(&url)?.create_async()?;
             while !done.load(Ordering::Relaxed) {
-                match ctx.receive().wait() {
+                match block_on(ctx.receive()) {
                     Ok(Ok(msg)) => {
                         // Duplicate message so it has same content (sender will check for identifier)
                         let mut response = msg.dup().unwrap();
                         // Response message's pipe must be set to that of the received message
                         let pipe = msg.get_pipe().unwrap();
                         response.set_pipe(&pipe);
-                        ctx.send(response).wait().unwrap().unwrap();
+                        block_on(ctx.send(response)).unwrap().unwrap();
                     }
                     Ok(Err(runng::Error::Errno(NngErrno::ETIMEDOUT))) => break,
                     Ok(Err(err)) => panic!(err),
@@ -141,14 +142,14 @@ fn pair1_poly() -> runng::Result<()> {
                 // Send message containing identifier
                 let mut msg = NngMsg::new()?;
                 msg.append_u32(i)?;
-                match ctx.send(msg).wait() {
+                match block_on(ctx.send(msg)) {
                     Ok(Ok(())) => {}
                     Ok(Err(runng::Error::Errno(NngErrno::ETIMEDOUT))) => break,
                     Ok(Err(err)) => panic!(err),
                     Err(oneshot::Canceled) => panic!(),
                 }
 
-                match ctx.receive().wait() {
+                match block_on(ctx.receive()) {
                     Ok(Ok(mut msg)) => {
                         let _reply = msg.trim_u32()?;
                         count.fetch_add(1, Ordering::Relaxed);

@@ -1,6 +1,6 @@
 //! Simple queue of asynchronous I/O work.
 
-use crate::{asyncio::*, *};
+use super::*;
 use log::debug;
 use std::{collections::VecDeque, marker::PhantomPinned, pin::Pin, sync::Mutex};
 

@@ -1,16 +1,12 @@
 use crate::common::*;
-use futures::future::Future;
 use log::debug;
 use rand::RngCore;
 use runng::{
     asyncio::*,
     factory::latest::ProtocolFactory,
-    msg::NngMsg,
     options::{NngOption, SetOpts},
-    protocol,
     protocol::Subscribe,
     socket::*,
-    NngErrno,
 };
 use std::{
     sync::{
@@ -62,7 +58,7 @@ fn bad_sub() -> runng::Result<()> {
         while !done.load(Ordering::Relaxed) {
             let mut msg = NngMsg::new()?;
             msg.append_u32(count)?;
-            match push_ctx.send(msg).wait().unwrap() {
+            match block_on(push_ctx.send(msg)).unwrap() {
                 // Only increment the count on success so if send fails we retry.
                 Ok(_) => count += 1,
                 // If get timeout just retry
@@ -87,7 +83,7 @@ fn bad_sub() -> runng::Result<()> {
         let mut expect_msg_id = 0;
         sub_ready.store(true, Ordering::Relaxed);
         while !done.load(Ordering::Relaxed) {
-            match ctx.receive().wait() {
+            match block_on(ctx.receive()) {
                 Ok(Ok(mut msg)) => {
                     let id = msg.trim_u32()?;
                     debug!("recv: {}", id);
@@ -159,7 +155,7 @@ fn contexts() -> runng::Result<()> {
             let mut msg = NngMsg::new()?;
             msg.append_u16(count as u16 % 2)?; // Topic
             msg.append_u32(count)?;
-            match push_ctx.send(msg).wait().unwrap() {
+            match block_on(push_ctx.send(msg)).unwrap() {
                 // Only increment the count on success so if send fails we retry.
                 Ok(_) => count += 1,
                 // If get timeout just retry
@@ -191,7 +187,7 @@ fn contexts() -> runng::Result<()> {
             let mut expect_msg_id: u32 = i.into();
             sub_ready.store(true, Ordering::Relaxed);
             while !done.load(Ordering::Relaxed) {
-                match ctx.receive().wait() {
+                match block_on(ctx.receive()) {
                     Ok(Ok(mut msg)) => {
                         let topic = msg.trim_u16()?;
                         let id = msg.trim_u32()?;

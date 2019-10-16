@@ -1,8 +1,8 @@
 //#![cfg(feature = "stats")]
 
-use crate::common::init_logging;
+use crate::common::*;
 use log::debug;
-use runng::{factory::latest::ProtocolFactory, protocol, socket::*, stats::*};
+use runng::{factory::latest::ProtocolFactory, socket::*, stats::*};
 
 fn init_stats() -> runng::Result<(protocol::push0::Push0, protocol::pull0::Pull0)> {
     init_logging();

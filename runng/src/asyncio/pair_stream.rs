@@ -1,7 +1,6 @@
 //! Async pair
 
-use crate::{asyncio::*, msg::NngMsg, *};
-use futures::sync::{mpsc, oneshot};
+use super::*;
 
 /// Asynchronous context for request socket.
 #[derive(Debug)]

@@ -1,6 +1,5 @@
-use crate::common::rand_msg;
+use crate::common::*;
 use rand::Rng;
-use runng::msg::NngMsg;
 
 #[test]
 fn equality() -> runng::Result<()> {

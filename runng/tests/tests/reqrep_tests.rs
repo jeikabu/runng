@@ -1,11 +1,7 @@
-use crate::common::{create_stop_message, get_url, not_stop_message, sleep_fast};
-use futures::{future::Future, Stream};
+use crate::common::*;
 use log::info;
 use rand::Rng;
-use runng::{
-    asyncio::*, factory::latest::ProtocolFactory, mem, msg::NngMsg, socket, socket::*, Error,
-    NngErrno,
-};
+use runng::{asyncio::*, factory::latest::ProtocolFactory, mem, socket, socket::*, Error};
 use std::{
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -38,17 +34,15 @@ fn example_async() -> runng::Result<()> {
     let req_socket = factory.requester_open()?.dial(&url)?;
     let mut req_ctx = req_socket.create_async()?;
     let req_future = req_ctx.send(NngMsg::new()?);
-    rep_ctx
-        .receive()
-        .unwrap()
-        .take(1)
-        .for_each(|_request| {
-            let msg = NngMsg::new().unwrap();
-            rep_ctx.reply(msg).wait().unwrap().unwrap();
-            Ok(())
+    let fut = rep_ctx.receive().unwrap().take(1).for_each(|_request| {
+        let msg = NngMsg::new().unwrap();
+        rep_ctx.reply(msg).then(|res| {
+            res.unwrap().unwrap();
+            future::ready(())
         })
-        .wait()?;
-    req_future.wait().unwrap()?;
+    });
+    block_on(fut);
+    block_on(req_future).unwrap()?;
 
     Ok(())
 }
@@ -169,7 +163,7 @@ fn contexts() -> runng::Result<()> {
     let mut rep_ctx = rep_socket.create_async_stream(1)?;
     let rep_recv_count = recv_count.clone();
     let rep = thread::spawn(move || -> runng::Result<()> {
-        rep_ctx
+        let fut = rep_ctx
             .receive()
             .unwrap()
             // Process until receive stop message
@@ -178,10 +172,10 @@ fn contexts() -> runng::Result<()> {
                 rep_recv_count.fetch_add(1, Ordering::Relaxed);
 
                 let msg = NngMsg::new().unwrap();
-                rep_ctx.reply(msg).wait().unwrap().unwrap();
-                Ok(())
-            })
-            .wait()?;
+                block_on(rep_ctx.reply(msg)).unwrap().unwrap();
+                future::ready(())
+            });
+        block_on(fut);
         Ok(())
     });
 
@@ -197,7 +191,7 @@ fn contexts() -> runng::Result<()> {
             for i in 0..NUM_REQUESTS {
                 let mut msg = NngMsg::new()?;
                 msg.append_u32(i)?;
-                req_ctx.send(msg).wait()??;
+                block_on(req_ctx.send(msg))??;
             }
             Ok(())
         });
