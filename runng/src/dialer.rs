@@ -17,7 +17,7 @@ impl NngDialer {
     /// See [nng_dialer_create](https://nanomsg.github.io/nng/man/v1.1.0/nng_dialer_create.3).
     pub(crate) fn create(socket: NngSocket, url: &str) -> NngResult<Self> {
         unsafe {
-            let mut dialer = nng_dialer { id: 0 };
+            let mut dialer = nng_dialer::default();
             let (_cstring, url) = to_cstr(url)?;
             NngFail::succeed(
                 nng_dialer_create(&mut dialer, socket.nng_socket(), url),

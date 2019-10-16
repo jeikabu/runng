@@ -27,7 +27,7 @@ backtrace = "0.3"
 futures = "0.1"
 log = "0.4"
 runng_derive = { version = "0.1", path = "../runng_derive" }
-runng-sys = { version = "1.1.1-rc", path = "../runng-sys" }
+runng_sys = { version = "1.1.1-rc", path = "../runng_sys", package = "nng-sys" }
 
 [dev-dependencies]
 clap = "2.32"

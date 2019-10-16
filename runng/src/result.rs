@@ -20,8 +20,6 @@ impl NngFail {
     pub fn from_i32(value: i32) -> NngReturn {
         if value == 0 {
             Ok(())
-        } else if let Some(error) = nng_errno_enum::from_i32(value) {
-            Err(NngFail::Err(error))
         } else {
             Err(NngFail::Unknown(value))
         }

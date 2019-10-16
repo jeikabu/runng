@@ -1,15 +1,12 @@
 [workspace]
 members = [
-    "runng-sys",
+    "runng_sys",
     "runng",
     "runng_derive",
     "runng_thrift",
 ]
 default-members = [
-    "runng-sys",
+    "runng_sys",
     "runng",
     "runng_derive",
 ]
-
-[patch.crates-io]
-cty = { git = 'https://github.com/jeikabu/cty' }

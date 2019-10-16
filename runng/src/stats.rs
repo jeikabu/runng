@@ -136,7 +136,7 @@ impl<'root> NngStatChild<'root> {
     pub fn stat_type(&self) -> Option<nng_stat_type_enum> {
         unsafe {
             let val = nng_stat_type(self.nng_stat());
-            nng_stat_type_enum::from_i32(val)
+            nng_stat_type_enum::try_from(val).ok()
         }
     }
 
@@ -167,7 +167,7 @@ impl<'root> NngStatChild<'root> {
     pub fn unit(&self) -> Option<nng_unit_enum> {
         unsafe {
             let val = nng_stat_unit(self.nng_stat());
-            nng_unit_enum::from_i32(val)
+            nng_unit_enum::try_from(val).ok()
         }
     }
 

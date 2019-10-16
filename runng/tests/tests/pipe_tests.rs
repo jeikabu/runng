@@ -12,7 +12,7 @@ static NUM_REMPOST: AtomicUsize = AtomicUsize::new(0);
 static NUM_BAD: AtomicUsize = AtomicUsize::new(0);
 
 extern "C" fn notify_callback(_pipe: nng_pipe, event: i32, _arg: PipeNotifyCallbackArg) {
-    match nng_pipe_ev::from_i32(event) {
+    match nng_pipe_ev::try_from(event).ok() {
         Some(NNG_PIPE_EV_ADD_PRE) => NUM_ADDPRE.fetch_add(1, Ordering::Relaxed),
         Some(NNG_PIPE_EV_ADD_POST) => NUM_ADDPOST.fetch_add(1, Ordering::Relaxed),
         Some(NNG_PIPE_EV_REM_POST) => NUM_REMPOST.fetch_add(1, Ordering::Relaxed),
