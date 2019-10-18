@@ -3,7 +3,6 @@ members = [
     "runng_sys",
     "runng",
     "runng_derive",
-    "runng_thrift",
 ]
 default-members = [
     "runng_sys",

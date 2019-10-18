@@ -130,8 +130,7 @@ unsafe extern "C" fn reply_callback(arg: AioCallbackArg) {
             match res {
                 Err(res) => {
                     match res {
-                        NngFail::Err(NNG_ECLOSED)
-                        | NngFail::Err(NNG_ECANCELED) => {
+                        NngFail::Err(NNG_ECLOSED) | NngFail::Err(NNG_ECANCELED) => {
                             debug!("reply_callback {:?}", res);
                         }
                         _ => {
