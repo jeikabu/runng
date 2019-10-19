@@ -142,9 +142,15 @@ mod tests {
             let mut broker_push_ctx = broker_push.create_async()?;
             let fut = broker_pull_ctx.receive().unwrap().for_each(|msg| {
                 if let Ok(msg) = msg {
-                    block_on(broker_push_ctx.send(msg)).unwrap().unwrap();
+                    futures::future::Either::Left(
+                        broker_push_ctx.send(msg).then(|res| {
+                            res.unwrap().unwrap();
+                            future::ready(())
+                        })
+                    )
+                } else {
+                    futures::future::Either::Right(future::ready(()))
                 }
-                future::ready(())
             });
             block_on(fut);
             Ok(())

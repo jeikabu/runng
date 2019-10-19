@@ -172,8 +172,10 @@ fn contexts() -> runng::Result<()> {
                 rep_recv_count.fetch_add(1, Ordering::Relaxed);
 
                 let msg = NngMsg::new().unwrap();
-                block_on(rep_ctx.reply(msg)).unwrap().unwrap();
-                future::ready(())
+                rep_ctx.reply(msg).then(|res| {
+                    res.unwrap().unwrap();
+                    future::ready(())
+                })
             });
         block_on(fut);
         Ok(())
