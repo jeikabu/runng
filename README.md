@@ -12,7 +12,7 @@ Rust [NNG (Nanomsg-Next-Generation)](https://github.com/nanomsg/nng):
 
 ||||
 |-|-|-
-| __runng-sys__ | [![runng-sys crate](https://img.shields.io/crates/v/runng-sys.svg)](https://crates.io/crates/runng-sys) | bindings to native NNG library
+| __runng_sys__ | [![runng-sys crate](https://img.shields.io/crates/v/runng-sys.svg)](https://crates.io/crates/runng-sys) | bindings to native NNG library
 | __runng__ | [![runng crate](https://img.shields.io/crates/v/runng.svg)](https://crates.io/crates/runng) | high-level wrapper for NNG
 | __runng_thrift__ | [![runng-thrift crate](https://img.shields.io/crates/v/runng-thrift.svg)](https://crates.io/crates/runng-thrift) | NNG as [Apache Thrift](https://github.com/apache/thrift) transport
 
@@ -22,7 +22,7 @@ In `Cargo.toml`:
 ```toml
 runng = "0.1"
 # OR
-runng-sys = "1.1.1-rc"
+runng_sys = "1.1.1-rc"
 ```
 
 Requirements:

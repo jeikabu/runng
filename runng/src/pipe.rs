@@ -24,7 +24,7 @@ impl NngPipe {
     pub(crate) fn create(message: &NngMsg) -> Option<Self> {
         unsafe {
             let pipe = nng_msg_get_pipe(message.msg());
-            if (pipe.id as i32) < 0 {
+            if (nng_pipe_id(pipe) as i32) < 0 {
                 None
             } else {
                 Some(NngPipe { pipe })

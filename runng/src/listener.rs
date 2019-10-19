@@ -17,7 +17,7 @@ impl NngListener {
     /// See [nng_listener_create](https://nanomsg.github.io/nng/man/v1.1.0/nng_listener_create.3).
     pub(crate) fn create(socket: NngSocket, url: &str) -> NngResult<Self> {
         unsafe {
-            let mut listener = nng_listener { id: 0 };
+            let mut listener = nng_listener::default();
             let (_cstring, url) = to_cstr(url)?;
             NngFail::succeed(
                 nng_listener_create(&mut listener, socket.nng_socket(), url),

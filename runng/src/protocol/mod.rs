@@ -33,7 +33,7 @@ where
     O: Fn(&mut nng_socket) -> i32,
     S: Fn(NngSocket) -> T,
 {
-    let mut socket = nng_socket { id: 0 };
+    let mut socket = nng_socket::default();
     let res = open_func(&mut socket);
     NngFail::succeed_then(res, || {
         let socket = NngSocket::new(socket);
