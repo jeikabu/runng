@@ -1,6 +1,6 @@
 //! Return values and error handling
 
-use futures::sync::oneshot;
+use futures::channel::oneshot;
 use runng_sys::*;
 use std::convert::TryFrom;
 use std::{error, fmt, result};

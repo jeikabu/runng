@@ -1,4 +1,4 @@
-use crate::common::get_url;
+use crate::common::*;
 use runng::{
     factory::latest::ProtocolFactory,
     options::{GetOpts, NngOption},

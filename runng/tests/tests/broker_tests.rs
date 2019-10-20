@@ -1,14 +1,11 @@
 use crate::common::*;
 use failure::Error;
-use futures::future::Future;
 use log::debug;
 use runng::{
     asyncio::*,
-    msg::NngMsg,
     options::{NngOption, SetOpts},
     protocol::*,
     socket::*,
-    NngErrno,
 };
 use std::{
     sync::{
@@ -40,10 +37,10 @@ fn simple() -> Result<(), Error> {
         let mut broker_in = broker_in.create_async()?;
         let mut broker_out = broker_out.create_async()?;
         while !done.load(Ordering::Relaxed) {
-            match broker_in.receive().wait() {
+            match block_on(broker_in.receive()) {
                 Ok(Ok(mut msg)) => {
                     forwarded_count.fetch_add(1, Ordering::Relaxed);
-                    broker_out.send(msg).wait().unwrap();
+                    block_on(broker_out.send(msg)).unwrap();
                 }
                 Ok(Err(runng::Error::Errno(NngErrno::ETIMEDOUT))) => break,
                 Ok(Err(err)) => panic!(err),
@@ -60,7 +57,7 @@ fn simple() -> Result<(), Error> {
         let mut ctx = Push0::open()?.dial(&in_url)?.create_async()?;
         while !done.load(Ordering::Relaxed) {
             let msg = NngMsg::new()?;
-            ctx.send(msg).wait()??;
+            block_on(ctx.send(msg))??;
             send_count.fetch_add(1, Ordering::Relaxed);
             sleep_brief();
         }
@@ -74,7 +71,7 @@ fn simple() -> Result<(), Error> {
         ctx.socket_mut().set_ms(NngOption::RECVTIMEO, 100)?;
         let mut ctx = ctx.create_async()?;
         while !done.load(Ordering::Relaxed) {
-            match ctx.receive().wait() {
+            match block_on(ctx.receive()) {
                 Ok(Ok(mut msg)) => {
                     recv_count.fetch_add(1, Ordering::Relaxed);
                 }

@@ -1,5 +1,4 @@
-use crate::common::init_logging;
-use futures::future::Future;
+use crate::common::*;
 use log::debug;
 use rand::Rng;
 use runng::{
@@ -28,8 +27,8 @@ fn stream() -> runng::Result<()> {
     let accept_future = listener.accept(&mut listener_aio);
     let dial_future = dialer.dial(&mut dialer_aio);
 
-    accept_future.wait()??;
-    dial_future.wait()??;
+    block_on(accept_future)??;
+    block_on(dial_future)??;
 
     Ok(())
 }
@@ -44,19 +43,18 @@ fn iov() -> runng::Result<()> {
     let accept_future = listener.accept(&mut listener_aio);
     let dial_future = dialer.dial(&mut dialer_aio);
 
-    let mut listen_stream = accept_future.wait()??;
-    let mut dial_stream = dial_future.wait()??;
+    let mut listen_stream = block_on(accept_future)??;
+    let mut dial_stream = block_on(dial_future)??;
     let mut original = vec![vec!(0u8, 128); 4];
     for iovx in original.iter_mut() {
         rand::thread_rng().fill(iovx.as_mut_slice());
     }
     let original = original;
 
-    dial_stream
-        .send(&mut dialer_aio, original.clone())
-        .wait()??;
+    let fut = dial_stream.send(&mut dialer_aio, original.clone());
+    block_on(fut)??;
     let iov = vec![vec!(0u8, 128); 4];
-    let iov = listen_stream.recv(&mut listener_aio, iov).wait()??;
+    let iov = block_on(listen_stream.recv(&mut listener_aio, iov))??;
     assert_eq!(iov, original);
 
     Ok(())

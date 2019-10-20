@@ -1,9 +1,7 @@
 //! Async request/reply
 
 use super::*;
-use crate::{ctx::NngCtx, msg::NngMsg, *};
-use futures::sync::oneshot;
-use runng_sys::*;
+use crate::ctx::NngCtx;
 use std::sync::Mutex;
 
 #[derive(Debug, PartialEq)]
@@ -97,20 +95,20 @@ impl AsyncContext for ReplyAsyncHandle {
 pub trait ReplyAsync {
     // FIXME: Can change this to -> impl Future later?
     /// Asynchronously receive a request.
-    fn receive(&mut self) -> Box<dyn Future<Item = Result<NngMsg>, Error = oneshot::Canceled>>;
+    fn receive(&mut self) -> AsyncMsg;
     /// Asynchronously reply to previously received request.
     fn reply(&mut self, msg: NngMsg) -> oneshot::Receiver<Result<()>>;
 }
 
 impl ReplyAsync for ReplyAsyncHandle {
-    fn receive(&mut self) -> Box<dyn Future<Item = Result<NngMsg>, Error = oneshot::Canceled>> {
+    fn receive(&mut self) -> AsyncMsg {
         let mut queue = self.aio_arg.queue.lock().unwrap();
         if let Some(item) = queue.ready.pop_front() {
-            Box::new(future::ok(item))
+            Box::pin(future::ok(item))
         } else {
             let (sender, receiver) = oneshot::channel();
             queue.waiting.push_back(sender);
-            Box::new(receiver)
+            Box::pin(receiver)
         }
     }
 

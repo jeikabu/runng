@@ -17,8 +17,8 @@ mod tests {
     mod stats_tests;
     mod stream_tests;
 
-    use crate::common::get_url;
-    use futures::{future, future::Future, Stream};
+    use crate::common::*;
+    use futures::{executor::block_on, future, future::Future, Stream};
     use runng::{asyncio::*, factory::latest::ProtocolFactory, protocol::*, *};
     use std::{thread, time::Duration};
 
@@ -77,24 +77,24 @@ mod tests {
             let topic: Vec<u8> = vec![0; 4];
             sub_ctx.subscribe(topic.as_slice())?;
 
-            sub_ctx
+            let fut = sub_ctx
                 .receive()
                 .unwrap()
                 // Process until receive stop message
                 .take_while(|res| {
                     const SIZE_OF_TOPIC: usize = std::mem::size_of::<u32>();
-                    match res {
-                        Ok(msg) => future::ok(msg.len() - SIZE_OF_TOPIC > 0),
-                        Err(_) => future::ok(false),
-                    }
+                    let is_taking = match res {
+                        Ok(msg) => msg.len() - SIZE_OF_TOPIC > 0,
+                        Err(_) => false,
+                    };
+                    future::ready(is_taking)
                 })
                 // Increment count of received messages
                 .for_each(|_| {
                     //thread_count.fetch_add(1, Ordering::Relaxed);
-                    Ok(())
-                })
-                .wait()
-                .unwrap();
+                    future::ready(())
+                });
+            block_on(fut);
             Ok(())
         });
         let pub_thread = thread::spawn(move || -> runng::Result<()> {
@@ -107,14 +107,14 @@ mod tests {
 
             for _ in 0..num_msg_per_subscriber {
                 let msg = msg.dup()?;
-                pub_ctx.send(msg).wait().unwrap()?;
+                block_on(pub_ctx.send(msg)).unwrap()?;
                 thread::sleep(Duration::from_millis(25));
             }
 
             // Send stop message
             let mut msg = msg::NngMsg::new()?;
             msg.append_u32(0)?; // topic
-            pub_ctx.send(msg).wait().unwrap()?;
+            block_on(pub_ctx.send(msg)).unwrap()?;
             Ok(())
         });
 
@@ -140,18 +140,19 @@ mod tests {
         thread::spawn(move || -> runng::Result<()> {
             let mut broker_pull_ctx = broker_pull.create_async_stream(1)?;
             let mut broker_push_ctx = broker_push.create_async()?;
-            broker_pull_ctx
-                .receive()
-                .unwrap()
-                .for_each(|msg| {
-                    if let Ok(msg) = msg {
-                        broker_push_ctx.send(msg).wait().unwrap().unwrap();
-                    }
-                    Ok(())
-                })
-                .wait()
-                .unwrap();
-
+            let fut = broker_pull_ctx.receive().unwrap().for_each(|msg| {
+                if let Ok(msg) = msg {
+                    futures::future::Either::Left(
+                        broker_push_ctx.send(msg).then(|res| {
+                            res.unwrap().unwrap();
+                            future::ready(())
+                        })
+                    )
+                } else {
+                    futures::future::Either::Right(future::ready(()))
+                }
+            });
+            block_on(fut);
             Ok(())
         });
 
@@ -164,23 +165,23 @@ mod tests {
 
             let topic: Vec<u8> = vec![0; 4];
             sub_ctx.subscribe(topic.as_slice())?;
-            sub_ctx
+            let fut = sub_ctx
                 .receive()
                 .unwrap()
                 // Process until receive stop message
                 .take_while(|res| {
                     const SIZE_OF_TOPIC: usize = std::mem::size_of::<u32>();
-                    match res {
-                        Ok(msg) => future::ok(msg.len() - SIZE_OF_TOPIC > 0),
-                        Err(_) => future::ok(false),
-                    }
+                    let is_taking = match res {
+                        Ok(msg) => msg.len() - SIZE_OF_TOPIC > 0,
+                        Err(_) => false,
+                    };
+                    future::ready(is_taking)
                 })
                 .for_each(|_| {
                     //thread_count.fetch_add(1, Ordering::Relaxed);
-                    Ok(())
-                })
-                .wait()
-                .unwrap();
+                    future::ready(())
+                });
+            block_on(fut);
             Ok(())
         });
 
@@ -193,13 +194,13 @@ mod tests {
                 let mut msg = msg::NngMsg::new()?;
                 msg.append_u32(0)?; // topic
                 msg.append_u32(1)?;
-                pub_ctx.send(msg).wait().unwrap()?;
+                block_on(pub_ctx.send(msg)).unwrap()?;
                 thread::sleep(Duration::from_millis(200));
             }
             // Send stop message
             let mut msg = msg::NngMsg::new()?;
             msg.append_u32(0)?; // topic
-            pub_ctx.send(msg).wait().unwrap()?;
+            block_on(pub_ctx.send(msg)).unwrap()?;
 
             Ok(())
         });
@@ -208,5 +209,4 @@ mod tests {
 
         Ok(())
     }
-
 }

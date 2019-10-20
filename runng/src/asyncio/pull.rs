@@ -1,8 +1,6 @@
 //! Async read.
 
 use super::*;
-use crate::{msg::NngMsg, *};
-use runng_sys::*;
 use std::sync::Mutex;
 
 #[derive(Debug)]

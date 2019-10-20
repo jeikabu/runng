@@ -77,5 +77,4 @@ pub mod compat {
             protocol::Pair0::open()
         }
     }
-
 }

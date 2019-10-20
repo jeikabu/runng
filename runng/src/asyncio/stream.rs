@@ -1,10 +1,8 @@
 //! Byte streams.
 
-use crate::{asyncio::*, *};
-use futures::sync::oneshot;
+use super::*;
 use log::trace;
 use runng_derive::{NngGetOpts, NngSetOpts};
-use runng_sys::*;
 use std::ptr;
 
 /// Byte stream corresponding to TCP, UNIX domain socket, named pipe, etc. connection.

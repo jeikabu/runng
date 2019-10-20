@@ -1,7 +1,7 @@
 //#![cfg(feature = "pipes")]
 
-use crate::common::{get_url, sleep_fast};
-use runng::{factory::latest::ProtocolFactory, msg::NngMsg, pipe::*, socket::*};
+use crate::common::*;
+use runng::{factory::latest::ProtocolFactory, pipe::*, socket::*};
 use runng_sys::{nng_pipe, nng_pipe_ev, nng_pipe_ev::*};
 use std::sync::atomic::{AtomicUsize, Ordering};
 

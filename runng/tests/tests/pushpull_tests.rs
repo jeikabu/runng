@@ -1,15 +1,11 @@
 use crate::common::*;
-use futures::{future::Future, Stream};
 use log::debug;
 use rand::RngCore;
 use runng::{
     asyncio::*,
     factory::latest::ProtocolFactory,
-    msg::NngMsg,
     options::{NngOption, SetOpts},
-    protocol,
     socket::*,
-    NngErrno,
 };
 use std::{
     sync::{
@@ -59,11 +55,11 @@ fn pull_stream() -> runng::Result<()> {
             let mut msg = NngMsg::new()?;
             msg.append_u32(count)?;
             count += 1;
-            push_ctx.send(msg).wait().unwrap()?;
+            block_on(push_ctx.send(msg)).unwrap()?;
             sleep_brief();
         }
         // Send a stop message
-        push_ctx.send(create_stop_message()).wait().unwrap()?;
+        block_on(push_ctx.send(create_stop_message())).unwrap()?;
         Ok(())
     });
 
@@ -74,7 +70,7 @@ fn pull_stream() -> runng::Result<()> {
         let mut pull_ctx = puller.create_async_stream(1)?;
         let (puller_ready, recv_count) = pull_vars;
         puller_ready.store(true, Ordering::Relaxed);
-        pull_ctx
+        let fut = pull_ctx
             .receive()
             .unwrap()
             // Process until receive stop message
@@ -82,9 +78,9 @@ fn pull_stream() -> runng::Result<()> {
             // Increment count of received messages
             .for_each(|_| {
                 recv_count.fetch_add(1, Ordering::Relaxed);
-                Ok(())
-            })
-            .wait()?;
+                future::ready(())
+            });
+        block_on(fut);
         Ok(())
     });
 
@@ -124,11 +120,11 @@ fn read() -> runng::Result<()> {
             let mut msg = NngMsg::new()?;
             msg.append_u32(count)?;
             count += 1;
-            push_ctx.send(msg).wait().unwrap()?;
+            block_on(push_ctx.send(msg)).unwrap()?;
             sleep_brief();
         }
         // Send a stop message
-        push_ctx.send(create_stop_message()).wait().unwrap()?;
+        block_on(push_ctx.send(create_stop_message())).unwrap()?;
         Ok(())
     });
 
@@ -140,7 +136,7 @@ fn read() -> runng::Result<()> {
         let mut read_ctx = puller.create_async()?;
         puller_ready.store(true, Ordering::Relaxed);
         while !done.load(Ordering::Relaxed) {
-            let msg = read_ctx.receive().wait()??;
+            let msg = block_on(read_ctx.receive())??;
             if msg.is_empty() {
                 break;
             } else {

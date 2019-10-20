@@ -1,7 +1,6 @@
 //! Async bus
 
-use crate::{asyncio::*, msg::NngMsg, *};
-use futures::sync::oneshot;
+use super::*;
 
 /// Async pair context for pair protocol.
 #[derive(Debug)]

@@ -1,8 +1,7 @@
 //! Async push/pull ("pipeline")
 
-use crate::{asyncio::*, msg::NngMsg, protocol::*, *};
-use futures::sync::mpsc;
-use runng_sys::*;
+use super::*;
+use crate::protocol::*;
 
 #[derive(Debug, PartialEq)]
 enum PullState {

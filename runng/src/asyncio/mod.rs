@@ -27,7 +27,13 @@ pub use self::simple::*;
 pub use self::stream::*;
 
 use crate::{msg::NngMsg, *};
-use futures::{future, future::Future, sync::mpsc, sync::oneshot, Sink};
+use futures::{
+    channel::{mpsc, oneshot},
+    future,
+    future::Future,
+    sink::SinkExt,
+    Sink,
+};
 use log::debug;
 use runng_sys::*;
 use std::collections::VecDeque;
@@ -90,14 +96,16 @@ fn try_signal_complete(sender: &mut mpsc::Sender<Result<NngMsg>>, message: Resul
         if err.is_disconnected() {
             let message = err.into_inner();
             debug!("mpsc::disconnected {:?}", message);
-            sender.close().unwrap();
+            //FIXME: replace this.  Function should return future?
+            futures::executor::block_on(sender.close());
         } else {
             debug!("mpsc::send failed {}", err);
         }
     }
 }
 
-pub type AsyncMsg = Box<dyn Future<Item = Result<NngMsg>, Error = oneshot::Canceled>>;
+pub type AsyncMsg =
+    std::pin::Pin<Box<dyn Future<Output = std::result::Result<Result<NngMsg>, oneshot::Canceled>>>>;
 
 #[derive(Debug, Default)]
 struct WorkQueue {
@@ -119,20 +127,17 @@ impl WorkQueue {
     fn pop_front(&mut self) -> AsyncMsg {
         // If a value is ready return it immediately.  Otherwise
         if let Some(item) = self.ready.pop_front() {
-            Box::new(future::ok(item))
+            Box::pin(future::ok(item))
         } else {
             let (sender, receiver) = oneshot::channel();
             self.waiting.push_back(sender);
-            Box::new(receiver)
+            Box::pin(receiver)
         }
     }
 }
 
-trait NngSink: Sink<SinkItem = Result<NngMsg>, SinkError = mpsc::SendError<Result<NngMsg>>> {}
-impl<T: Sink<SinkItem = Result<NngMsg>, SinkError = mpsc::SendError<Result<NngMsg>>>> NngSink
-    for T
-{
-}
+trait NngSink: Sink<Result<NngMsg>, Error = mpsc::SendError> {}
+impl<T: Sink<Result<NngMsg>, Error = mpsc::SendError>> NngSink for T {}
 
 /// Represents asynchronous I/O operation performed by NngAio handle.
 /// All methods will be called from native threads, impls must be thread-safe.
