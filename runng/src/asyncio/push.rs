@@ -19,7 +19,7 @@ struct PushContextAioArg {
 
 impl PushContextAioArg {
     pub fn new(socket: NngSocket) -> Result<AioArg<Self>> {
-        NngAio::new(
+        NngAio::create(
             |aio| Self {
                 aio,
                 state: PushState::Ready,

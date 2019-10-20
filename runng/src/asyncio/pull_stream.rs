@@ -19,7 +19,7 @@ struct PullContextAioArg {
 
 impl PullContextAioArg {
     pub fn new(socket: NngSocket, sender: mpsc::Sender<Result<NngMsg>>) -> Result<AioArg<Self>> {
-        NngAio::new(
+        NngAio::create(
             |aio| Self {
                 aio,
                 state: PullState::Ready,

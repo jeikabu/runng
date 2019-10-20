@@ -23,7 +23,7 @@ struct RequestContextAioArg {
 impl RequestContextAioArg {
     pub fn new(socket: NngSocket) -> Result<AioArg<Self>> {
         let ctx = NngCtx::new(socket.clone())?;
-        NngAio::new(
+        NngAio::create(
             |aio| Self {
                 aio,
                 ctx,

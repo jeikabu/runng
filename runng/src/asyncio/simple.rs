@@ -69,24 +69,25 @@ impl AioQueue {
     }
 
     pub fn new() -> Result<AioArg<AioQueue>> {
-        NngAio::new(Self::new_with_aio, native_callback)
+        NngAio::create(Self::new_with_aio, native_callback)
     }
 
     fn callback(&mut self) {
         let mut shared = self.shared.lock().unwrap();
         let front = shared.queue.pop_front();
-        if shared.state == State::Idle || front.is_none() {
-            let res = unsafe { nng_int_to_result(nng_aio_result(self.aio.nng_aio())) };
-            debug!("Unexpected callback: {:?}", res);
-        } else {
-            let mut front = front.unwrap();
-            front.finish(self.aio());
-            if let Some(next) = shared.queue.front() {
-                next.begin(self.aio());
-            } else {
-                shared.state = State::Idle;
+        if shared.state != State::Idle {
+            if let Some(mut front) = front {
+                front.finish(self.aio());
+                if let Some(next) = shared.queue.front() {
+                    next.begin(self.aio());
+                } else {
+                    shared.state = State::Idle;
+                }
+                return;
             }
         }
+        let res = unsafe { nng_int_to_result(nng_aio_result(self.aio.nng_aio())) };
+        debug!("Unexpected callback: {:?}", res);
     }
 }
 

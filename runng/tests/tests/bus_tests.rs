@@ -1,18 +1,16 @@
 use crate::common::*;
-use futures::channel::oneshot;
 use log::{debug, trace};
 use runng::{
     asyncio::*,
-    factory::latest::ProtocolFactory,
     options::{NngOption, SetOpts},
     socket::*,
 };
 use std::{
     sync::{
-        atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc,
     },
-    thread, time,
+    thread,
 };
 
 fn wait_load(atomic: &Arc<AtomicUsize>, value: usize, done: &Arc<AtomicBool>) {

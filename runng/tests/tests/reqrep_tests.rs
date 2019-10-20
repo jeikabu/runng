@@ -1,5 +1,4 @@
 use crate::common::*;
-use log::info;
 use rand::Rng;
 use runng::{asyncio::*, factory::latest::ProtocolFactory, mem, socket, socket::*, Error};
 use std::{
@@ -118,7 +117,7 @@ fn nonblock() -> runng::Result<()> {
         //rand::thread_rng().fill(data.as_mut_slice());
         send_loop(&req, msg);
         let request = receive_loop(&rep);
-        req.recvmsg_flags(socket::Flags::NONBLOCK);
+        req.recvmsg_flags(socket::Flags::NONBLOCK)?;
         send_loop(&rep, request);
         let _reply = receive_loop(&req);
         //assert_eq!(data, reply);
@@ -138,10 +137,10 @@ fn blocking() -> runng::Result<()> {
     for _ in 0..10 {
         let mut msg = vec![0u8; 128];
         rand::thread_rng().fill(msg.as_mut_slice());
-        req.send(&mut msg)?;
+        req.send(&msg)?;
 
         let mut buffer = vec![0u8; 1024];
-        let mut request = rep.recv(buffer.as_mut_slice())?;
+        let request = rep.recv(buffer.as_mut_slice())?;
         rep.send(request)?;
         let mut reply = vec![0u8; 1024];
         let reply = req.recv(reply.as_mut_slice())?;

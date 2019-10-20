@@ -13,7 +13,7 @@ struct PullAioArg {
 impl PullAioArg {
     pub fn new(socket: NngSocket) -> Result<AioArg<Self>> {
         let queue = Mutex::new(WorkQueue::default());
-        let context = NngAio::new(|aio| Self { aio, queue, socket }, read_callback)?;
+        let context = NngAio::create(|aio| Self { aio, queue, socket }, read_callback)?;
         context.receive();
         Ok(context)
     }
@@ -70,7 +70,7 @@ impl SubAioArg {
     pub fn new(socket: NngSocket) -> Result<AioArg<Self>> {
         let ctx = NngCtx::new(socket.clone())?;
         let queue = Mutex::new(WorkQueue::default());
-        let context = NngAio::new(
+        let context = NngAio::create(
             |aio| Self {
                 aio,
                 ctx,

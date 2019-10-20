@@ -1,11 +1,12 @@
 #!/usr/bin/env pwsh
 
 if ($IsWindows) {
-    cargo test
 } elseif ($IsMacOS) {
     $env:PATH += [IO.Path]::PathSeparator + "$env:HOME/.cargo/bin"
-    cargo test
 } else {
-    cargo test
 }
 
+cargo fmt --all -- --check
+cargo clippy
+$env:RUST_BACKTRACE = 1
+cargo test

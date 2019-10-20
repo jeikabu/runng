@@ -26,7 +26,7 @@ impl ReplyContextAioArg {
     pub fn new(socket: NngSocket) -> Result<AioArg<Self>> {
         let ctx = NngCtx::new(socket.clone())?;
         let queue = Mutex::new(WorkQueue::default());
-        let mut context = NngAio::new(
+        let mut context = NngAio::create(
             |aio| Self {
                 aio,
                 ctx,

@@ -1,6 +1,5 @@
 use crate::common::*;
 use failure::Error;
-use log::debug;
 use runng::{
     asyncio::*,
     options::{NngOption, SetOpts},
@@ -38,13 +37,12 @@ fn simple() -> Result<(), Error> {
         let mut broker_out = broker_out.create_async()?;
         while !done.load(Ordering::Relaxed) {
             match block_on(broker_in.receive()) {
-                Ok(mut msg) => {
+                Ok(msg) => {
                     forwarded_count.fetch_add(1, Ordering::Relaxed);
                     block_on(broker_out.send(msg)).unwrap();
                 }
                 Err(runng::Error::Errno(NngErrno::ETIMEDOUT)) => break,
                 Err(err) => panic!(err),
-                _ => panic!(),
             }
         }
 
@@ -72,12 +70,11 @@ fn simple() -> Result<(), Error> {
         let mut ctx = ctx.create_async()?;
         while !done.load(Ordering::Relaxed) {
             match block_on(ctx.receive()) {
-                Ok(mut msg) => {
+                Ok(mut _msg) => {
                     recv_count.fetch_add(1, Ordering::Relaxed);
                 }
                 Err(runng::Error::Errno(NngErrno::ETIMEDOUT)) => break,
                 Err(err) => panic!(err),
-                _ => panic!(),
             }
         }
         Ok(())

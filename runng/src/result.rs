@@ -20,17 +20,19 @@ pub type Result<T> = result::Result<T, Error>;
 /// {
 ///     input.map(runng::flatten_result)
 /// }
-/// 
+///
 /// let (_, receiver) = oneshot::channel();
 /// let receiver = flatten(receiver);
 /// ```
-pub fn flatten_result<T, E, F>(result: result::Result<result::Result<T, E>, F>) -> result::Result<T, E>
+pub fn flatten_result<T, E, F>(
+    result: result::Result<result::Result<T, E>, F>,
+) -> result::Result<T, E>
 where
-    E: std::convert::From<F>
+    E: std::convert::From<F>,
 {
     match result {
         Ok(result) => result,
-        Err(err) => Err(err.into())
+        Err(err) => Err(err.into()),
     }
 }
 
@@ -89,7 +91,7 @@ pub enum NngErrno {
 impl TryFrom<i32> for NngErrno {
     type Error = EnumFromIntError;
 
-    #[allow(clippy::cyclomatic_complexity)]
+    #[allow(clippy::cognitive_complexity)]
     fn try_from(value: i32) -> result::Result<Self, Self::Error> {
         match value {
             value if value == NngErrno::EINTR as i32 => Ok(NngErrno::EINTR),

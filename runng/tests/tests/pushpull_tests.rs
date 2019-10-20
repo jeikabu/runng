@@ -1,9 +1,6 @@
 use crate::common::*;
-use log::debug;
-use rand::RngCore;
 use runng::{
     asyncio::*,
-    factory::latest::ProtocolFactory,
     options::{NngOption, SetOpts},
     socket::*,
 };
@@ -13,7 +10,6 @@ use std::{
         Arc,
     },
     thread,
-    time::Duration,
 };
 
 fn create_pusher(url: &str) -> runng::Result<protocol::Push0> {
@@ -96,7 +92,6 @@ fn pull_stream() -> runng::Result<()> {
 #[test]
 fn read() -> runng::Result<()> {
     let url = get_url();
-    let factory = ProtocolFactory::default();
 
     let pusher = create_pusher(&url)?;
     let puller = create_puller(&url)?;

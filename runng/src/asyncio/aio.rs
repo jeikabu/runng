@@ -1,7 +1,6 @@
 //! Wrapper for `nng_aio`.
 
 use super::*;
-use log::debug;
 use std::{pin, ptr};
 
 /// Type which exposes an [`NngAio`](struct.NngAio.html).
@@ -34,7 +33,7 @@ pub type AioCallback = unsafe extern "C" fn(arg1: AioArgPtr);
 impl NngAio {
     /// Create an `nng_aio` for asynchronous I/O operations.
     /// See [nng_aio_alloc](https://nanomsg.github.io/nng/man/v1.1.0/nng_aio_alloc.3)
-    pub fn new<T, F>(func: F, callback: AioCallback) -> Result<AioArg<T>>
+    pub fn create<T, F>(func: F, callback: AioCallback) -> Result<AioArg<T>>
     where
         T: Aio,
         F: FnOnce(NngAio) -> T,

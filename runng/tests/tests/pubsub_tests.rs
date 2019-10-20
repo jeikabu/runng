@@ -1,6 +1,5 @@
 use crate::common::*;
 use log::debug;
-use rand::RngCore;
 use runng::{
     asyncio::*,
     factory::latest::ProtocolFactory,
@@ -14,7 +13,6 @@ use std::{
         Arc,
     },
     thread,
-    time::Duration,
 };
 
 fn create_pub(url: &str) -> runng::Result<protocol::Pub0> {
@@ -105,13 +103,13 @@ fn bad_sub() -> runng::Result<()> {
         Ok(())
     });
 
-    let sub_vars = (done.clone());
+    let sub_vars = done.clone();
     let _bad_thread = thread::spawn(move || -> runng::Result<()> {
-        let (done) = sub_vars;
+        let done = sub_vars;
         while !done.load(Ordering::Relaxed) {
             let puller = factory.puller_open()?.dial(&url)?;
             let mut read_ctx = puller.create_async()?;
-            let recv_future = read_ctx.receive();
+            let _recv_future = read_ctx.receive();
             rand_sleep(2, 16);
         }
         Ok(())
@@ -132,7 +130,6 @@ fn bad_sub() -> runng::Result<()> {
 #[test]
 fn contexts() -> runng::Result<()> {
     let url = get_url();
-    let factory = ProtocolFactory::default();
 
     let sub_ready = Arc::new(AtomicBool::default());
     let done = Arc::new(AtomicBool::default());

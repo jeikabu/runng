@@ -1,6 +1,6 @@
 use crate::common::*;
 use log::debug;
-use runng::{asyncio::*, factory::latest::ProtocolFactory, msg::NngMsg, protocol::*, socket::*};
+use runng::{asyncio::*, factory::latest::ProtocolFactory, msg::NngMsg, socket::*};
 use std::{
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -73,7 +73,7 @@ fn pushpull_timeout() -> runng::Result<()> {
                     future::err(())
                 }
             });
-            block_on(fut);
+            block_on(fut)?;
         }
         Ok(())
     });

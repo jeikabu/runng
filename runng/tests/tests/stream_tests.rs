@@ -1,11 +1,9 @@
 use crate::common::*;
-use log::debug;
 use rand::Rng;
 use runng::{
     asyncio::*,
     options::{GetOpts, NngOption},
 };
-use runng_sys::*;
 
 fn create_listener_dialer_tcp() -> runng::Result<(StreamListener, StreamDialer)> {
     let url = "tcp://localhost:0";

@@ -4,6 +4,7 @@ pub use futures::{
     future::{self, Either, Future},
 };
 pub use futures_util::{future::FutureExt, stream::StreamExt};
+pub use log::{debug, info};
 use rand::Rng;
 pub use runng::{asyncio, msg::NngMsg, protocol, NngErrno};
 use std::{

@@ -1,6 +1,4 @@
 use crate::common::*;
-use futures::{channel::oneshot, stream::Stream};
-use log::debug;
 use runng::{
     asyncio::*,
     factory::latest::ProtocolFactory,
@@ -13,23 +11,19 @@ use std::{
         Arc,
     },
     thread,
-    time::Duration,
 };
 
-fn forward(
-    ctx: &mut PairStreamHandle,
-    msg: runng::Result<NngMsg>,
-) -> AsyncUnit {
-    // Increment value.  If larger than some value send a stop message and return Err to stop for_each().  Otherwise forward it.
-    let mut msg = msg.unwrap();
-    let value = msg.trim_u32().unwrap() + 1;
-    if value > 100 {
-        ctx.send(create_stop_message())
-    } else {
-        msg.append_u32(value).unwrap();
-        ctx.send(msg)
-    }
-}
+// fn forward(ctx: &mut PairStreamHandle, msg: runng::Result<NngMsg>) -> AsyncUnit {
+//     // Increment value.  If larger than some value send a stop message and return Err to stop for_each().  Otherwise forward it.
+//     let mut msg = msg.unwrap();
+//     let value = msg.trim_u32().unwrap() + 1;
+//     if value > 100 {
+//         ctx.send(create_stop_message())
+//     } else {
+//         msg.append_u32(value).unwrap();
+//         ctx.send(msg)
+//     }
+// }
 
 #[test]
 fn pair() -> runng::Result<()> {
@@ -71,15 +65,17 @@ fn pair1_poly() -> runng::Result<()> {
     b.socket_mut().set_ms(NngOption::RECVTIMEO, 100)?;
     b.socket_mut().set_ms(NngOption::SENDTIMEO, 100)?;
 
-    let puller_ready = Arc::new(AtomicBool::default());
+    let listener_ready = Arc::new(AtomicBool::default());
     let done = Arc::new(AtomicBool::default());
 
     let mut threads = vec![];
     {
         let url = url.clone();
+        let listener_ready = listener_ready.clone();
         let done = done.clone();
         let thread = thread::spawn(move || -> runng::Result<()> {
             let mut ctx = a.listen(&url)?.create_async()?;
+            listener_ready.store(true, Ordering::Relaxed);
             while !done.load(Ordering::Relaxed) {
                 match block_on(ctx.receive()) {
                     Ok(msg) => {
@@ -92,7 +88,6 @@ fn pair1_poly() -> runng::Result<()> {
                     }
                     Err(runng::Error::Errno(NngErrno::ETIMEDOUT)) => break,
                     Err(err) => panic!(err),
-                    _ => break,
                 }
             }
             Ok(())
@@ -100,8 +95,9 @@ fn pair1_poly() -> runng::Result<()> {
         threads.push(thread);
     }
 
-    // Let listener start
-    thread::sleep(Duration::from_millis(50));
+    while !listener_ready.load(Ordering::Relaxed) && !done.load(Ordering::Relaxed) {
+        sleep_fast();
+    }
 
     const NUM_DIALERS: u32 = 2;
     let count = Arc::new(AtomicUsize::new(0));
@@ -154,7 +150,6 @@ fn pair1_poly() -> runng::Result<()> {
     assert!(count.load(Ordering::Relaxed) > NUM_DIALERS as usize);
     Ok(())
 }
-
 
 #[test]
 fn pair_stream() -> runng::Result<()> {

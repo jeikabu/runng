@@ -25,7 +25,7 @@ impl ReplyContextAioArg {
         request_sender: mpsc::Sender<Result<NngMsg>>,
     ) -> Result<AioArg<Self>> {
         let ctx = NngCtx::new(socket)?;
-        NngAio::new(
+        NngAio::create(
             |aio| Self {
                 aio,
                 ctx,

@@ -22,6 +22,7 @@ pub fn derive_nng_msg(_tokens: TokenStream) -> TokenStream {
     _derive_nng_msg()
 }
 
+#[allow(clippy::single_match)]
 fn get_nng_member(ast: &syn::DeriveInput) -> Option<syn::Ident> {
     match ast.data {
         syn::Data::Struct(ref data_struct) => {

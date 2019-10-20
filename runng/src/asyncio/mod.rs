@@ -30,7 +30,6 @@ use crate::{msg::NngMsg, *};
 use futures::{
     channel::{mpsc, oneshot},
     future,
-    future::Future,
     sink::SinkExt,
     Sink,
 };
@@ -98,7 +97,7 @@ fn try_signal_complete(sender: &mut mpsc::Sender<Result<NngMsg>>, message: Resul
             let message = err.into_inner();
             debug!("mpsc::disconnected {:?}", message);
             //FIXME: replace this.  Function should return future?
-            futures::executor::block_on(sender.close());
+            futures::executor::block_on(sender.close()).unwrap();
         } else {
             debug!("mpsc::send failed {}", err);
         }

@@ -19,6 +19,7 @@ pub struct NngStream {
 /// https://github.com/jeikabu/runng/issues/47
 pub type IoVec = Vec<Vec<u8>>;
 
+#[allow(clippy::ptr_arg)]
 fn as_iov(vec: &IoVec) -> Vec<nng_iov> {
     let mut iovs = Vec::new();
     for buffer in vec.iter() {
@@ -94,8 +95,8 @@ impl AioWork for SendAioWork {
                 Ok(()) => Ok(aio.aio_count()),
                 Err(err) => Err(err),
             };
-            if let Err(_) = self.2.take().unwrap().send(res) {
-                debug!("Finish failed");
+            if let Err(err) = self.2.take().unwrap().send(res) {
+                debug!("Finish failed: {:?}", err);
             }
         }
     }
@@ -121,8 +122,8 @@ impl AioWork for RecvAioWork {
             let res = aio.result();
             trace!("Receive: {:?}", res);
             let res = res.map(|_| self.1.to_owned());
-            if let Err(_) = self.2.take().unwrap().send(res) {
-                debug!("Finish failed");
+            if let Err(err) = self.2.take().unwrap().send(res) {
+                debug!("Finish failed: {:?}", err);
             }
         }
     }
@@ -150,7 +151,7 @@ impl StreamListener {
     }
 
     /// Allocate byte stream listener.
-    pub fn alloc_url(url: nng_url) -> Result<Self> {
+    pub fn alloc_url(_url: nng_url) -> Result<Self> {
         unimplemented!()
     }
 
@@ -215,8 +216,8 @@ impl AioWork for AcceptAioWork {
                 }
                 Err(err) => Err(err),
             };
-            if let Err(_) = self.1.take().unwrap().send(res) {
-                debug!("Finish failed");
+            if let Err(err) = self.1.take().unwrap().send(res) {
+                debug!("Finish failed: {:?}", err);
             }
         }
     }
@@ -242,7 +243,7 @@ impl StreamDialer {
         res.map(|_| Self { dialer })
     }
 
-    pub fn alloc_url(url: nng_url) -> Result<Self> {
+    pub fn alloc_url(_url: nng_url) -> Result<Self> {
         unimplemented!()
     }
 
@@ -294,8 +295,8 @@ impl AioWork for DialAioWork {
                 }
                 Err(err) => Err(err),
             };
-            if let Err(_) = self.1.take().unwrap().send(res) {
-                debug!("Finish failed");
+            if let Err(err) = self.1.take().unwrap().send(res) {
+                debug!("Finish failed: {:?}", err);
             }
         }
     }

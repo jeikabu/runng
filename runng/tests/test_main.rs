@@ -18,7 +18,7 @@ mod tests {
     mod stream_tests;
 
     use crate::common::*;
-    use futures::{executor::block_on, future, future::Future, Stream};
+    use futures::{executor::block_on, future};
     use runng::{asyncio::*, factory::latest::ProtocolFactory, protocol::*, *};
     use std::{thread, time::Duration};
 
@@ -142,12 +142,10 @@ mod tests {
             let mut broker_push_ctx = broker_push.create_async()?;
             let fut = broker_pull_ctx.receive().unwrap().for_each(|msg| {
                 if let Ok(msg) = msg {
-                    futures::future::Either::Left(
-                        broker_push_ctx.send(msg).then(|res| {
-                            res.unwrap();
-                            future::ready(())
-                        })
-                    )
+                    futures::future::Either::Left(broker_push_ctx.send(msg).then(|res| {
+                        res.unwrap();
+                        future::ready(())
+                    }))
                 } else {
                     futures::future::Either::Right(future::ready(()))
                 }
