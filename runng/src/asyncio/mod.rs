@@ -34,6 +34,7 @@ use futures::{
     sink::SinkExt,
     Sink,
 };
+use futures_util::future::FutureExt;
 use log::debug;
 use runng_sys::*;
 use std::collections::VecDeque;
@@ -104,8 +105,8 @@ fn try_signal_complete(sender: &mut mpsc::Sender<Result<NngMsg>>, message: Resul
     }
 }
 
-pub type AsyncMsg =
-    std::pin::Pin<Box<dyn Future<Output = std::result::Result<Result<NngMsg>, oneshot::Canceled>>>>;
+pub type AsyncMsg = future::BoxFuture<'static, Result<NngMsg>>;
+pub type AsyncUnit = future::BoxFuture<'static, Result<()>>;
 
 #[derive(Debug, Default)]
 struct WorkQueue {
@@ -127,10 +128,11 @@ impl WorkQueue {
     fn pop_front(&mut self) -> AsyncMsg {
         // If a value is ready return it immediately.  Otherwise
         if let Some(item) = self.ready.pop_front() {
-            Box::pin(future::ok(item))
+            Box::pin(future::ready(item))
         } else {
             let (sender, receiver) = oneshot::channel();
             self.waiting.push_back(sender);
+            let receiver = receiver.map(result::flatten_result);
             Box::pin(receiver)
         }
     }

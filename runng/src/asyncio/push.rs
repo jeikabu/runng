@@ -76,15 +76,15 @@ impl AsyncContext for PushAsyncHandle {
 /// Trait for asynchronous contexts that can send a message.
 pub trait AsyncPush {
     /// Asynchronously send a message.
-    fn send(&mut self, msg: NngMsg) -> oneshot::Receiver<Result<()>>;
+    fn send(&mut self, msg: NngMsg) -> AsyncUnit;
 }
 
 impl AsyncPush for PushAsyncHandle {
-    fn send(&mut self, msg: NngMsg) -> oneshot::Receiver<Result<()>> {
+    fn send(&mut self, msg: NngMsg) -> AsyncUnit {
         let (sender, receiver) = oneshot::channel::<Result<()>>();
         self.aio_arg.send(msg, sender);
 
-        receiver
+        Box::pin(receiver.map(result::flatten_result))
     }
 }
 

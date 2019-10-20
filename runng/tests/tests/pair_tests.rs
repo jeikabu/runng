@@ -19,7 +19,7 @@ use std::{
 fn forward(
     ctx: &mut PairStreamHandle,
     msg: runng::Result<NngMsg>,
-) -> oneshot::Receiver<runng::Result<()>> {
+) -> AsyncUnit {
     // Increment value.  If larger than some value send a stop message and return Err to stop for_each().  Otherwise forward it.
     let mut msg = msg.unwrap();
     let value = msg.trim_u32().unwrap() + 1;
@@ -41,12 +41,12 @@ fn pair() -> runng::Result<()> {
     let a_thread = thread::spawn(move || -> runng::Result<()> {
         let mut ctx = a.create_async()?;
         let msg = NngMsg::new()?;
-        block_on(ctx.send(msg))??;
+        block_on(ctx.send(msg))?;
         Ok(())
     });
     let b_thread = thread::spawn(move || -> runng::Result<()> {
         let mut ctx = b.create_async()?;
-        block_on(ctx.receive())??;
+        block_on(ctx.receive())?;
         Ok(())
     });
 
@@ -82,16 +82,16 @@ fn pair1_poly() -> runng::Result<()> {
             let mut ctx = a.listen(&url)?.create_async()?;
             while !done.load(Ordering::Relaxed) {
                 match block_on(ctx.receive()) {
-                    Ok(Ok(msg)) => {
+                    Ok(msg) => {
                         // Duplicate message so it has same content (sender will check for identifier)
                         let mut response = msg.dup().unwrap();
                         // Response message's pipe must be set to that of the received message
                         let pipe = msg.get_pipe().unwrap();
                         response.set_pipe(&pipe);
-                        block_on(ctx.send(response)).unwrap().unwrap();
+                        block_on(ctx.send(response)).unwrap();
                     }
-                    Ok(Err(runng::Error::Errno(NngErrno::ETIMEDOUT))) => break,
-                    Ok(Err(err)) => panic!(err),
+                    Err(runng::Error::Errno(NngErrno::ETIMEDOUT)) => break,
+                    Err(err) => panic!(err),
                     _ => break,
                 }
             }
@@ -117,14 +117,13 @@ fn pair1_poly() -> runng::Result<()> {
                 let mut msg = NngMsg::new()?;
                 msg.append_u32(i)?;
                 match block_on(ctx.send(msg)) {
-                    Ok(Ok(())) => {}
-                    Ok(Err(runng::Error::Errno(NngErrno::ETIMEDOUT))) => break,
-                    Ok(Err(err)) => panic!(err),
-                    Err(oneshot::Canceled) => panic!(),
+                    Ok(()) => {}
+                    Err(runng::Error::Errno(NngErrno::ETIMEDOUT)) => break,
+                    Err(err) => panic!(err),
                 }
 
                 match block_on(ctx.receive()) {
-                    Ok(Ok(mut msg)) => {
+                    Ok(mut msg) => {
                         let _reply = msg.trim_u32()?;
                         count.fetch_add(1, Ordering::Relaxed);
 
@@ -136,9 +135,8 @@ fn pair1_poly() -> runng::Result<()> {
                         //     Err(())
                         // }
                     }
-                    Ok(Err(runng::Error::Errno(NngErrno::ETIMEDOUT))) => break,
-                    Ok(Err(err)) => panic!(err),
-                    _ => break,
+                    Err(runng::Error::Errno(NngErrno::ETIMEDOUT)) => break,
+                    Err(err) => panic!(err),
                 }
             }
 

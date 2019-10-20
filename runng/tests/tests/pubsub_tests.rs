@@ -58,7 +58,7 @@ fn bad_sub() -> runng::Result<()> {
         while !done.load(Ordering::Relaxed) {
             let mut msg = NngMsg::new()?;
             msg.append_u32(count)?;
-            match block_on(push_ctx.send(msg)).unwrap() {
+            match block_on(push_ctx.send(msg)) {
                 // Only increment the count on success so if send fails we retry.
                 Ok(_) => count += 1,
                 // If get timeout just retry
@@ -84,7 +84,7 @@ fn bad_sub() -> runng::Result<()> {
         sub_ready.store(true, Ordering::Relaxed);
         while !done.load(Ordering::Relaxed) {
             match block_on(ctx.receive()) {
-                Ok(Ok(mut msg)) => {
+                Ok(mut msg) => {
                     let id = msg.trim_u32()?;
                     debug!("recv: {}", id);
                     if id != expect_msg_id {
@@ -98,7 +98,7 @@ fn bad_sub() -> runng::Result<()> {
                     recv_count.fetch_add(1, Ordering::Relaxed);
                 }
                 // If get read timeout loop back around and retry in case it was spurious
-                Ok(Err(runng::Error::Errno(NngErrno::ETIMEDOUT))) => debug!("Read timeout"),
+                Err(runng::Error::Errno(NngErrno::ETIMEDOUT)) => debug!("Read timeout"),
                 err => panic!("Unexpected: {:?}", err),
             }
         }
@@ -155,7 +155,7 @@ fn contexts() -> runng::Result<()> {
             let mut msg = NngMsg::new()?;
             msg.append_u16(count as u16 % 2)?; // Topic
             msg.append_u32(count)?;
-            match block_on(push_ctx.send(msg)).unwrap() {
+            match block_on(push_ctx.send(msg)) {
                 // Only increment the count on success so if send fails we retry.
                 Ok(_) => count += 1,
                 // If get timeout just retry
@@ -188,7 +188,7 @@ fn contexts() -> runng::Result<()> {
             sub_ready.store(true, Ordering::Relaxed);
             while !done.load(Ordering::Relaxed) {
                 match block_on(ctx.receive()) {
-                    Ok(Ok(mut msg)) => {
+                    Ok(mut msg) => {
                         let topic = msg.trim_u16()?;
                         let id = msg.trim_u32()?;
                         debug!("recv: {} {} {}", i, topic, id);
@@ -206,7 +206,7 @@ fn contexts() -> runng::Result<()> {
                         recv_count.fetch_add(1, Ordering::Relaxed);
                     }
                     // If get read timeout loop back around and retry in case it was spurious
-                    Ok(Err(runng::Error::Errno(NngErrno::ETIMEDOUT))) => debug!("Read timeout"),
+                    Err(runng::Error::Errno(NngErrno::ETIMEDOUT)) => debug!("Read timeout"),
                     err => panic!("Unexpected: {:?}", err),
                 }
             }

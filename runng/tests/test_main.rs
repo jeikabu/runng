@@ -107,14 +107,14 @@ mod tests {
 
             for _ in 0..num_msg_per_subscriber {
                 let msg = msg.dup()?;
-                block_on(pub_ctx.send(msg)).unwrap()?;
+                block_on(pub_ctx.send(msg))?;
                 thread::sleep(Duration::from_millis(25));
             }
 
             // Send stop message
             let mut msg = msg::NngMsg::new()?;
             msg.append_u32(0)?; // topic
-            block_on(pub_ctx.send(msg)).unwrap()?;
+            block_on(pub_ctx.send(msg))?;
             Ok(())
         });
 
@@ -144,7 +144,7 @@ mod tests {
                 if let Ok(msg) = msg {
                     futures::future::Either::Left(
                         broker_push_ctx.send(msg).then(|res| {
-                            res.unwrap().unwrap();
+                            res.unwrap();
                             future::ready(())
                         })
                     )
@@ -194,13 +194,13 @@ mod tests {
                 let mut msg = msg::NngMsg::new()?;
                 msg.append_u32(0)?; // topic
                 msg.append_u32(1)?;
-                block_on(pub_ctx.send(msg)).unwrap()?;
+                block_on(pub_ctx.send(msg))?;
                 thread::sleep(Duration::from_millis(200));
             }
             // Send stop message
             let mut msg = msg::NngMsg::new()?;
             msg.append_u32(0)?; // topic
-            block_on(pub_ctx.send(msg)).unwrap()?;
+            block_on(pub_ctx.send(msg))?;
 
             Ok(())
         });

@@ -34,6 +34,7 @@ fn simple_reqrep() -> Result<(), runng::Error> {
 Asynchronous I/O:
 ```rust
 use futures::{
+    executor::block_on,
     future::Future,
     stream::Stream,
 };
@@ -53,9 +54,9 @@ fn async_reqrep() -> Result<(), runng::Error> {
 
     let mut req_ctx = factory.requester_open()?.dial(&url)?.create_async()?;
     let req_future = req_ctx.send(NngMsg::new()?);
-    let _request = rep_ctx.receive().wait()?;
-    rep_ctx.reply(NngMsg::new()?).wait()??;
-    req_future.wait().unwrap()?;
+    let _request = block_on(rep_ctx.receive())?;
+    block_on(rep_ctx.reply(NngMsg::new()?))?;
+    block_on(req_future)?;
 
     Ok(())
 }

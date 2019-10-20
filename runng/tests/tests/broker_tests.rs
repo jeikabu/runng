@@ -38,12 +38,12 @@ fn simple() -> Result<(), Error> {
         let mut broker_out = broker_out.create_async()?;
         while !done.load(Ordering::Relaxed) {
             match block_on(broker_in.receive()) {
-                Ok(Ok(mut msg)) => {
+                Ok(mut msg) => {
                     forwarded_count.fetch_add(1, Ordering::Relaxed);
                     block_on(broker_out.send(msg)).unwrap();
                 }
-                Ok(Err(runng::Error::Errno(NngErrno::ETIMEDOUT))) => break,
-                Ok(Err(err)) => panic!(err),
+                Err(runng::Error::Errno(NngErrno::ETIMEDOUT)) => break,
+                Err(err) => panic!(err),
                 _ => panic!(),
             }
         }
@@ -57,7 +57,7 @@ fn simple() -> Result<(), Error> {
         let mut ctx = Push0::open()?.dial(&in_url)?.create_async()?;
         while !done.load(Ordering::Relaxed) {
             let msg = NngMsg::new()?;
-            block_on(ctx.send(msg))??;
+            block_on(ctx.send(msg))?;
             send_count.fetch_add(1, Ordering::Relaxed);
             sleep_brief();
         }
@@ -72,11 +72,11 @@ fn simple() -> Result<(), Error> {
         let mut ctx = ctx.create_async()?;
         while !done.load(Ordering::Relaxed) {
             match block_on(ctx.receive()) {
-                Ok(Ok(mut msg)) => {
+                Ok(mut msg) => {
                     recv_count.fetch_add(1, Ordering::Relaxed);
                 }
-                Ok(Err(runng::Error::Errno(NngErrno::ETIMEDOUT))) => break,
-                Ok(Err(err)) => panic!(err),
+                Err(runng::Error::Errno(NngErrno::ETIMEDOUT)) => break,
+                Err(err) => panic!(err),
                 _ => panic!(),
             }
         }

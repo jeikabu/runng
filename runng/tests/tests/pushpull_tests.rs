@@ -55,11 +55,11 @@ fn pull_stream() -> runng::Result<()> {
             let mut msg = NngMsg::new()?;
             msg.append_u32(count)?;
             count += 1;
-            block_on(push_ctx.send(msg)).unwrap()?;
+            block_on(push_ctx.send(msg))?;
             sleep_brief();
         }
         // Send a stop message
-        block_on(push_ctx.send(create_stop_message())).unwrap()?;
+        block_on(push_ctx.send(create_stop_message()))?;
         Ok(())
     });
 
@@ -120,11 +120,11 @@ fn read() -> runng::Result<()> {
             let mut msg = NngMsg::new()?;
             msg.append_u32(count)?;
             count += 1;
-            block_on(push_ctx.send(msg)).unwrap()?;
+            block_on(push_ctx.send(msg))?;
             sleep_brief();
         }
         // Send a stop message
-        block_on(push_ctx.send(create_stop_message())).unwrap()?;
+        block_on(push_ctx.send(create_stop_message()))?;
         Ok(())
     });
 
@@ -136,7 +136,7 @@ fn read() -> runng::Result<()> {
         let mut read_ctx = puller.create_async()?;
         puller_ready.store(true, Ordering::Relaxed);
         while !done.load(Ordering::Relaxed) {
-            let msg = block_on(read_ctx.receive())??;
+            let msg = block_on(read_ctx.receive())?;
             if msg.is_empty() {
                 break;
             } else {

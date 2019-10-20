@@ -104,10 +104,11 @@ impl ReplyAsync for ReplyAsyncHandle {
     fn receive(&mut self) -> AsyncMsg {
         let mut queue = self.aio_arg.queue.lock().unwrap();
         if let Some(item) = queue.ready.pop_front() {
-            Box::pin(future::ok(item))
+            Box::pin(future::ready(item))
         } else {
             let (sender, receiver) = oneshot::channel();
             queue.waiting.push_back(sender);
+            let receiver = receiver.map(result::flatten_result);
             Box::pin(receiver)
         }
     }

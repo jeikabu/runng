@@ -19,7 +19,7 @@ impl AsyncStreamContext for PairStreamHandle {
 }
 
 impl AsyncPush for PairStreamHandle {
-    fn send(&mut self, msg: NngMsg) -> oneshot::Receiver<Result<()>> {
+    fn send(&mut self, msg: NngMsg) -> AsyncUnit {
         self.push.send(msg)
     }
 }

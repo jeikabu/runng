@@ -156,20 +156,20 @@ fn create_peer_async(
                     break;
                 }
                 match block_on(ctx.receive()) {
-                    Ok(Ok(mut msg)) => {
+                    Ok(mut msg) => {
                         let recv_id = msg.trim_u32()?;
                         trace!("Recv {} {}", id, recv_id);
                         if recv_id + 2 >= id {
                             break;
                         }
                     }
-                    Ok(Err(runng::Error::Errno(NngErrno::ETIMEDOUT))) => debug!("Read timeout"),
+                    Err(runng::Error::Errno(NngErrno::ETIMEDOUT)) => debug!("Read timeout"),
                     err => panic!("Unexpected: {:?}", err),
                 }
             }
             let mut msg = NngMsg::new()?;
             msg.append_u32(id)?;
-            block_on(ctx.send(msg))??;
+            block_on(ctx.send(msg))?;
             trace!("Sent {} {}", url, id);
         }
 

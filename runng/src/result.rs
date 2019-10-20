@@ -7,6 +7,33 @@ use std::{error, fmt, result};
 
 pub type Result<T> = result::Result<T, Error>;
 
+/// Flattens nested results.
+/// Primary use case is with channels:
+/// ```
+/// use futures::channel::oneshot;
+/// use futures_util::future::FutureExt; // for map()
+///
+/// // Wrapper to explicity show the types
+/// fn flatten<T>(input: T) -> impl futures::Future<Output = runng::Result<runng::msg::NngMsg>>
+/// where
+///     T: futures::Future<Output = Result<runng::Result<runng::msg::NngMsg>, oneshot::Canceled>>,
+/// {
+///     input.map(runng::flatten_result)
+/// }
+/// 
+/// let (_, receiver) = oneshot::channel();
+/// let receiver = flatten(receiver);
+/// ```
+pub fn flatten_result<T, E, F>(result: result::Result<result::Result<T, E>, F>) -> result::Result<T, E>
+where
+    E: std::convert::From<F>
+{
+    match result {
+        Ok(result) => result,
+        Err(err) => Err(err.into())
+    }
+}
+
 /// Converts integers returned by NNG methods into `Result`.
 /// 0 is Ok() and anything else is Err()
 pub fn nng_int_to_result(value: i32) -> Result<()> {

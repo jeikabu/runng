@@ -19,7 +19,7 @@ impl AsyncContext for BusAsyncHandle {
 }
 
 impl AsyncPush for BusAsyncHandle {
-    fn send(&mut self, msg: NngMsg) -> oneshot::Receiver<Result<()>> {
+    fn send(&mut self, msg: NngMsg) -> AsyncUnit {
         self.push.send(msg)
     }
 }

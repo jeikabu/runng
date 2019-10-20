@@ -19,7 +19,7 @@ impl AsyncContext for PairAsyncHandle {
 }
 
 impl AsyncPush for PairAsyncHandle {
-    fn send(&mut self, msg: NngMsg) -> oneshot::Receiver<Result<()>> {
+    fn send(&mut self, msg: NngMsg) -> AsyncUnit {
         self.push.send(msg)
     }
 }

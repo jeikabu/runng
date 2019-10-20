@@ -36,7 +36,7 @@ fn pushpull_timeout() -> runng::Result<()> {
         while !done.load(Ordering::Relaxed) {
             let mut msg = NngMsg::new()?;
             msg.append_u32(count)?;
-            block_on(push_ctx.send(msg)).unwrap()?;
+            block_on(push_ctx.send(msg))?;
             count += 1;
             sleep_brief();
         }
@@ -58,7 +58,7 @@ fn pushpull_timeout() -> runng::Result<()> {
             let duration = Duration::from_millis(100);
             let fut = timeout(recv_fut, duration).then(|res| match res {
                 TimeoutResult::Ok(msg) => {
-                    let id = msg.unwrap().unwrap().trim_u32().unwrap();
+                    let id = msg.unwrap().trim_u32().unwrap();
                     let expect_id = recv_msg_id + 1;
                     if id != expect_id {
                         debug!("Lost a message!  Expected {}, got {}", expect_id, id);
