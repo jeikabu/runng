@@ -39,39 +39,14 @@ fn pair() -> runng::Result<()> {
     let b = factory.pair_open()?.dial(&url)?;
 
     let a_thread = thread::spawn(move || -> runng::Result<()> {
-        let mut ctx = a.create_async_stream(1)?;
-        // Send the first (0th) message
-        let mut msg = NngMsg::new()?;
-        msg.append_u32(0)?;
+        let mut ctx = a.create_async()?;
+        let msg = NngMsg::new()?;
         block_on(ctx.send(msg))??;
-        let stream_fut = ctx
-            .receive()
-            .unwrap()
-            .take_while(not_stop_message)
-            // Receive a message and send it to other pair
-            .for_each(|msg| {
-                forward(&mut ctx, msg).then(|res| {
-                    res.unwrap().unwrap();
-                    future::ready(())
-                })
-            });
-        block_on(stream_fut);
         Ok(())
     });
     let b_thread = thread::spawn(move || -> runng::Result<()> {
-        let mut ctx = b.create_async_stream(1)?;
-        let fut = ctx
-            .receive()
-            .unwrap()
-            .take_while(not_stop_message)
-            // Receive a message and send it to other pair
-            .for_each(|msg| {
-                forward(&mut ctx, msg).then(|res| {
-                    res.unwrap().unwrap();
-                    future::ready(())
-                })
-            });
-        block_on(fut);
+        let mut ctx = b.create_async()?;
+        block_on(ctx.receive())??;
         Ok(())
     });
 
@@ -80,7 +55,6 @@ fn pair() -> runng::Result<()> {
     Ok(())
 }
 
-//#[ignore]
 #[test]
 fn pair1_poly() -> runng::Result<()> {
     let url = get_url();
@@ -180,5 +154,11 @@ fn pair1_poly() -> runng::Result<()> {
         .into_iter()
         .for_each(|thread| thread.join().unwrap().unwrap());
     assert!(count.load(Ordering::Relaxed) > NUM_DIALERS as usize);
+    Ok(())
+}
+
+
+#[test]
+fn pair_stream() -> runng::Result<()> {
     Ok(())
 }
