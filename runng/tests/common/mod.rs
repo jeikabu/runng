@@ -4,7 +4,7 @@ pub use futures::{
     future::{self, Either, Future},
 };
 pub use futures_util::{future::FutureExt, stream::StreamExt};
-pub use log::{debug, info};
+pub use log::{debug, info, trace};
 use rand::Rng;
 pub use runng::{asyncio, msg::NngMsg, protocol, NngErrno};
 use std::{
@@ -14,7 +14,7 @@ use std::{
 };
 
 pub fn init_logging() {
-    Builder::from_env(Env::default().default_filter_or("debug"))
+    Builder::from_env(Env::default().default_filter_or("info"))
         .try_init()
         .unwrap_or_else(|err| println!("env_logger::init() failed: {}", err));
 }
@@ -38,16 +38,20 @@ pub fn not_stop_message(res: &runng::Result<NngMsg>) -> impl Future<Output = boo
     })
 }
 
+pub const DURATION_FAST: time::Duration = time::Duration::from_millis(10);
+pub const DURATION_BRIEF: time::Duration = time::Duration::from_millis(25);
+pub const DURATION_TEST: time::Duration = time::Duration::from_secs(1);
+
 pub fn sleep_fast() {
-    thread::sleep(time::Duration::from_millis(10));
+    thread::sleep(DURATION_FAST);
 }
 
 pub fn sleep_brief() {
-    thread::sleep(time::Duration::from_millis(25));
+    thread::sleep(DURATION_BRIEF);
 }
 
 pub fn sleep_test() {
-    thread::sleep(time::Duration::from_secs(1));
+    thread::sleep(DURATION_TEST);
 }
 
 pub fn rand_msg() -> runng::Result<NngMsg> {

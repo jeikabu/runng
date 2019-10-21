@@ -1,6 +1,6 @@
 use crate::common::*;
 use log::debug;
-use runng::{asyncio::*, factory::latest::ProtocolFactory, msg::NngMsg, socket::*};
+use runng::{asyncio::*, factory::compat::ProtocolFactory, msg::NngMsg, socket::*};
 use std::{
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -15,7 +15,7 @@ fn pushpull_timeout() -> runng::Result<()> {
     let url = get_url();
     let factory = ProtocolFactory::default();
 
-    let pusher = factory.pusher_open()?.listen(&url)?;
+    let pusher = factory.pair_open()?.listen(&url)?;
 
     let puller_ready = Arc::new(AtomicBool::default());
     let done = Arc::new(AtomicBool::default());
@@ -44,7 +44,7 @@ fn pushpull_timeout() -> runng::Result<()> {
     });
 
     // Puller
-    let puller = factory.puller_open()?.dial(&url)?;
+    let puller = factory.pair_open()?.dial(&url)?;
     let recv_count = Arc::new(AtomicUsize::new(0));
     let lost_count = Arc::new(AtomicUsize::new(0));
     let pull_vars = (done.clone(), recv_count.clone(), lost_count.clone());
@@ -53,8 +53,10 @@ fn pushpull_timeout() -> runng::Result<()> {
         let mut read_ctx = puller.create_async()?;
         let mut recv_msg_id = 0;
         puller_ready.store(true, Ordering::Relaxed);
+        let mut prev_recv: Option<AsyncMsg> = None;
         while !done.load(Ordering::Relaxed) {
-            let recv_fut = read_ctx.receive();
+            let recv_fut = prev_recv.unwrap_or(read_ctx.receive());
+
             let duration = Duration::from_millis(100);
             let fut = timeout(recv_fut, duration).then(|res| match res {
                 TimeoutResult::Ok(msg) => {
@@ -66,14 +68,14 @@ fn pushpull_timeout() -> runng::Result<()> {
                     }
                     recv_msg_id = id;
                     recv_count.fetch_add(1, Ordering::Relaxed);
-                    future::ok(())
+                    future::ready(None)
                 }
-                _ => {
+                TimeoutResult::Timeout(fut) => {
                     debug!("Error");
-                    future::err(())
+                    future::ready(Some(fut))
                 }
             });
-            block_on(fut)?;
+            prev_recv = block_on(fut);
         }
         Ok(())
     });

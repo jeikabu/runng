@@ -6,7 +6,7 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     },
-    thread,
+    thread, time,
 };
 
 #[test]
@@ -68,38 +68,38 @@ fn zerocopy() -> Result<(), failure::Error> {
     Ok(())
 }
 
-fn send_loop<T>(socket: &T, mut msg: NngMsg)
+type DummyMsg = u32;
+
+fn send_loop<T>(socket: &T, start: time::Instant)
 where
     T: socket::SendSocket,
 {
-    loop {
-        let res = socket.sendmsg_flags(msg, socket::Flags::NONBLOCK);
-        if let Err(senderror) = res {
-            if senderror.error == Error::Errno(NngErrno::EAGAIN) {
-                msg = senderror.into_inner();
-                sleep_fast();
-            } else {
-                panic!(senderror)
-            }
-        } else {
-            break;
-        }
-    }
-}
-
-fn receive_loop<T>(socket: &T) -> NngMsg
-where
-    T: socket::RecvSocket,
-{
-    loop {
-        let flags = socket::Flags::NONBLOCK;
-        let msg = socket.recvmsg_flags(flags);
-        match msg {
-            Ok(msg) => return msg,
+    let dummy_message: DummyMsg = 0;
+    while start.elapsed() < DURATION_TEST {
+        let res = socket.send_flags(&dummy_message.to_be_bytes(), socket::Flags::NONBLOCK);
+        match res {
+            Ok(_) => return,
             Err(Error::Errno(NngErrno::EAGAIN)) => sleep_fast(),
             Err(err) => panic!(err),
         }
     }
+    panic!("Timeout");
+}
+
+fn receive_loop<T>(socket: &T, start: time::Instant)
+where
+    T: socket::RecvSocket,
+{
+    while start.elapsed() < DURATION_TEST {
+        let mut buffer = [0u8; std::mem::size_of::<DummyMsg>()];
+        let recv = socket.recv_flags(&mut buffer, socket::Flags::NONBLOCK);
+        match recv {
+            Ok(_) => return,
+            Err(Error::Errno(NngErrno::EAGAIN)) => sleep_fast(),
+            Err(err) => panic!(err),
+        }
+    }
+    panic!("Timeout");
 }
 
 #[test]
@@ -110,19 +110,19 @@ fn nonblock() -> runng::Result<()> {
     let flags = socket::SocketFlags::NONBLOCK;
     let rep = factory.replier_open()?.listen_flags(&url, flags)?;
     let req = factory.requester_open()?.dial_flags(&url, flags)?;
-    std::thread::sleep(std::time::Duration::from_millis(50));
 
-    for _ in 0..10 {
-        let msg = NngMsg::new()?;
+    let start = time::Instant::now();
+    let mut count = 0;
+    while start.elapsed() < (DURATION_TEST / 2) {
         //rand::thread_rng().fill(data.as_mut_slice());
-        send_loop(&req, msg);
-        let request = receive_loop(&rep);
-        req.recvmsg_flags(socket::Flags::NONBLOCK)?;
-        send_loop(&rep, request);
-        let _reply = receive_loop(&req);
+        send_loop(&req, start);
+        receive_loop(&rep, start);
+        send_loop(&rep, start);
+        receive_loop(&req, start);
         //assert_eq!(data, reply);
+        count += 1;
     }
-
+    assert!(count > 1, "Received {}", count);
     Ok(())
 }
 
