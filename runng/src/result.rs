@@ -163,7 +163,7 @@ impl TryFrom<i32> for Error {
         } else if value & ESYSERR != 0 {
             Ok(Error::SysErr(value ^ ESYSERR))
         } else if value & ETRANERR != 0 {
-            Ok(Error::SysErr(value ^ ETRANERR))
+            Ok(Error::TranErr(value ^ ETRANERR))
         } else {
             Ok(Error::UnknownErrno(value))
         }
