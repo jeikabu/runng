@@ -10,7 +10,6 @@ use std::ptr;
 #[derive(Debug, NngGetOpts, NngSetOpts)]
 #[prefix = "nng_stream_"]
 pub struct NngStream {
-    #[nng_member]
     stream: *mut nng_stream,
 }
 
@@ -102,6 +101,13 @@ impl AioWork for SendAioWork {
     }
 }
 
+impl NngWrapper for NngStream {
+    type NngType = *mut nng_stream;
+    unsafe fn get_nng_type(&self) -> Self::NngType {
+        self.stream
+    }
+}
+
 struct RecvAioWork(
     *mut nng_stream,
     IoVec,
@@ -134,7 +140,6 @@ impl AioWork for RecvAioWork {
 #[derive(Debug, NngGetOpts, NngSetOpts)]
 #[prefix = "nng_stream_listener_"]
 pub struct StreamListener {
-    #[nng_member]
     listener: *mut nng_stream_listener,
 }
 
@@ -190,6 +195,13 @@ impl Drop for StreamListener {
     }
 }
 
+impl NngWrapper for StreamListener {
+    type NngType = *mut nng_stream_listener;
+    unsafe fn get_nng_type(&self) -> Self::NngType {
+        self.listener
+    }
+}
+
 struct AcceptAioWork(
     *mut nng_stream_listener,
     Option<oneshot::Sender<Result<NngStream>>>,
@@ -227,7 +239,6 @@ impl AioWork for AcceptAioWork {
 #[derive(Debug, NngGetOpts, NngSetOpts)]
 #[prefix = "nng_stream_dialer_"]
 pub struct StreamDialer {
-    #[nng_member]
     dialer: *mut nng_stream_dialer,
 }
 
@@ -268,6 +279,13 @@ impl Drop for StreamDialer {
     /// Close dialer and release resources.
     fn drop(&mut self) {
         unsafe { nng_stream_dialer_free(self.dialer) }
+    }
+}
+
+impl NngWrapper for StreamDialer {
+    type NngType = *mut nng_stream_dialer;
+    unsafe fn get_nng_type(&self) -> Self::NngType {
+        self.dialer
     }
 }
 

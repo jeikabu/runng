@@ -5,7 +5,8 @@ use crate::asyncio::*;
 use runng_sys::*;
 
 /// Half of pair pattern.  See [nng_pair](https://nanomsg.github.io/nng/man/v1.1.0/nng_pair.7).
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, NngGetOpts, NngSetOpts)]
+#[prefix = "nng_socket_"]
 pub struct Pair0 {
     socket: NngSocket,
 }
@@ -21,7 +22,7 @@ impl Pair0 {
     }
 }
 
-impl Socket for Pair0 {
+impl GetSocket for Pair0 {
     fn socket(&self) -> &NngSocket {
         &self.socket
     }
@@ -30,6 +31,7 @@ impl Socket for Pair0 {
     }
 }
 
+impl Socket for Pair0 {}
 impl Dial for Pair0 {}
 impl Listen for Pair0 {}
 impl SendSocket for Pair0 {}

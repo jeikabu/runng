@@ -8,7 +8,6 @@ use runng_sys::*;
 #[derive(Debug, NngGetOpts, NngSetOpts)]
 #[prefix = "nng_dialer_"]
 pub struct NngDialer {
-    #[nng_member]
     dialer: nng_dialer,
     socket: NngSocket,
 }
@@ -30,6 +29,13 @@ impl NngDialer {
     // be set before the dialer is started.
     pub fn start(&self) -> Result<()> {
         unsafe { nng_int_to_result(nng_dialer_start(self.dialer, 0)) }
+    }
+}
+
+impl NngWrapper for NngDialer {
+    type NngType = nng_dialer;
+    unsafe fn get_nng_type(&self) -> Self::NngType {
+        self.dialer
     }
 }
 

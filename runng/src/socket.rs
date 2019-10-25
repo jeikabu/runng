@@ -64,91 +64,16 @@ impl NngSocket {
     }
 }
 
-impl GetOpts for NngSocket {
-    fn get_bool(&self, option: NngOption) -> Result<bool> {
-        unsafe {
-            let mut value: bool = Default::default();
-            Error::zero_map(
-                nng_socket_get_bool(self.nng_socket(), option.as_cptr(), &mut value),
-                || value,
-            )
-        }
-    }
-    fn get_int(&self, option: NngOption) -> Result<i32> {
-        unsafe {
-            let mut value: i32 = Default::default();
-            Error::zero_map(
-                nng_socket_get_int(self.nng_socket(), option.as_cptr(), &mut value),
-                || value,
-            )
-        }
-    }
-    fn get_ms(&self, option: NngOption) -> Result<i32> {
-        unsafe {
-            let mut value: i32 = Default::default();
-            Error::zero_map(
-                nng_socket_get_ms(self.nng_socket(), option.as_cptr(), &mut value),
-                || value,
-            )
-        }
-    }
-    fn get_size(&self, option: NngOption) -> Result<usize> {
-        unsafe {
-            let mut value: usize = Default::default();
-            Error::zero_map(
-                nng_socket_get_size(self.nng_socket(), option.as_cptr(), &mut value),
-                || value,
-            )
-        }
-    }
-    fn get_uint64(&self, option: NngOption) -> Result<u64> {
-        unsafe {
-            let mut value: u64 = Default::default();
-            Error::zero_map(
-                nng_socket_get_uint64(self.nng_socket(), option.as_cptr(), &mut value),
-                || value,
-            )
-        }
-    }
-    fn get_string(&self, option: NngOption) -> Result<NngString> {
-        unsafe {
-            let mut value: *mut ::std::os::raw::c_char = std::ptr::null_mut();
-            let res = nng_socket_get_string(self.nng_socket(), option.as_cptr(), &mut value);
-            nng_int_to_result(res)?;
-            Ok(NngString::from_raw(value))
-        }
+impl<T> NngWrapper for T
+where T: Socket
+{
+    type NngType = nng_socket;
+    unsafe fn get_nng_type(&self) -> Self::NngType {
+        self.socket().nng_socket()
     }
 }
 
-impl SetOpts for NngSocket {
-    fn set_bool(&mut self, option: NngOption, value: bool) -> Result<&mut Self> {
-        let res = unsafe { nng_socket_set_bool(self.nng_socket(), option.as_cptr(), value) };
-        Error::zero_map(res, || self)
-    }
-    fn set_int(&mut self, option: NngOption, value: i32) -> Result<&mut Self> {
-        let res = unsafe { nng_socket_set_int(self.nng_socket(), option.as_cptr(), value) };
-        Error::zero_map(res, || self)
-    }
-    fn set_ms(&mut self, option: NngOption, value: nng_duration) -> Result<&mut Self> {
-        let res = unsafe { nng_socket_set_ms(self.nng_socket(), option.as_cptr(), value) };
-        Error::zero_map(res, || self)
-    }
-    fn set_size(&mut self, option: NngOption, value: usize) -> Result<&mut Self> {
-        let res = unsafe { nng_socket_set_size(self.nng_socket(), option.as_cptr(), value) };
-        Error::zero_map(res, || self)
-    }
-    fn set_uint64(&mut self, option: NngOption, value: u64) -> Result<&mut Self> {
-        let res = unsafe { nng_socket_set_uint64(self.nng_socket(), option.as_cptr(), value) };
-        Error::zero_map(res, || self)
-    }
-    fn set_string(&mut self, option: NngOption, value: &str) -> Result<&mut Self> {
-        let (_, value) = to_cstr(value)?;
-        let res = unsafe { nng_socket_set_string(self.nng_socket(), option.as_cptr(), value) };
-        Error::zero_map(res, || self)
-    }
-}
-
-impl Socket for NngSocket {
+impl GetSocket for NngSocket {
     fn socket(&self) -> &NngSocket {
         self
     }
@@ -157,6 +82,7 @@ impl Socket for NngSocket {
     }
 }
 
+impl Socket for NngSocket {}
 impl SendSocket for NngSocket {}
 impl RecvSocket for NngSocket {}
 
@@ -167,8 +93,8 @@ impl Clone for NngSocket {
     }
 }
 
-/// Type which exposes a [`NngSocket`](struct.NngSocket.html).
-pub trait Socket: Sized {
+/// Type which exposes an [`NngSocket`](struct.NngSocket.html).
+pub trait GetSocket {
     /// Obtain underlying `NngSocket`.
     fn socket(&self) -> &NngSocket;
     fn socket_mut(&mut self) -> &mut NngSocket;
@@ -177,7 +103,10 @@ pub trait Socket: Sized {
     unsafe fn nng_socket(&self) -> nng_socket {
         self.socket().nng_socket()
     }
+}
 
+/// Type which __is__ an [`NngSocket`](struct.NngSocket.html).
+pub trait Socket: GetSocket + Sized {
     /// Helper to chain constructors with methods that return `&Self`.
     ///
     /// # Examples
@@ -191,7 +120,9 @@ pub trait Socket: Sized {
     ///     Ok(())
     /// }
     /// ```
-    fn with(mut self, setup: impl FnOnce(&mut Self) -> Result<&mut Self>) -> Result<Self> {
+    fn with<T>(mut self, setup: T) -> Result<Self>
+        where T: FnOnce(&mut Self) -> Result<&mut Self>
+    {
         setup(&mut self)?;
         Ok(self)
     }

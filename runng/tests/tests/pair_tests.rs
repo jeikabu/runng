@@ -58,14 +58,14 @@ fn pair1_poly() -> runng::Result<()> {
 
     // Enable pair ver 1 socket "polyamorous" mode; multiple dialers can share a socket
     let mut a = factory.pair_open()?;
-    a.socket_mut().set_bool(NngOption::PAIR1_POLY, true)?;
-    a.socket_mut().set_ms(NngOption::RECVTIMEO, 100)?;
-    a.socket_mut().set_ms(NngOption::SENDTIMEO, 100)?;
+    a.set_bool(NngOption::PAIR1_POLY, true)?
+        .set_ms(NngOption::RECVTIMEO, 100)?
+        .set_ms(NngOption::SENDTIMEO, 100)?;
     let mut b = factory.pair_open()?;
     // Only listener needs PAIR1_POLY
     //b.socket_mut().set_bool(NngOption::PAIR1_POLY, true)?;
-    b.socket_mut().set_ms(NngOption::RECVTIMEO, 100)?;
-    b.socket_mut().set_ms(NngOption::SENDTIMEO, 100)?;
+    b.set_ms(NngOption::RECVTIMEO, 100)?
+        .set_ms(NngOption::SENDTIMEO, 100)?;
 
     let listener_ready = Arc::new(AtomicBool::default());
     let done = Arc::new(AtomicBool::default());

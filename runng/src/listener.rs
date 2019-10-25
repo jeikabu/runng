@@ -8,7 +8,6 @@ use runng_sys::*;
 #[derive(Debug, NngGetOpts, NngSetOpts)]
 #[prefix = "nng_listener_"]
 pub struct NngListener {
-    #[nng_member]
     listener: nng_listener,
     socket: NngSocket,
 }
@@ -29,6 +28,22 @@ impl NngListener {
         // TODO: Use different type for started vs non-started dialer?  According to nng docs options can generally only
         // be set before the dialer is started.
         unsafe { nng_int_to_result(nng_listener_start(self.listener, 0)) }
+    }
+}
+
+impl NngWrapper for NngListener {
+    type NngType = nng_listener;
+    unsafe fn get_nng_type(&self) -> Self::NngType {
+        self.listener
+    }
+}
+
+impl GetSocket for NngListener {
+    fn socket(&self) -> &NngSocket {
+        &self.socket
+    }
+    fn socket_mut(&mut self) -> &mut NngSocket {
+        &mut self.socket
     }
 }
 

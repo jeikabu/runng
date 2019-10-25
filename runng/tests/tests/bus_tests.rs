@@ -29,8 +29,7 @@ fn create_peer_sync(
     thread::spawn(move || -> runng::Result<()> {
         let url = &peer_urls[peer_index];
         let mut socket = protocol::Bus0::open()?;
-        socket.listen(url)?;
-        socket.socket_mut().set_ms(NngOption::RECVTIMEO, 100)?;
+        socket.set_ms(NngOption::RECVTIMEO, 100)?.listen(url)?;
 
         let num_peers = peer_urls.len();
         debug!("Listening {} {}...", url, num_peers);
@@ -126,9 +125,7 @@ fn create_peer_async(
     thread::spawn(move || -> runng::Result<()> {
         let url = &peer_urls[peer_index];
         let mut socket = protocol::Bus0::open()?;
-        socket.listen(url)?;
-        socket.socket_mut().set_ms(NngOption::RECVTIMEO, 100)?;
-        let mut ctx = socket.create_async()?;
+        let mut ctx = socket.set_ms(NngOption::RECVTIMEO, 100)?.listen(url)?.create_async()?;
 
         let num_peers = peer_urls.len();
         let _ = peers_ready.fetch_add(1, Ordering::Relaxed);

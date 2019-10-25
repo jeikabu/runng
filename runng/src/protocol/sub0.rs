@@ -5,7 +5,8 @@ use crate::{asyncio::*, *};
 use runng_sys::*;
 
 /// Subscribe half of publisher/subscriber pattern.  See [nng_sub](https://nanomsg.github.io/nng/man/v1.1.0/nng_sub.7).
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, NngGetOpts, NngSetOpts)]
+#[prefix = "nng_socket_"]
 pub struct Sub0 {
     socket: NngSocket,
 }
@@ -29,7 +30,7 @@ impl Subscribe for Sub0 {
     }
 }
 
-impl Socket for Sub0 {
+impl GetSocket for Sub0 {
     fn socket(&self) -> &NngSocket {
         &self.socket
     }
@@ -38,6 +39,7 @@ impl Socket for Sub0 {
     }
 }
 
+impl Socket for Sub0 {}
 impl Dial for Sub0 {}
 impl Listen for Sub0 {}
 impl RecvSocket for Sub0 {}

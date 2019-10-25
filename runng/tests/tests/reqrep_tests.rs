@@ -64,10 +64,10 @@ trait TestHelpers {
 
 impl<T> TestHelpers for T
 where
-    T: Socket,
+    T: Socket + SetOpts,
 {
     fn set_timeouts(&mut self) -> runng::Result<&mut Self> {
-        self.socket_mut()
+        self
             .set_duration(NngOption::SENDTIMEO, DURATION_LONG)?
             .set_duration(NngOption::RECVTIMEO, DURATION_LONG)?;
         Ok(self)

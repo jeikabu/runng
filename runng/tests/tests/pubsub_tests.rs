@@ -19,8 +19,7 @@ fn create_pub(url: &str) -> runng::Result<protocol::Pub0> {
     let mut sock = protocol::Pub0::open()?;
     // Pub socket doesn't support SENDBUF, messages are just dropped.
     //sock.socket_mut().set_int(NngOption::SENDBUF, 1000)?;
-    sock.socket_mut().set_ms(NngOption::SENDTIMEO, 100)?;
-    sock.listen(&url)?;
+    sock.set_ms(NngOption::SENDTIMEO, 100)?.listen(&url)?;
     Ok(sock)
 }
 
@@ -28,8 +27,7 @@ fn create_sub(url: &str) -> runng::Result<protocol::Sub0> {
     let mut sock = protocol::Sub0::open()?;
     // Sub socket doesn't support RECVBUF, messages are just dropped.
     //sock.socket_mut().set_int(NngOption::RECVBUF, 1000)?;
-    sock.socket_mut().set_ms(NngOption::RECVTIMEO, 100)?;
-    sock.dial(&url)?;
+    sock.set_ms(NngOption::RECVTIMEO, 100)?.dial(&url)?;
     Ok(sock)
 }
 

@@ -15,7 +15,6 @@ pub type PipeNotifyCallbackArg = *mut ::std::os::raw::c_void;
 #[derive(Debug, NngGetOpts)] // Note: nng_pipe has no setopt() functions
 #[prefix = "nng_pipe_"]
 pub struct NngPipe {
-    #[nng_member]
     pipe: nng_pipe,
 }
 
@@ -77,5 +76,12 @@ impl NngPipe {
     /// This will cause associated aio/ctx functions that were using the pipe to fail.
     pub unsafe fn close(self) -> Result<()> {
         nng_int_to_result(nng_pipe_close(self.pipe))
+    }
+}
+
+impl NngWrapper for NngPipe {
+    type NngType = nng_pipe;
+    unsafe fn get_nng_type(&self) -> Self::NngType {
+        self.pipe
     }
 }

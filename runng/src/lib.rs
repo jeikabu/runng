@@ -95,7 +95,14 @@ pub use self::socket::*;
 use log::{debug, trace};
 use runng_sys::*;
 
-// Trait where type exposes a socket, but this shouldn't be part of public API
+trait NngWrapper {
+    type NngType;
+    unsafe fn get_nng_type(&self) -> Self::NngType;
+}
+
+/// Trait where type exposes a socket, but this shouldn't be part of public API
+/// Can be removed if RFC is implemented: https://github.com/Centril/rfcs/blob/rfc/hidden-impls/text/0000-hidden-impls.md
+/// Meaning, `impl InternalSocket for XXX` could be replaced with `crate impl GetSocket for XXX`
 trait InternalSocket {
     fn socket(&self) -> &NngSocket;
     unsafe fn nng_socket(&self) -> nng_socket {

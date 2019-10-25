@@ -11,8 +11,8 @@ fn string_equality() -> runng::Result<()> {
     let factory = ProtocolFactory::default();
     let mut rep = factory.replier_open()?;
     rep.listen(&url)?;
-    let sockname0 = rep.socket().get_string(NngOption::SOCKNAME)?;
-    let sockname1 = rep.socket().get_string(NngOption::SOCKNAME)?;
+    let sockname0 = rep.get_string(NngOption::SOCKNAME)?;
+    let sockname1 = rep.get_string(NngOption::SOCKNAME)?;
     assert_eq!(sockname0, sockname1);
     Ok(())
 }
