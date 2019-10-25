@@ -67,8 +67,7 @@ where
     T: Socket + SetOpts,
 {
     fn set_timeouts(&mut self) -> runng::Result<&mut Self> {
-        self
-            .set_duration(NngOption::SENDTIMEO, DURATION_LONG)?
+        self.set_duration(NngOption::SENDTIMEO, DURATION_LONG)?
             .set_duration(NngOption::RECVTIMEO, DURATION_LONG)?;
         Ok(self)
     }

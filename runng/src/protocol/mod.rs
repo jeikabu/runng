@@ -21,8 +21,8 @@ pub use self::req0::*;
 pub use self::sub0::*;
 
 use crate::*;
-use runng_sys::*;
 use runng_derive::{NngGetOpts, NngSetOpts};
+use runng_sys::*;
 
 /// Type of subscribe half in publish/subscribe pattern.
 pub trait Subscribe {

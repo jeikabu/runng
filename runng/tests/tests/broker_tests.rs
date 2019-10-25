@@ -21,7 +21,9 @@ fn simple() -> Result<(), Error> {
     let out_url = get_url();
 
     let mut broker_in = Pull0::open()?;
-    broker_in.set_ms(NngOption::RECVTIMEO, 100)?.listen(&in_url)?;
+    broker_in
+        .set_ms(NngOption::RECVTIMEO, 100)?
+        .listen(&in_url)?;
     let mut broker_out = Push0::open()?;
     broker_out.listen(&out_url)?;
 
@@ -66,9 +68,7 @@ fn simple() -> Result<(), Error> {
     let client_thread = thread::spawn(move || -> Result<(), Error> {
         let (done, recv_count) = client_args;
         let mut socket = Pull0::open()?;
-        socket
-            .set_ms(NngOption::RECVTIMEO, 100)?
-            .dial(&out_url)?;
+        socket.set_ms(NngOption::RECVTIMEO, 100)?.dial(&out_url)?;
         let mut ctx = socket.create_async()?;
         while !done.load(Ordering::Relaxed) {
             match block_on(ctx.receive()) {

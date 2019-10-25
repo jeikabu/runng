@@ -65,7 +65,8 @@ impl NngSocket {
 }
 
 impl<T> NngWrapper for T
-where T: Socket
+where
+    T: Socket,
 {
     type NngType = nng_socket;
     unsafe fn get_nng_type(&self) -> Self::NngType {
@@ -121,7 +122,8 @@ pub trait Socket: GetSocket + Sized {
     /// }
     /// ```
     fn with<T>(mut self, setup: T) -> Result<Self>
-        where T: FnOnce(&mut Self) -> Result<&mut Self>
+    where
+        T: FnOnce(&mut Self) -> Result<&mut Self>,
     {
         setup(&mut self)?;
         Ok(self)

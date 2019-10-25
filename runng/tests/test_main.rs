@@ -64,6 +64,13 @@ mod tests {
     }
 
     #[test]
+    fn results() -> std::result::Result<(), runng_sys::EnumFromIntError> {
+        use std::convert::TryFrom;
+        assert_eq!(NngErrno::EINTR, NngErrno::try_from(runng_sys::NNG_EINTR as i32).unwrap());
+        Ok(())
+    }
+
+    #[test]
     fn pubsub() -> runng::Result<()> {
         let url = get_url();
         let factory = ProtocolFactory::default();

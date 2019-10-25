@@ -95,12 +95,15 @@ pub use self::socket::*;
 use log::{debug, trace};
 use runng_sys::*;
 
+/// Type which wraps a native nng type
 trait NngWrapper {
+    /// Native nng type wrapped
     type NngType;
+    /// Returns copy of wrapped nng type
     unsafe fn get_nng_type(&self) -> Self::NngType;
 }
 
-/// Trait where type exposes a socket, but this shouldn't be part of public API
+/// Type exposes a socket, but this shouldn't be part of public API
 /// Can be removed if RFC is implemented: https://github.com/Centril/rfcs/blob/rfc/hidden-impls/text/0000-hidden-impls.md
 /// Meaning, `impl InternalSocket for XXX` could be replaced with `crate impl GetSocket for XXX`
 trait InternalSocket {
@@ -110,7 +113,7 @@ trait InternalSocket {
     }
 }
 
-// Return string and pointer so string isn't dropped
+/// Return string and pointer so string isn't dropped
 fn to_cstr(
     string: &str,
 ) -> std::result::Result<(std::ffi::CString, *const std::os::raw::c_char), std::ffi::NulError> {
