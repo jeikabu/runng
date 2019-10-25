@@ -17,18 +17,20 @@ use std::{
 
 fn create_pub(url: &str) -> runng::Result<protocol::Pub0> {
     let mut sock = protocol::Pub0::open()?;
-    sock.socket_mut().set_ms(NngOption::SENDTIMEO, 100)?;
     // Pub socket doesn't support SENDBUF, messages are just dropped.
     //sock.socket_mut().set_int(NngOption::SENDBUF, 1000)?;
-    sock.listen(&url)
+    sock.socket_mut().set_ms(NngOption::SENDTIMEO, 100)?;
+    sock.listen(&url)?;
+    Ok(sock)
 }
 
 fn create_sub(url: &str) -> runng::Result<protocol::Sub0> {
     let mut sock = protocol::Sub0::open()?;
-    sock.socket_mut().set_ms(NngOption::RECVTIMEO, 100)?;
     // Sub socket doesn't support RECVBUF, messages are just dropped.
     //sock.socket_mut().set_int(NngOption::RECVBUF, 1000)?;
-    sock.dial(&url)
+    sock.socket_mut().set_ms(NngOption::RECVTIMEO, 100)?;
+    sock.dial(&url)?;
+    Ok(sock)
 }
 
 #[test]
@@ -107,7 +109,8 @@ fn bad_sub() -> runng::Result<()> {
     let _bad_thread = thread::spawn(move || -> runng::Result<()> {
         let done = sub_vars;
         while !done.load(Ordering::Relaxed) {
-            let puller = factory.puller_open()?.dial(&url)?;
+            let mut puller = factory.puller_open()?;
+            puller.dial(&url)?;
             let mut read_ctx = puller.create_async()?;
             let _recv_future = read_ctx.receive();
             rand_sleep(2, 16);

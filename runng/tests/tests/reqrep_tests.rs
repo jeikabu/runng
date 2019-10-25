@@ -1,6 +1,14 @@
 use crate::common::*;
 use rand::Rng;
-use runng::{asyncio::*, factory::latest::ProtocolFactory, mem, socket, socket::*, Error};
+use runng::{
+    asyncio::*,
+    factory::latest::ProtocolFactory,
+    mem,
+    options::{NngOption, SetOpts},
+    socket,
+    socket::*,
+    Error,
+};
 use std::{
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -14,8 +22,10 @@ fn example_basic() -> runng::Result<()> {
     let url = get_url();
 
     let factory = ProtocolFactory::default();
-    let rep = factory.replier_open()?.listen(&url)?;
-    let req = factory.requester_open()?.dial(&url)?;
+    let mut rep = factory.replier_open()?;
+    rep.listen(&url)?;
+    let mut req = factory.requester_open()?;
+    req.dial(&url)?;
     req.sendmsg(NngMsg::new()?)?;
     rep.recvmsg()?;
 
@@ -27,10 +37,12 @@ fn example_async() -> runng::Result<()> {
     let url = get_url();
 
     let factory = ProtocolFactory::default();
-    let rep_socket = factory.replier_open()?.listen(&url)?;
+    let mut rep_socket = factory.replier_open()?;
+    rep_socket.listen(&url)?;
     let mut rep_ctx = rep_socket.create_async_stream(1)?;
 
-    let req_socket = factory.requester_open()?.dial(&url)?;
+    let mut req_socket = factory.requester_open()?;
+    req_socket.dial(&url)?;
     let mut req_ctx = req_socket.create_async()?;
     let req_future = req_ctx.send(NngMsg::new()?);
     let fut = rep_ctx.receive().unwrap().take(1).for_each(|_request| {
@@ -46,15 +58,36 @@ fn example_async() -> runng::Result<()> {
     Ok(())
 }
 
+trait TestHelpers {
+    fn set_timeouts(&mut self) -> runng::Result<&mut Self>;
+}
+
+impl<T> TestHelpers for T
+where
+    T: Socket,
+{
+    fn set_timeouts(&mut self) -> runng::Result<&mut Self> {
+        self.socket_mut()
+            .set_duration(NngOption::SENDTIMEO, DURATION_LONG)?
+            .set_duration(NngOption::RECVTIMEO, DURATION_LONG)?;
+        Ok(self)
+    }
+}
+
 #[test]
 fn zerocopy() -> Result<(), failure::Error> {
     let url = get_url();
-
     let factory = ProtocolFactory::default();
-    let rep = factory.replier_open()?.listen(&url)?;
-    let req = factory.requester_open()?.dial(&url)?;
 
-    for _ in 0..10 {
+    let mut rep = factory.replier_open()?;
+    rep.set_timeouts()?.listen(&url)?;
+
+    let mut req = factory.requester_open()?;
+    req.set_timeouts()?.dial(&url)?;
+
+    let start = time::Instant::now();
+    let mut count = 0;
+    while start.elapsed() < (DURATION_TEST / 2) {
         let mut data = mem::Alloc::with_capacity(128).unwrap();
         rand::thread_rng().fill(data.as_mut_slice());
 
@@ -63,8 +96,9 @@ fn zerocopy() -> Result<(), failure::Error> {
         rep.send_zerocopy(request)?;
         let reply = req.recv_zerocopy()?;
         assert_eq!(data, reply);
+        count += 1;
     }
-
+    assert!(count > 1, "Received {}", count);
     Ok(())
 }
 
@@ -108,8 +142,10 @@ fn nonblock() -> runng::Result<()> {
 
     let factory = ProtocolFactory::default();
     let flags = socket::SocketFlags::NONBLOCK;
-    let rep = factory.replier_open()?.listen_flags(&url, flags)?;
-    let req = factory.requester_open()?.dial_flags(&url, flags)?;
+    let mut rep = factory.replier_open()?;
+    rep.listen_flags(&url, flags)?;
+    let mut req = factory.requester_open()?;
+    req.dial_flags(&url, flags)?;
 
     let start = time::Instant::now();
     let mut count = 0;
@@ -131,8 +167,10 @@ fn blocking() -> runng::Result<()> {
     let url = get_url();
 
     let factory = ProtocolFactory::default();
-    let rep = factory.replier_open()?.listen(&url)?;
-    let req = factory.requester_open()?.dial(&url)?;
+    let mut rep = factory.replier_open()?;
+    rep.listen(&url)?;
+    let mut req = factory.requester_open()?;
+    req.dial(&url)?;
 
     for _ in 0..10 {
         let mut msg = vec![0u8; 128];
@@ -158,7 +196,8 @@ fn contexts() -> runng::Result<()> {
     let recv_count = Arc::new(AtomicUsize::new(0));
 
     // Replier
-    let rep_socket = factory.replier_open()?.listen(&url)?;
+    let mut rep_socket = factory.replier_open()?;
+    rep_socket.listen(&url)?;
     let mut rep_ctx = rep_socket.create_async_stream(1)?;
     let rep_recv_count = recv_count.clone();
     let rep = thread::spawn(move || -> runng::Result<()> {
@@ -181,7 +220,8 @@ fn contexts() -> runng::Result<()> {
     });
 
     // Requesters share a socket
-    let req_socket = factory.requester_open()?.dial(&url)?;
+    let mut req_socket = factory.requester_open()?;
+    req_socket.dial(&url)?;
     const NUM_REQUESTERS: u32 = 2;
     const NUM_REQUESTS: u32 = 100;
     let mut threads = vec![];

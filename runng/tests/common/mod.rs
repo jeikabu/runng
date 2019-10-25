@@ -40,6 +40,7 @@ pub fn not_stop_message(res: &runng::Result<NngMsg>) -> impl Future<Output = boo
 
 pub const DURATION_FAST: time::Duration = time::Duration::from_millis(10);
 pub const DURATION_BRIEF: time::Duration = time::Duration::from_millis(25);
+pub const DURATION_LONG: time::Duration = time::Duration::from_millis(75);
 pub const DURATION_TEST: time::Duration = time::Duration::from_secs(1);
 
 pub fn sleep_fast() {

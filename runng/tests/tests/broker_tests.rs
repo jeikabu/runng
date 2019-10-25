@@ -22,8 +22,9 @@ fn simple() -> Result<(), Error> {
 
     let mut broker_in = Pull0::open()?;
     broker_in.socket_mut().set_ms(NngOption::RECVTIMEO, 100)?;
-    let broker_in = broker_in.listen(&in_url)?;
-    let broker_out = Push0::open()?.listen(&out_url)?;
+    broker_in.listen(&in_url)?;
+    let mut broker_out = Push0::open()?;
+    broker_out.listen(&out_url)?;
 
     let done = Arc::new(AtomicBool::default());
     let forwarded_count = Arc::new(AtomicUsize::new(0));
@@ -65,9 +66,10 @@ fn simple() -> Result<(), Error> {
     let client_args = (done.clone(), recv_count.clone());
     let client_thread = thread::spawn(move || -> Result<(), Error> {
         let (done, recv_count) = client_args;
-        let mut ctx = Pull0::open()?.dial(&out_url)?;
-        ctx.socket_mut().set_ms(NngOption::RECVTIMEO, 100)?;
-        let mut ctx = ctx.create_async()?;
+        let mut socket = Pull0::open()?;
+        socket.dial(&out_url)?;
+        socket.socket_mut().set_ms(NngOption::RECVTIMEO, 100)?;
+        let mut ctx = socket.create_async()?;
         while !done.load(Ordering::Relaxed) {
             match block_on(ctx.receive()) {
                 Ok(mut _msg) => {

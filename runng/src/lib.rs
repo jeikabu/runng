@@ -22,8 +22,10 @@ fn simple_reqrep() -> Result<(), runng::Error> {
     const url: &str = "inproc://test";
 
     let factory = ProtocolFactory::default();
-    let rep = factory.replier_open()?.listen(&url)?;
-    let req = factory.requester_open()?.dial(&url)?;
+    let mut rep = factory.replier_open()?;
+    rep.listen(&url)?;
+    let mut req = factory.requester_open()?;
+    req.dial(&url)?;
     req.sendmsg(NngMsg::new()?)?;
     rep.recvmsg()?;
 
@@ -50,9 +52,11 @@ fn async_reqrep() -> Result<(), runng::Error> {
     const url: &str = "inproc://test";
 
     let factory = ProtocolFactory::default();
-    let mut rep_ctx = factory.replier_open()?.listen(&url)?.create_async()?;
+    let mut rep_sock = factory.replier_open()?;
+    let mut rep_ctx = rep_sock.listen(&url)?.create_async()?;
 
-    let mut req_ctx = factory.requester_open()?.dial(&url)?.create_async()?;
+    let mut req_sock = factory.requester_open()?;
+    let mut req_ctx = req_sock.dial(&url)?.create_async()?;
     let req_future = req_ctx.send(NngMsg::new()?);
     let _request = block_on(rep_ctx.receive())?;
     block_on(rep_ctx.reply(NngMsg::new()?))?;

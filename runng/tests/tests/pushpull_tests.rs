@@ -14,16 +14,20 @@ use std::{
 
 fn create_pusher(url: &str) -> runng::Result<protocol::Push0> {
     let mut sock = protocol::Push0::open()?;
-    sock.socket_mut().set_ms(NngOption::SENDTIMEO, 100)?;
-    sock.socket_mut().set_int(NngOption::SENDBUF, 1000)?;
-    sock.listen(&url)
+    sock.socket_mut()
+        .set_duration(NngOption::SENDTIMEO, DURATION_LONG)?
+        .set_int(NngOption::SENDBUF, 1000)?;
+    sock.listen(&url)?;
+    Ok(sock)
 }
 
 fn create_puller(url: &str) -> runng::Result<protocol::Pull0> {
     let mut sock = protocol::Pull0::open()?;
-    sock.socket_mut().set_ms(NngOption::RECVTIMEO, 100)?;
-    sock.socket_mut().set_int(NngOption::RECVBUF, 1000)?;
-    sock.dial(&url)
+    sock.socket_mut()
+        .set_duration(NngOption::RECVTIMEO, DURATION_LONG)?
+        .set_int(NngOption::RECVBUF, 1000)?;
+    sock.dial(&url)?;
+    Ok(sock)
 }
 
 #[test]

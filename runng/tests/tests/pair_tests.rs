@@ -29,8 +29,10 @@ use std::{
 fn pair() -> runng::Result<()> {
     let url = get_url();
     let factory = ProtocolFactory::default();
-    let a = factory.pair_open()?.listen(&url)?;
-    let b = factory.pair_open()?.dial(&url)?;
+    let mut a = factory.pair_open()?;
+    a.listen(&url)?;
+    let mut b = factory.pair_open()?;
+    b.dial(&url)?;
 
     let a_thread = thread::spawn(move || -> runng::Result<()> {
         let mut ctx = a.create_async()?;
@@ -103,7 +105,7 @@ fn pair1_poly() -> runng::Result<()> {
     let count = Arc::new(AtomicUsize::new(0));
     for i in 0..NUM_DIALERS {
         let url = url.clone();
-        let socket = b.clone();
+        let mut socket = b.clone();
         let count = count.clone();
         let done = done.clone();
         let thread = thread::spawn(move || -> runng::Result<()> {

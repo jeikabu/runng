@@ -9,7 +9,8 @@ use runng::{
 fn string_equality() -> runng::Result<()> {
     let url = get_url();
     let factory = ProtocolFactory::default();
-    let rep = factory.replier_open()?.listen(&url)?;
+    let mut rep = factory.replier_open()?;
+    rep.listen(&url)?;
     let sockname0 = rep.socket().get_string(NngOption::SOCKNAME)?;
     let sockname1 = rep.socket().get_string(NngOption::SOCKNAME)?;
     assert_eq!(sockname0, sockname1);

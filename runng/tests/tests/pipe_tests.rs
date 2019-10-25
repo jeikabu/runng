@@ -22,7 +22,8 @@ fn notify() -> runng::Result<()> {
     let url = get_url();
 
     let factory = ProtocolFactory::default();
-    let rep = factory.replier_open()?.listen(&url)?;
+    let mut rep = factory.replier_open()?;
+    rep.listen(&url)?;
     [
         NNG_PIPE_EV_ADD_PRE,
         NNG_PIPE_EV_ADD_POST,
@@ -51,8 +52,10 @@ fn dialer_listener() -> runng::Result<()> {
     let url = get_url();
 
     let factory = ProtocolFactory::default();
-    let rep = factory.replier_open()?.listen(&url)?;
-    let req = factory.requester_open()?.dial(&url)?;
+    let mut rep = factory.replier_open()?;
+    rep.listen(&url)?;
+    let mut req = factory.requester_open()?;
+    req.dial(&url)?;
     req.sendmsg(NngMsg::new()?)?;
     let msg = rep.recvmsg()?;
     let rep_pipe = msg.get_pipe().unwrap();

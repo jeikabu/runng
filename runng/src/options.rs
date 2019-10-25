@@ -1,7 +1,7 @@
 //! NNG options.
 
 use crate::{mem::NngString, *};
-use std::os::raw::c_char;
+use std::{os::raw::c_char, time};
 
 /// Types which support getting NNG options.
 /// Also see [`SetOpts`](trait.SetOpts.html).
@@ -17,12 +17,17 @@ pub trait GetOpts {
 /// Types which support setting NNG options.
 /// Also see [`GetOpts`](trait.GetOpts.html).
 pub trait SetOpts {
-    fn set_bool(&mut self, option: NngOption, value: bool) -> Result<()>;
-    fn set_int(&mut self, option: NngOption, value: i32) -> Result<()>;
-    fn set_ms(&mut self, option: NngOption, value: nng_duration) -> Result<()>;
-    fn set_size(&mut self, option: NngOption, value: usize) -> Result<()>;
-    fn set_uint64(&mut self, option: NngOption, value: u64) -> Result<()>;
-    fn set_string(&mut self, option: NngOption, value: &str) -> Result<()>;
+    fn set_bool(&mut self, option: NngOption, value: bool) -> Result<&mut Self>;
+    fn set_int(&mut self, option: NngOption, value: i32) -> Result<&mut Self>;
+    fn set_ms(&mut self, option: NngOption, value: nng_duration) -> Result<&mut Self>;
+    fn set_size(&mut self, option: NngOption, value: usize) -> Result<&mut Self>;
+    fn set_uint64(&mut self, option: NngOption, value: u64) -> Result<&mut Self>;
+    fn set_string(&mut self, option: NngOption, value: &str) -> Result<&mut Self>;
+
+    fn set_duration(&mut self, option: NngOption, value: time::Duration) -> Result<&mut Self> {
+        let ms = value.as_millis() as nng_duration;
+        self.set_ms(option, ms)
+    }
 }
 
 /// Wraps NNG option names for [GetOpts](trait.GetOpts.html) and [SetOpts](trait.SetOpts.html).

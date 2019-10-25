@@ -54,7 +54,8 @@ mod tests {
                 // Drop the listener
             }
             // Replier still works
-            let requester = factory.requester_open()?.dial(&url)?;
+            let mut requester = factory.requester_open()?;
+            requester.dial(&url)?;
             requester.sendmsg(msg::NngMsg::new()?)?;
             let _request = replier.recvmsg()?;
         }
@@ -67,8 +68,10 @@ mod tests {
         let url = get_url();
         let factory = ProtocolFactory::default();
 
-        let publisher = factory.publisher_open()?.listen(&url)?;
-        let subscriber = factory.subscriber_open()?.dial(&url)?;
+        let mut publisher = factory.publisher_open()?;
+        publisher.listen(&url)?;
+        let mut subscriber = factory.subscriber_open()?;
+        subscriber.dial(&url)?;
 
         let num_msg_per_subscriber = 4;
 
@@ -131,8 +134,10 @@ mod tests {
 
         let factory = ProtocolFactory::default();
 
-        let broker_pull = factory.puller_open()?.listen(&url_broker_in)?;
-        let broker_push = factory.publisher_open()?.listen(&url_broker_out)?;
+        let mut broker_pull = factory.puller_open()?;
+        broker_pull.listen(&url_broker_in)?;
+        let mut broker_push = factory.publisher_open()?;
+        broker_push.listen(&url_broker_out)?;
 
         thread::sleep(Duration::from_millis(50));
 
@@ -154,8 +159,10 @@ mod tests {
             Ok(())
         });
 
-        let publisher = factory.pusher_open()?.dial(&url_broker_in)?;
-        let subscriber = factory.subscriber_open()?.dial(&url_broker_out)?;
+        let mut publisher = factory.pusher_open()?;
+        publisher.dial(&url_broker_in)?;
+        let mut subscriber = factory.subscriber_open()?;
+        subscriber.dial(&url_broker_out)?;
 
         // Subscriber
         thread::spawn(move || -> runng::Result<()> {

@@ -176,41 +176,47 @@ fn gen_set_impl(name: &syn::Ident, prefix: &str, member: &syn::Ident) -> TokenSt
         impl SetOpts for #name {
             /// Set `bool` [NngOption](./struct.NngOption.html).
             /// See #set_bool
-            fn set_bool(&mut self, option: NngOption, value: bool) -> Result<()> {
-                unsafe {
-                    nng_int_to_result(#set_bool(self.#member, option.as_cptr(), value))
-                }
+            fn set_bool(&mut self, option: NngOption, value: bool) -> Result<&mut Self> {
+                let res = unsafe {
+                    #set_bool(self.#member, option.as_cptr(), value)
+                };
+                Error::zero_map(res, || self)
             }
             /// See #set_int
-            fn set_int(&mut self, option: NngOption, value: i32) -> Result<()> {
-                unsafe {
-                    nng_int_to_result(#set_int(self.#member, option.as_cptr(), value))
-                }
+            fn set_int(&mut self, option: NngOption, value: i32) -> Result<&mut Self> {
+                let res = unsafe {
+                    #set_int(self.#member, option.as_cptr(), value)
+                };
+                Error::zero_map(res, || self)
             }
             /// See #set_ms
-            fn set_ms(&mut self, option: NngOption, value: i32) -> Result<()> {
-                unsafe {
-                    nng_int_to_result(#set_ms(self.#member, option.as_cptr(), value))
-                }
+            fn set_ms(&mut self, option: NngOption, value: i32) -> Result<&mut Self> {
+                let res = unsafe {
+                    #set_ms(self.#member, option.as_cptr(), value)
+                };
+                Error::zero_map(res, || self)
             }
             /// See #set_size
-            fn set_size(&mut self, option: NngOption, value: usize) -> Result<()> {
-                unsafe {
-                    nng_int_to_result(#set_size(self.#member, option.as_cptr(), value))
-                }
+            fn set_size(&mut self, option: NngOption, value: usize) -> Result<&mut Self> {
+                let res = unsafe {
+                    #set_size(self.#member, option.as_cptr(), value)
+                };
+                Error::zero_map(res, || self)
             }
             /// See #set_uint64
-            fn set_uint64(&mut self, option: NngOption, value: u64) -> Result<()> {
-                unsafe {
-                    nng_int_to_result(#set_uint64(self.#member, option.as_cptr(), value))
-                }
+            fn set_uint64(&mut self, option: NngOption, value: u64) -> Result<&mut Self> {
+                let res = unsafe {
+                    #set_uint64(self.#member, option.as_cptr(), value)
+                };
+                Error::zero_map(res, || self)
             }
             /// See #set_string
-            fn set_string(&mut self, option: NngOption, value: &str) -> Result<()> {
-                unsafe {
+            fn set_string(&mut self, option: NngOption, value: &str) -> Result<&mut Self> {
+                let res = unsafe {
                     let (_, value) = to_cstr(value)?;
-                    nng_int_to_result(#set_string(self.#member, option.as_cptr(), value))
-                }
+                    #set_string(self.#member, option.as_cptr(), value)
+                };
+                Error::zero_map(res, || self)
             }
         }
     };

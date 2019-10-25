@@ -28,7 +28,8 @@ fn create_peer_sync(
 ) -> thread::JoinHandle<runng::Result<()>> {
     thread::spawn(move || -> runng::Result<()> {
         let url = &peer_urls[peer_index];
-        let mut socket = protocol::Bus0::open()?.listen(url)?;
+        let mut socket = protocol::Bus0::open()?;
+        socket.listen(url)?;
         socket.socket_mut().set_ms(NngOption::RECVTIMEO, 100)?;
 
         let num_peers = peer_urls.len();
@@ -38,7 +39,7 @@ fn create_peer_sync(
         for (i, url_other) in peer_urls.iter().enumerate() {
             if i != peer_index {
                 debug!("Dialing {} {}...", url, url_other);
-                socket.dial_mut(&url_other)?;
+                socket.dial(&url_other)?;
             }
         }
 
@@ -124,7 +125,8 @@ fn create_peer_async(
 ) -> thread::JoinHandle<runng::Result<()>> {
     thread::spawn(move || -> runng::Result<()> {
         let url = &peer_urls[peer_index];
-        let mut socket = protocol::Bus0::open()?.listen(url)?;
+        let mut socket = protocol::Bus0::open()?;
+        socket.listen(url)?;
         socket.socket_mut().set_ms(NngOption::RECVTIMEO, 100)?;
         let mut ctx = socket.create_async()?;
 
@@ -134,7 +136,7 @@ fn create_peer_async(
         for (i, url_other) in peer_urls.iter().enumerate() {
             if i != peer_index {
                 debug!("Dialing {} {}...", url, url_other);
-                socket.dial_mut(&url_other)?;
+                socket.dial(&url_other)?;
             }
         }
 

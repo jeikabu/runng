@@ -61,8 +61,8 @@ pub trait AsyncStreamContext: Sized {
 /// };
 /// fn test() -> runng::Result<()> {
 ///     let factory = ProtocolFactory::default();
-///     let pusher = factory.pusher_open()?.listen("inproc://test")?;
-///     let mut push_ctx = pusher.create_async()?;
+///     let mut pusher = factory.pusher_open()?;
+///     let mut push_ctx = pusher.listen("inproc://test")?.create_async()?;
 ///     Ok(())
 /// }
 /// ```

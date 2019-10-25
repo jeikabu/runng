@@ -15,7 +15,8 @@ fn pushpull_timeout() -> runng::Result<()> {
     let url = get_url();
     let factory = ProtocolFactory::default();
 
-    let pusher = factory.pair_open()?.listen(&url)?;
+    let mut pusher = factory.pair_open()?;
+    pusher.listen(&url)?;
 
     let puller_ready = Arc::new(AtomicBool::default());
     let done = Arc::new(AtomicBool::default());
@@ -44,7 +45,8 @@ fn pushpull_timeout() -> runng::Result<()> {
     });
 
     // Puller
-    let puller = factory.pair_open()?.dial(&url)?;
+    let mut puller = factory.pair_open()?;
+    puller.dial(&url)?;
     let recv_count = Arc::new(AtomicUsize::new(0));
     let lost_count = Arc::new(AtomicUsize::new(0));
     let pull_vars = (done.clone(), recv_count.clone(), lost_count.clone());

@@ -10,8 +10,10 @@ fn init_stats() -> runng::Result<(protocol::pair0::Pair0, protocol::pair0::Pair0
     // https://github.com/nanomsg/nng/issues/841
     let url = get_url();
     let factory = ProtocolFactory::default();
-    let p0 = factory.pair_open()?.listen(&url)?;
-    let p1 = factory.pair_open()?.dial(&url)?;
+    let mut p0 = factory.pair_open()?;
+    p0.listen(&url)?;
+    let mut p1 = factory.pair_open()?;
+    p1.dial(&url)?;
     Ok((p0, p1))
 }
 

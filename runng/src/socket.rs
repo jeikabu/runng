@@ -121,60 +121,30 @@ impl GetOpts for NngSocket {
 }
 
 impl SetOpts for NngSocket {
-    fn set_bool(&mut self, option: NngOption, value: bool) -> Result<()> {
-        unsafe {
-            nng_int_to_result(nng_socket_set_bool(
-                self.nng_socket(),
-                option.as_cptr(),
-                value,
-            ))
-        }
+    fn set_bool(&mut self, option: NngOption, value: bool) -> Result<&mut Self> {
+        let res = unsafe { nng_socket_set_bool(self.nng_socket(), option.as_cptr(), value) };
+        Error::zero_map(res, || self)
     }
-    fn set_int(&mut self, option: NngOption, value: i32) -> Result<()> {
-        unsafe {
-            nng_int_to_result(nng_socket_set_int(
-                self.nng_socket(),
-                option.as_cptr(),
-                value,
-            ))
-        }
+    fn set_int(&mut self, option: NngOption, value: i32) -> Result<&mut Self> {
+        let res = unsafe { nng_socket_set_int(self.nng_socket(), option.as_cptr(), value) };
+        Error::zero_map(res, || self)
     }
-    fn set_ms(&mut self, option: NngOption, value: nng_duration) -> Result<()> {
-        unsafe {
-            nng_int_to_result(nng_socket_set_ms(
-                self.nng_socket(),
-                option.as_cptr(),
-                value,
-            ))
-        }
+    fn set_ms(&mut self, option: NngOption, value: nng_duration) -> Result<&mut Self> {
+        let res = unsafe { nng_socket_set_ms(self.nng_socket(), option.as_cptr(), value) };
+        Error::zero_map(res, || self)
     }
-    fn set_size(&mut self, option: NngOption, value: usize) -> Result<()> {
-        unsafe {
-            nng_int_to_result(nng_socket_set_size(
-                self.nng_socket(),
-                option.as_cptr(),
-                value,
-            ))
-        }
+    fn set_size(&mut self, option: NngOption, value: usize) -> Result<&mut Self> {
+        let res = unsafe { nng_socket_set_size(self.nng_socket(), option.as_cptr(), value) };
+        Error::zero_map(res, || self)
     }
-    fn set_uint64(&mut self, option: NngOption, value: u64) -> Result<()> {
-        unsafe {
-            nng_int_to_result(nng_socket_set_uint64(
-                self.nng_socket(),
-                option.as_cptr(),
-                value,
-            ))
-        }
+    fn set_uint64(&mut self, option: NngOption, value: u64) -> Result<&mut Self> {
+        let res = unsafe { nng_socket_set_uint64(self.nng_socket(), option.as_cptr(), value) };
+        Error::zero_map(res, || self)
     }
-    fn set_string(&mut self, option: NngOption, value: &str) -> Result<()> {
-        unsafe {
-            let (_, value) = to_cstr(value)?;
-            nng_int_to_result(nng_socket_set_string(
-                self.nng_socket(),
-                option.as_cptr(),
-                value,
-            ))
-        }
+    fn set_string(&mut self, option: NngOption, value: &str) -> Result<&mut Self> {
+        let (_, value) = to_cstr(value)?;
+        let res = unsafe { nng_socket_set_string(self.nng_socket(), option.as_cptr(), value) };
+        Error::zero_map(res, || self)
     }
 }
 
@@ -202,21 +172,40 @@ pub trait Socket: Sized {
     /// Obtain underlying `NngSocket`.
     fn socket(&self) -> &NngSocket;
     fn socket_mut(&mut self) -> &mut NngSocket;
+
     /// Obtain underlying `nng_socket`.
     unsafe fn nng_socket(&self) -> nng_socket {
         self.socket().nng_socket()
+    }
+
+    /// Helper to chain constructors with methods that return `&Self`.
+    ///
+    /// # Examples
+    /// ```
+    /// use runng::{Listen, protocol::Pair0, Socket};
+    /// fn main() -> runng::Result<()> {
+    ///     let mut socket0 = Pair0::open()?;
+    ///     socket0.listen("inproc://socket0")?;
+    ///     // VS
+    ///     let socket1 = Pair0::open()?.with(|sock| sock.listen("inproc://socket1"))?;
+    ///     Ok(())
+    /// }
+    /// ```
+    fn with(mut self, setup: impl FnOnce(&mut Self) -> Result<&mut Self>) -> Result<Self> {
+        setup(&mut self)?;
+        Ok(self)
     }
 }
 
 /// `Socket` that can accept connections from ("listen" to) other `Socket`s.
 pub trait Listen: Socket {
     /// Listen for connections to specified URL.  See [nng_listen](https://nanomsg.github.io/nng/man/v1.1.0/nng_listen.3).
-    fn listen(self, url: &str) -> Result<Self> {
+    fn listen(&mut self, url: &str) -> Result<&mut Self> {
         self.listen_flags(url, Default::default())
     }
 
     /// Listen for connections to specified URL.  See [nng_listen](https://nanomsg.github.io/nng/man/v1.1.0/nng_listen.3).
-    fn listen_flags(self, url: &str, flags: SocketFlags) -> Result<Self> {
+    fn listen_flags(&mut self, url: &str, flags: SocketFlags) -> Result<&mut Self> {
         unsafe {
             let (_cstring, ptr) = to_cstr(url)?;
             let res = nng_listen(self.nng_socket(), ptr, std::ptr::null_mut(), flags.bits());
@@ -232,29 +221,16 @@ pub trait Listen: Socket {
 /// `Socket` that can connect to ("dial") another `Socket`.
 pub trait Dial: Socket {
     /// Dial socket specified by URL.  See [nng_dial](https://nanomsg.github.io/nng/man/v1.1.0/nng_dial.3)
-    fn dial(self, url: &str) -> Result<Self> {
+    fn dial(&mut self, url: &str) -> Result<&mut Self> {
         self.dial_flags(url, Default::default())
     }
 
     /// Dial socket specified by URL.  See [nng_dial](https://nanomsg.github.io/nng/man/v1.1.0/nng_dial.3)
-    fn dial_flags(self, url: &str, flags: SocketFlags) -> Result<Self> {
+    fn dial_flags(&mut self, url: &str, flags: SocketFlags) -> Result<&mut Self> {
         unsafe {
             let (_cstring, ptr) = to_cstr(url)?;
             let res = nng_dial(self.nng_socket(), ptr, std::ptr::null_mut(), flags.bits());
             Error::zero_map(res, || self)
-        }
-    }
-
-    fn dial_mut(&mut self, url: &str) -> Result<()> {
-        unsafe {
-            let (_cstring, ptr) = to_cstr(url)?;
-            let res = nng_dial(
-                self.nng_socket(),
-                ptr,
-                std::ptr::null_mut(),
-                SocketFlags::default().bits(),
-            );
-            nng_int_to_result(res)
         }
     }
 
