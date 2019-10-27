@@ -82,11 +82,12 @@ fn pair1_poly() -> runng::Result<()> {
                 match block_on(ctx.receive()) {
                     Ok(msg) => {
                         // Duplicate message so it has same content (sender will check for identifier)
-                        let mut response = msg.dup().unwrap();
+                        let mut response = msg.dup()?;
                         // Response message's pipe must be set to that of the received message
-                        let pipe = msg.get_pipe().unwrap();
-                        response.set_pipe(&pipe);
-                        block_on(ctx.send(response)).unwrap();
+                        if let Some(pipe) = msg.get_pipe() {
+                            response.set_pipe(&pipe);
+                            block_on(ctx.send(response))?;
+                        }
                     }
                     Err(runng::Error::Errno(NngErrno::ETIMEDOUT)) => break,
                     Err(err) => panic!(err),
