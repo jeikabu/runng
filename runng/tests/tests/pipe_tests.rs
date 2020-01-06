@@ -2,18 +2,23 @@
 
 use crate::common::*;
 use runng::{factory::latest::ProtocolFactory, pipe::*, socket::*};
-use runng_sys::{nng_pipe, nng_pipe_ev, nng_pipe_ev::*};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use runng_sys::{nng_pipe, nng_pipe_ev};
+use std::{
+    convert::TryFrom,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 static NUM_ADDPRE: AtomicUsize = AtomicUsize::new(0);
 static NUM_ADDPOST: AtomicUsize = AtomicUsize::new(0);
 static NUM_REMPOST: AtomicUsize = AtomicUsize::new(0);
 
 extern "C" fn notify_callback(_pipe: nng_pipe, event: nng_pipe_ev, _arg: PipeNotifyCallbackArg) {
-    match event {
-        NNG_PIPE_EV_ADD_PRE => NUM_ADDPRE.fetch_add(1, Ordering::Relaxed),
-        NNG_PIPE_EV_ADD_POST => NUM_ADDPOST.fetch_add(1, Ordering::Relaxed),
-        NNG_PIPE_EV_REM_POST => NUM_REMPOST.fetch_add(1, Ordering::Relaxed),
+    use NngPipeEv::*;
+    match NngPipeEv::try_from(event) {
+        Ok(AddPre) => NUM_ADDPRE.fetch_add(1, Ordering::Relaxed),
+        Ok(AddPost) => NUM_ADDPOST.fetch_add(1, Ordering::Relaxed),
+        Ok(RemPost) => NUM_REMPOST.fetch_add(1, Ordering::Relaxed),
+        Err(_) => panic!("Unexpected: {}", event),
     };
 }
 
@@ -25,9 +30,9 @@ fn notify() -> runng::Result<()> {
     let mut rep = factory.replier_open()?;
     rep.listen(&url)?;
     [
-        NNG_PIPE_EV_ADD_PRE,
-        NNG_PIPE_EV_ADD_POST,
-        NNG_PIPE_EV_REM_POST,
+        runng_sys::NNG_PIPE_EV_ADD_PRE,
+        runng_sys::NNG_PIPE_EV_ADD_POST,
+        runng_sys::NNG_PIPE_EV_REM_POST,
     ]
     .iter()
     .for_each(|event| {

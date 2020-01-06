@@ -11,6 +11,30 @@ pub type PipeNotifyCallback =
     unsafe extern "C" fn(pipe: nng_pipe, event: nng_pipe_ev, arg1: PipeNotifyCallbackArg);
 pub type PipeNotifyCallbackArg = *mut ::std::os::raw::c_void;
 
+/// Pipe events that can occur on sockets.
+/// See [`nng_pipe_ev` in nng_pipe_notify](https://nng.nanomsg.org/man/v1.2.2/nng_pipe_notify.3.html).
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[repr(u32)]
+pub enum NngPipeEv {
+    AddPre = NNG_PIPE_EV_ADD_PRE,
+    AddPost = NNG_PIPE_EV_ADD_POST,
+    RemPost = NNG_PIPE_EV_REM_POST,
+}
+
+impl core::convert::TryFrom<nng_pipe_ev> for NngPipeEv {
+    type Error = EnumFromIntError;
+
+    fn try_from(value: nng_pipe_ev) -> std::result::Result<Self, Self::Error> {
+        use NngPipeEv::*;
+        match value {
+            NNG_PIPE_EV_ADD_PRE => Ok(AddPre),
+            NNG_PIPE_EV_ADD_POST => Ok(AddPost),
+            NNG_PIPE_EV_REM_POST => Ok(RemPost),
+            _ => Err(EnumFromIntError(value as i32)),
+        }
+    }
+}
+
 /// Wraps `nng_pipe`.  See [nng_pipe](https://nanomsg.github.io/nng/man/v1.1.0/nng_pipe.5).
 #[derive(Debug, NngGetOpts)] // Note: nng_pipe has no setopt() functions
 #[prefix = "nng_pipe_"]
