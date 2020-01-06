@@ -1,40 +1,47 @@
-//! Dialer
+//! Dialers connect to listeners.
 
-use super::*;
+use crate::*;
 use runng_derive::{NngGetOpts, NngSetOpts};
 use runng_sys::*;
 
 /// Wraps `nng_dialer`.  See [nng_dialer](https://nanomsg.github.io/nng/man/v1.1.0/nng_dialer.5).
-#[derive(NngGetOpts, NngSetOpts)]
+#[derive(Debug, NngGetOpts, NngSetOpts)]
 #[prefix = "nng_dialer_"]
 pub struct NngDialer {
-    #[nng_member]
     dialer: nng_dialer,
     socket: NngSocket,
 }
 
 impl NngDialer {
     /// See [nng_dialer_create](https://nanomsg.github.io/nng/man/v1.1.0/nng_dialer_create.3).
-    pub(crate) fn create(socket: NngSocket, url: &str) -> NngResult<Self> {
+    pub(crate) fn new(socket: NngSocket, url: &str) -> Result<Self> {
         unsafe {
             let mut dialer = nng_dialer::default();
             let (_cstring, url) = to_cstr(url)?;
-            NngFail::succeed(
+            Error::zero_map(
                 nng_dialer_create(&mut dialer, socket.nng_socket(), url),
-                NngDialer { dialer, socket },
+                || NngDialer { dialer, socket },
             )
         }
     }
 
     // TODO: Use different type for started vs non-started dialer?  According to nng docs options can generally only
     // be set before the dialer is started.
-    pub fn start(&self) -> NngReturn {
-        unsafe { NngFail::from_i32(nng_dialer_start(self.dialer, 0)) }
+    pub fn start(&self) -> Result<()> {
+        unsafe { nng_int_to_result(nng_dialer_start(self.dialer, 0)) }
+    }
+}
+
+impl NngWrapper for NngDialer {
+    type NngType = nng_dialer;
+    unsafe fn get_nng_type(&self) -> Self::NngType {
+        self.dialer
     }
 }
 
 /// "Unsafe" version of `NngDialer`.  Merely wraps `nng_dialer` and makes no attempt to manage the underlying resources.
 /// May be invalid, close unexpectedly, etc.
+#[derive(Debug)]
 pub struct UnsafeDialer {
     dialer: nng_dialer,
 }

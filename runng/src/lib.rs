@@ -12,14 +12,23 @@ Features:
 
 Simple:
 ```rust
-use runng::*;
-fn test() -> Result<(), NngFail> {
+use runng::{
+    Dial, Listen, RecvSocket, SendSocket,
+    factory::latest::ProtocolFactory,
+    msg::NngMsg,
+    protocol::*,
+};
+fn simple_reqrep() -> Result<(), runng::Error> {
     const url: &str = "inproc://test";
-    let factory = Latest::default();
-    let rep = factory.replier_open()?.listen(&url)?;
-    let req = factory.requester_open()?.dial(&url)?;
-    req.send(msg::NngMsg::create()?)?;
-    rep.recv()?;
+
+    let factory = ProtocolFactory::default();
+    let mut rep = factory.replier_open()?;
+    rep.listen(&url)?;
+    let mut req = factory.requester_open()?;
+    req.dial(&url)?;
+    req.sendmsg(NngMsg::new()?)?;
+    rep.recvmsg()?;
+
     Ok(())
 }
 ```
@@ -27,40 +36,31 @@ fn test() -> Result<(), NngFail> {
 Asynchronous I/O:
 ```rust
 use futures::{
+    executor::block_on,
     future::Future,
     stream::Stream,
 };
 use runng::{
-    *,
+    Dial, Listen,
     asyncio::*,
+    factory::latest::ProtocolFactory,
+    msg::NngMsg,
     protocol::*,
 };
 
-fn aio() -> NngReturn {
+fn async_reqrep() -> Result<(), runng::Error> {
     const url: &str = "inproc://test";
 
-    let factory = Latest::default();
-    let mut rep_ctx = factory
-        .replier_open()?
-        .listen(&url)?
-        .create_async_stream(1)?;
+    let factory = ProtocolFactory::default();
+    let mut rep_sock = factory.replier_open()?;
+    let mut rep_ctx = rep_sock.listen(&url)?.create_async()?;
 
-    let mut req_ctx = factory
-        .requester_open()?
-        .dial(&url)?
-        .create_async()?;
-    let req_future = req_ctx.send(msg::NngMsg::create()?);
-    rep_ctx
-        .receive()
-        .unwrap()
-        .take(1)
-        .for_each(|_request| {
-            let msg = msg::NngMsg::create().unwrap();
-            rep_ctx.reply(msg).wait().unwrap().unwrap();
-            Ok(())
-        })
-        .wait()?;
-    req_future.wait().unwrap()?;
+    let mut req_sock = factory.requester_open()?;
+    let mut req_ctx = req_sock.dial(&url)?.create_async()?;
+    let req_future = req_ctx.send(NngMsg::new()?);
+    let _request = block_on(rep_ctx.receive())?;
+    block_on(rep_ctx.reply(NngMsg::new()?))?;
+    block_on(req_future)?;
 
     Ok(())
 }
@@ -70,12 +70,12 @@ Additional examples [in `examples/` folder](https://github.com/jeikabu/runng/tre
 
 */
 
-pub mod aio;
 pub mod asyncio;
 pub mod ctx;
 pub mod dialer;
 pub mod factory;
 pub mod listener;
+pub mod mem;
 pub mod msg;
 pub mod options;
 pub mod pipe;
@@ -85,9 +85,9 @@ pub mod socket;
 pub mod stats;
 pub mod transport;
 
-pub use self::aio::*;
 pub use self::ctx::*;
 pub use self::factory::*;
+pub use self::mem::NngString;
 pub use self::options::*;
 pub use self::result::*;
 pub use self::socket::*;
@@ -95,7 +95,17 @@ pub use self::socket::*;
 use log::{debug, trace};
 use runng_sys::*;
 
-// Trait where type exposes a socket, but this shouldn't be part of public API
+/// Type which wraps a native nng type
+trait NngWrapper {
+    /// Native nng type wrapped
+    type NngType;
+    /// Returns copy of wrapped nng type
+    unsafe fn get_nng_type(&self) -> Self::NngType;
+}
+
+/// Type exposes a socket, but this shouldn't be part of public API
+/// Can be removed if RFC is implemented: https://github.com/Centril/rfcs/blob/rfc/hidden-impls/text/0000-hidden-impls.md
+/// Meaning, `impl InternalSocket for XXX` could be replaced with `crate impl GetSocket for XXX`
 trait InternalSocket {
     fn socket(&self) -> &NngSocket;
     unsafe fn nng_socket(&self) -> nng_socket {
@@ -103,10 +113,10 @@ trait InternalSocket {
     }
 }
 
-// Return string and pointer so string isn't dropped
+/// Return string and pointer so string isn't dropped
 fn to_cstr(
     string: &str,
-) -> Result<(std::ffi::CString, *const std::os::raw::c_char), std::ffi::NulError> {
+) -> std::result::Result<(std::ffi::CString, *const std::os::raw::c_char), std::ffi::NulError> {
     let string = std::ffi::CString::new(string)?;
     let ptr = string.as_bytes_with_nul().as_ptr() as *const std::os::raw::c_char;
     Ok((string, ptr))

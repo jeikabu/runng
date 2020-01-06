@@ -1,85 +1,44 @@
 //! Return values and error handling
 
-use futures::sync::oneshot;
+use futures::channel::oneshot;
 use runng_sys::*;
-use std::{error, fmt, io, result};
-
-#[derive(Debug)]
-pub enum NngFail {
-    Err(nng_errno_enum),
-    Unknown(i32),
-    IoError(io::Error),
-    NulError(std::ffi::NulError),
-    Unit,
-    Canceled,
-    NoneError,
-}
-
-impl NngFail {
-    /// Converts values returned by NNG methods into `Result<>`
-    pub fn from_i32(value: i32) -> NngReturn {
-        if value == 0 {
-            Ok(())
-        } else if let Ok(error) = NngErrno::try_from(value) {
-            Err(NngFail::Err(error as u32))
-        } else {
-            Err(NngFail::Unknown(value))
-        }
-    }
-    pub fn succeed<T>(value: i32, result: T) -> NngResult<T> {
-        match NngFail::from_i32(value) {
-            Ok(()) => Ok(result),
-            Err(error) => Err(error),
-        }
-    }
-    pub fn succeed_then<T, F: FnOnce() -> T>(value: i32, result: F) -> NngResult<T> {
-        match NngFail::from_i32(value) {
-            Ok(()) => Ok(result()),
-            Err(error) => Err(error),
-        }
-    }
-}
-
-impl From<io::Error> for NngFail {
-    fn from(err: io::Error) -> NngFail {
-        NngFail::IoError(err)
-    }
-}
-
-impl From<std::ffi::NulError> for NngFail {
-    fn from(err: std::ffi::NulError) -> NngFail {
-        NngFail::NulError(err)
-    }
-}
-
-impl From<()> for NngFail {
-    fn from(_: ()) -> NngFail {
-        NngFail::Unit
-    }
-}
-
-impl From<oneshot::Canceled> for NngFail {
-    fn from(_: oneshot::Canceled) -> NngFail {
-        NngFail::Canceled
-    }
-}
-
-impl From<NngFail> for io::Error {
-    fn from(_err: NngFail) -> io::Error {
-        io::Error::from(io::ErrorKind::Other)
-    }
-}
-
-pub type NngResult<T> = Result<T, NngFail>;
-pub type NngReturn = NngResult<()>;
-
 use std::convert::TryFrom;
+use std::{error, fmt, result};
 
-type NewResult<T> = result::Result<T, Error>;
+pub type Result<T> = result::Result<T, Error>;
+
+/// Flattens nested results.
+/// Primary use case is with channels:
+/// ```
+/// use futures::channel::oneshot;
+/// use futures_util::future::FutureExt; // for map()
+///
+/// // Wrapper to explicity show the types
+/// fn flatten<T>(input: T) -> impl futures::Future<Output = runng::Result<runng::msg::NngMsg>>
+/// where
+///     T: futures::Future<Output = Result<runng::Result<runng::msg::NngMsg>, oneshot::Canceled>>,
+/// {
+///     input.map(runng::flatten_result)
+/// }
+///
+/// let (_, receiver) = oneshot::channel();
+/// let receiver = flatten(receiver);
+/// ```
+pub fn flatten_result<T, E, F>(
+    result: result::Result<result::Result<T, E>, F>,
+) -> result::Result<T, E>
+where
+    E: std::convert::From<F>,
+{
+    match result {
+        Ok(result) => result,
+        Err(err) => Err(err.into()),
+    }
+}
 
 /// Converts integers returned by NNG methods into `Result`.
 /// 0 is Ok() and anything else is Err()
-pub fn nng_int_to_result(value: i32) -> NewResult<()> {
+pub fn nng_int_to_result(value: i32) -> Result<()> {
     if value == 0 {
         Ok(())
     } else if let Ok(error) = Error::try_from(value) {
@@ -130,43 +89,42 @@ pub enum NngErrno {
 }
 
 impl TryFrom<i32> for NngErrno {
-    type Error = TryFromIntError;
+    type Error = EnumFromIntError;
 
-    #[allow(clippy::cyclomatic_complexity)]
     fn try_from(value: i32) -> result::Result<Self, Self::Error> {
-        match value {
-            value if value == NngErrno::EINTR as i32 => Ok(NngErrno::EINTR),
-            value if value == NngErrno::ENOMEM as i32 => Ok(NngErrno::ENOMEM),
-            value if value == NngErrno::EINVAL as i32 => Ok(NngErrno::EINVAL),
-            value if value == NngErrno::EBUSY as i32 => Ok(NngErrno::EBUSY),
-            value if value == NngErrno::ETIMEDOUT as i32 => Ok(NngErrno::ETIMEDOUT),
-            value if value == NngErrno::ECONNREFUSED as i32 => Ok(NngErrno::ECONNREFUSED),
-            value if value == NngErrno::ECLOSED as i32 => Ok(NngErrno::ECLOSED),
-            value if value == NngErrno::EAGAIN as i32 => Ok(NngErrno::EAGAIN),
-            value if value == NngErrno::ENOTSUP as i32 => Ok(NngErrno::ENOTSUP),
-            value if value == NngErrno::EADDRINUSE as i32 => Ok(NngErrno::EADDRINUSE),
-            value if value == NngErrno::ESTATE as i32 => Ok(NngErrno::ESTATE),
-            value if value == NngErrno::ENOENT as i32 => Ok(NngErrno::ENOENT),
-            value if value == NngErrno::EPROTO as i32 => Ok(NngErrno::EPROTO),
-            value if value == NngErrno::EUNREACHABLE as i32 => Ok(NngErrno::EUNREACHABLE),
-            value if value == NngErrno::EADDRINVAL as i32 => Ok(NngErrno::EADDRINVAL),
-            value if value == NngErrno::EPERM as i32 => Ok(NngErrno::EPERM),
-            value if value == NngErrno::EMSGSIZE as i32 => Ok(NngErrno::EMSGSIZE),
-            value if value == NngErrno::ECONNABORTED as i32 => Ok(NngErrno::ECONNABORTED),
-            value if value == NngErrno::ECONNRESET as i32 => Ok(NngErrno::ECONNRESET),
-            value if value == NngErrno::ECANCELED as i32 => Ok(NngErrno::ECANCELED),
-            value if value == NngErrno::ENOFILES as i32 => Ok(NngErrno::ENOFILES),
-            value if value == NngErrno::ENOSPC as i32 => Ok(NngErrno::ENOSPC),
-            value if value == NngErrno::EEXIST as i32 => Ok(NngErrno::EEXIST),
-            value if value == NngErrno::EREADONLY as i32 => Ok(NngErrno::EREADONLY),
-            value if value == NngErrno::EWRITEONLY as i32 => Ok(NngErrno::EWRITEONLY),
-            value if value == NngErrno::ECRYPTO as i32 => Ok(NngErrno::ECRYPTO),
-            value if value == NngErrno::EPEERAUTH as i32 => Ok(NngErrno::EPEERAUTH),
-            value if value == NngErrno::ENOARG as i32 => Ok(NngErrno::ENOARG),
-            value if value == NngErrno::EAMBIGUOUS as i32 => Ok(NngErrno::EAMBIGUOUS),
-            value if value == NngErrno::EBADTYPE as i32 => Ok(NngErrno::EBADTYPE),
-            value if value == NngErrno::EINTERNAL as i32 => Ok(NngErrno::EINTERNAL),
-            _ => Err(TryFromIntError),
+        match value as u32 {
+            runng_sys::NNG_EINTR => Ok(NngErrno::EINTR),
+            runng_sys::NNG_ENOMEM => Ok(NngErrno::ENOMEM),
+            runng_sys::NNG_EINVAL => Ok(NngErrno::EINVAL),
+            runng_sys::NNG_EBUSY => Ok(NngErrno::EBUSY),
+            runng_sys::NNG_ETIMEDOUT => Ok(NngErrno::ETIMEDOUT),
+            runng_sys::NNG_ECONNREFUSED => Ok(NngErrno::ECONNREFUSED),
+            runng_sys::NNG_ECLOSED => Ok(NngErrno::ECLOSED),
+            runng_sys::NNG_EAGAIN => Ok(NngErrno::EAGAIN),
+            runng_sys::NNG_ENOTSUP => Ok(NngErrno::ENOTSUP),
+            runng_sys::NNG_EADDRINUSE => Ok(NngErrno::EADDRINUSE),
+            runng_sys::NNG_ESTATE => Ok(NngErrno::ESTATE),
+            runng_sys::NNG_ENOENT => Ok(NngErrno::ENOENT),
+            runng_sys::NNG_EPROTO => Ok(NngErrno::EPROTO),
+            runng_sys::NNG_EUNREACHABLE => Ok(NngErrno::EUNREACHABLE),
+            runng_sys::NNG_EADDRINVAL => Ok(NngErrno::EADDRINVAL),
+            runng_sys::NNG_EPERM => Ok(NngErrno::EPERM),
+            runng_sys::NNG_EMSGSIZE => Ok(NngErrno::EMSGSIZE),
+            runng_sys::NNG_ECONNABORTED => Ok(NngErrno::ECONNABORTED),
+            runng_sys::NNG_ECONNRESET => Ok(NngErrno::ECONNRESET),
+            runng_sys::NNG_ECANCELED => Ok(NngErrno::ECANCELED),
+            runng_sys::NNG_ENOFILES => Ok(NngErrno::ENOFILES),
+            runng_sys::NNG_ENOSPC => Ok(NngErrno::ENOSPC),
+            runng_sys::NNG_EEXIST => Ok(NngErrno::EEXIST),
+            runng_sys::NNG_EREADONLY => Ok(NngErrno::EREADONLY),
+            runng_sys::NNG_EWRITEONLY => Ok(NngErrno::EWRITEONLY),
+            runng_sys::NNG_ECRYPTO => Ok(NngErrno::ECRYPTO),
+            runng_sys::NNG_EPEERAUTH => Ok(NngErrno::EPEERAUTH),
+            runng_sys::NNG_ENOARG => Ok(NngErrno::ENOARG),
+            runng_sys::NNG_EAMBIGUOUS => Ok(NngErrno::EAMBIGUOUS),
+            runng_sys::NNG_EBADTYPE => Ok(NngErrno::EBADTYPE),
+            runng_sys::NNG_EINTERNAL => Ok(NngErrno::EINTERNAL),
+            _ => Err(EnumFromIntError(value)),
         }
     }
 }
@@ -186,25 +144,25 @@ pub enum Error {
 
 impl Error {
     /// If `value` is zero returns `Ok(result())`.  Otherwise converts `value` to an `Error` and returns that.
-    pub fn zero_map<T, F: FnOnce() -> T>(value: i32, result: F) -> NewResult<T> {
+    pub fn zero_map<T, F: FnOnce() -> T>(value: i32, result: F) -> Result<T> {
         nng_int_to_result(value).map(|_| result())
     }
 }
 
 impl TryFrom<i32> for Error {
-    type Error = TryFromIntError;
+    type Error = EnumFromIntError;
 
     fn try_from(value: i32) -> result::Result<Self, Self::Error> {
         const ESYSERR: i32 = runng_sys::NNG_ESYSERR as i32;
         const ETRANERR: i32 = runng_sys::NNG_ETRANERR as i32;
         if value == 0 {
-            Err(TryFromIntError)
+            Err(EnumFromIntError(value))
         } else if let Ok(error) = NngErrno::try_from(value) {
             Ok(Error::Errno(error))
         } else if value & ESYSERR != 0 {
             Ok(Error::SysErr(value ^ ESYSERR))
         } else if value & ETRANERR != 0 {
-            Ok(Error::SysErr(value ^ ETRANERR))
+            Ok(Error::TranErr(value ^ ETRANERR))
         } else {
             Ok(Error::UnknownErrno(value))
         }

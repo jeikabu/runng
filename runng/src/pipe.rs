@@ -8,23 +8,47 @@ use runng_derive::NngGetOpts;
 use runng_sys::*;
 
 pub type PipeNotifyCallback =
-    unsafe extern "C" fn(pipe: nng_pipe, event: i32, arg1: PipeNotifyCallbackArg);
+    unsafe extern "C" fn(pipe: nng_pipe, event: nng_pipe_ev, arg1: PipeNotifyCallbackArg);
 pub type PipeNotifyCallbackArg = *mut ::std::os::raw::c_void;
 
+/// Pipe events that can occur on sockets.
+/// See [`nng_pipe_ev` in nng_pipe_notify](https://nng.nanomsg.org/man/v1.2.2/nng_pipe_notify.3.html).
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[repr(u32)]
+pub enum NngPipeEv {
+    AddPre = NNG_PIPE_EV_ADD_PRE,
+    AddPost = NNG_PIPE_EV_ADD_POST,
+    RemPost = NNG_PIPE_EV_REM_POST,
+}
+
+impl core::convert::TryFrom<nng_pipe_ev> for NngPipeEv {
+    type Error = EnumFromIntError;
+
+    fn try_from(value: nng_pipe_ev) -> std::result::Result<Self, Self::Error> {
+        use NngPipeEv::*;
+        match value {
+            NNG_PIPE_EV_ADD_PRE => Ok(AddPre),
+            NNG_PIPE_EV_ADD_POST => Ok(AddPost),
+            NNG_PIPE_EV_REM_POST => Ok(RemPost),
+            _ => Err(EnumFromIntError(value as i32)),
+        }
+    }
+}
+
 /// Wraps `nng_pipe`.  See [nng_pipe](https://nanomsg.github.io/nng/man/v1.1.0/nng_pipe.5).
-#[derive(NngGetOpts)] // Note: nng_pipe has no setopt() functions
+#[derive(Debug, NngGetOpts)] // Note: nng_pipe has no setopt() functions
 #[prefix = "nng_pipe_"]
 pub struct NngPipe {
-    #[nng_member]
     pipe: nng_pipe,
 }
 
 impl NngPipe {
     /// Get pipe associated with a message, if one exists.  See [nng_msg_get_pipe](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg_get_pipe.3).
-    pub(crate) fn create(message: &NngMsg) -> Option<Self> {
+    pub(crate) fn new(message: &NngMsg) -> Option<Self> {
         unsafe {
             let pipe = nng_msg_get_pipe(message.msg());
-            if (nng_pipe_id(pipe) as i32) < 0 {
+            let id = nng_pipe_id(pipe);
+            if id <= 0 {
                 None
             } else {
                 Some(NngPipe { pipe })
@@ -74,7 +98,14 @@ impl NngPipe {
 
     /// Closes the pipe.  See [nng_pipe_close](https://nanomsg.github.io/nng/man/v1.1.0/nng_pipe_close.3).
     /// This will cause associated aio/ctx functions that were using the pipe to fail.
-    pub unsafe fn close(self) -> NngReturn {
-        NngFail::from_i32(nng_pipe_close(self.pipe))
+    pub unsafe fn close(self) -> Result<()> {
+        nng_int_to_result(nng_pipe_close(self.pipe))
+    }
+}
+
+impl NngWrapper for NngPipe {
+    type NngType = nng_pipe;
+    unsafe fn get_nng_type(&self) -> Self::NngType {
+        self.pipe
     }
 }

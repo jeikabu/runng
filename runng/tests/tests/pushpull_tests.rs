@@ -1,96 +1,139 @@
-use crate::common::{create_stop_message, get_url, not_stop_message};
-use futures::{future::Future, Stream};
-use runng::{asyncio::*, *};
+use crate::common::*;
+use runng::{
+    asyncio::*,
+    options::{NngOption, SetOpts},
+    socket::*,
+};
 use std::{
     sync::{
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc,
     },
     thread,
 };
 
-#[test]
-fn pushpull() -> NngReturn {
-    let url = get_url();
-    let factory = Latest::default();
+fn create_pusher(url: &str) -> runng::Result<protocol::Push0> {
+    let mut sock = protocol::Push0::open()?;
+    sock.set_duration(NngOption::SENDTIMEO, DURATION_LONG)?
+        .set_int(NngOption::SENDBUF, 1000)?;
+    sock.listen(&url)?;
+    Ok(sock)
+}
 
-    let pusher = factory.pusher_open()?.listen(&url)?;
-    let puller = factory.puller_open()?.dial(&url)?;
-    let count = 4;
+fn create_puller(url: &str) -> runng::Result<protocol::Pull0> {
+    let mut sock = protocol::Pull0::open()?;
+    sock.set_duration(NngOption::RECVTIMEO, DURATION_LONG)?
+        .set_int(NngOption::RECVBUF, 1000)?;
+    sock.dial(&url)?;
+    Ok(sock)
+}
+
+#[test]
+fn pull_stream() -> runng::Result<()> {
+    let url = get_url();
+    let pusher = create_pusher(&url)?;
+    let puller = create_puller(&url)?;
+
+    let puller_ready = Arc::new(AtomicBool::default());
+    let done = Arc::new(AtomicBool::default());
 
     // Pusher
-    let push_thread = thread::spawn(move || -> NngReturn {
+    let push_vars = (puller_ready.clone(), done.clone());
+    let push_thread = thread::spawn(move || -> runng::Result<()> {
         let mut push_ctx = pusher.create_async()?;
-        // Send messages
-        for i in 0..count {
-            let mut msg = msg::NngMsg::create()?;
-            msg.append_u32(i)?;
-            push_ctx.send(msg).wait().unwrap()?;
+        let (puller_ready, done) = push_vars;
+
+        // Wait for puller (or end of test)
+        while !puller_ready.load(Ordering::Relaxed) && !done.load(Ordering::Relaxed) {
+            sleep_brief();
+        }
+
+        let mut count = 1;
+        while !done.load(Ordering::Relaxed) {
+            let mut msg = NngMsg::new()?;
+            msg.append_u32(count)?;
+            count += 1;
+            block_on(push_ctx.send(msg))?;
+            sleep_brief();
         }
         // Send a stop message
-        push_ctx.send(create_stop_message()).wait().unwrap()?;
+        block_on(push_ctx.send(create_stop_message()))?;
         Ok(())
     });
 
     // Puller
     let recv_count = Arc::new(AtomicUsize::new(0));
-    let thread_count = recv_count.clone();
-    let pull_thread = thread::spawn(move || -> NngReturn {
+    let pull_vars = (puller_ready.clone(), recv_count.clone());
+    let pull_thread = thread::spawn(move || -> runng::Result<()> {
         let mut pull_ctx = puller.create_async_stream(1)?;
-        pull_ctx
+        let (puller_ready, recv_count) = pull_vars;
+        puller_ready.store(true, Ordering::Relaxed);
+        let fut = pull_ctx
             .receive()
             .unwrap()
             // Process until receive stop message
             .take_while(not_stop_message)
             // Increment count of received messages
             .for_each(|_| {
-                thread_count.fetch_add(1, Ordering::Relaxed);
-                Ok(())
-            })
-            .wait()
-            .unwrap();
+                recv_count.fetch_add(1, Ordering::Relaxed);
+                future::ready(())
+            });
+        block_on(fut);
         Ok(())
     });
 
+    sleep_test();
+    done.store(true, Ordering::Relaxed);
     push_thread.join().unwrap()?;
     pull_thread.join().unwrap()?;
-
-    // Received number of messages we sent
-    assert_eq!(recv_count.load(Ordering::Relaxed), count as usize);
+    assert!(recv_count.load(Ordering::Relaxed) > 1);
 
     Ok(())
 }
 
 #[test]
-fn read() -> NngReturn {
+fn read() -> runng::Result<()> {
     let url = get_url();
-    let factory = Latest::default();
 
-    let pusher = factory.pusher_open()?.listen(&url)?;
-    let puller = factory.puller_open()?.dial(&url)?;
-    let count = 4;
+    let pusher = create_pusher(&url)?;
+    let puller = create_puller(&url)?;
+    let puller_ready = Arc::new(AtomicBool::default());
+    let done = Arc::new(AtomicBool::default());
 
     // Pusher
-    let push_thread = thread::spawn(move || -> NngReturn {
+    let push_vars = (puller_ready.clone(), done.clone());
+    let push_thread = thread::spawn(move || -> runng::Result<()> {
+        let (puller_ready, done) = push_vars;
         let mut push_ctx = pusher.create_async()?;
+
+        // Wait for puller (or end of test)
+        while !puller_ready.load(Ordering::Relaxed) && !done.load(Ordering::Relaxed) {
+            sleep_brief();
+        }
+
         // Send messages
-        for i in 0..count {
-            let mut msg = msg::NngMsg::create()?;
-            msg.append_u32(i)?;
-            push_ctx.send(msg).wait().unwrap()?;
+        let mut count = 1;
+        while !done.load(Ordering::Relaxed) {
+            let mut msg = NngMsg::new()?;
+            msg.append_u32(count)?;
+            count += 1;
+            block_on(push_ctx.send(msg))?;
+            sleep_brief();
         }
         // Send a stop message
-        push_ctx.send(create_stop_message()).wait().unwrap()?;
+        block_on(push_ctx.send(create_stop_message()))?;
         Ok(())
     });
 
     // Puller
     let recv_count = Arc::new(AtomicUsize::new(0));
-    let thread_count = recv_count.clone();
-    let pull_thread = thread::spawn(move || -> NngReturn {
+    let pull_vars = (puller_ready.clone(), done.clone(), recv_count.clone());
+    let pull_thread = thread::spawn(move || -> runng::Result<()> {
+        let (puller_ready, done, thread_count) = pull_vars;
         let mut read_ctx = puller.create_async()?;
-        loop {
-            let msg = read_ctx.receive().wait()??;
+        puller_ready.store(true, Ordering::Relaxed);
+        while !done.load(Ordering::Relaxed) {
+            let msg = block_on(read_ctx.receive())?;
             if msg.is_empty() {
                 break;
             } else {
@@ -100,51 +143,14 @@ fn read() -> NngReturn {
         Ok(())
     });
 
+    sleep_test();
+    done.store(true, Ordering::Relaxed);
+
     push_thread.join().unwrap()?;
     pull_thread.join().unwrap()?;
 
     // Received number of messages we sent
-    assert_eq!(recv_count.load(Ordering::Relaxed), count as usize);
+    assert!(recv_count.load(Ordering::Relaxed) > 1);
 
     Ok(())
 }
-
-// #[test]
-// fn crash() -> NngReturn {
-//     let url = get_url();
-//     let factory = Latest::default();
-
-//     let pusher = factory.pusher_open()?.listen(&url)?;
-//     let puller = factory.puller_open()?.dial(&url)?;
-
-//     // Pusher
-//     let push_thread = thread::spawn(move || -> NngReturn {
-//         let mut push_ctx = pusher.create_async()?;
-//         // Send messages
-//         loop {
-//             let msg = msg::NngMsg::create()?;
-//             push_ctx.send(msg).wait().unwrap()?;
-//         }
-//         Ok(())
-//     });
-
-//     // Puller
-//     let recv_count = Arc::new(AtomicUsize::new(0));
-//     let thread_count = recv_count.clone();
-//     let pull_thread = thread::spawn(move || -> NngReturn {
-//         puller.create_async()?
-//             .receive().unwrap()
-//             .for_each(|msg| {
-//                 debug!("Pulled: {:?}", msg);
-//                 Ok(())
-//             }
-//             )
-//             .wait().unwrap();
-//         Ok(())
-//     });
-
-//     push_thread.join().unwrap();
-//     pull_thread.join().unwrap();
-
-//     Ok(())
-// }

@@ -5,13 +5,15 @@ use crate::asyncio::*;
 use runng_sys::*;
 
 /// Pull half of push/pull ("pipeline") pattern.  See [nng_pull](https://nanomsg.github.io/nng/man/v1.1.0/nng_pull.7).
+#[derive(Clone, Debug, NngGetOpts, NngSetOpts)]
+#[prefix = "nng_socket_"]
 pub struct Pull0 {
     socket: NngSocket,
 }
 
 impl Pull0 {
     /// Create a pull socket.  See [nng_pull_open](https://nanomsg.github.io/nng/man/v1.1.0/nng_pull_open.3).
-    pub fn open() -> NngResult<Self> {
+    pub fn open() -> Result<Self> {
         nng_open(
             |socket| unsafe { nng_pull0_open(socket) },
             |socket| Pull0 { socket },
@@ -19,7 +21,7 @@ impl Pull0 {
     }
 }
 
-impl Socket for Pull0 {
+impl GetSocket for Pull0 {
     fn socket(&self) -> &NngSocket {
         &self.socket
     }
@@ -28,9 +30,10 @@ impl Socket for Pull0 {
     }
 }
 
+impl Socket for Pull0 {}
 impl Dial for Pull0 {}
 impl Listen for Pull0 {}
-impl RecvMsg for Pull0 {}
+impl RecvSocket for Pull0 {}
 
 impl AsyncSocket for Pull0 {
     type ContextType = PullAsyncHandle;

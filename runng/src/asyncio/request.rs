@@ -1,15 +1,8 @@
 //! Async request/reply
 
-use crate::{
-    aio::{AioCallbackArg, NngAio},
-    asyncio::*,
-    ctx::NngCtx,
-    msg::NngMsg,
-    *,
-};
-use futures::sync::oneshot;
+use super::*;
+use crate::ctx::NngCtx;
 use log::{debug, info};
-use runng_sys::*;
 
 #[derive(Debug, PartialEq)]
 enum RequestState {
@@ -18,29 +11,36 @@ enum RequestState {
     Receiving,
 }
 
+#[derive(Debug)]
 struct RequestContextAioArg {
+    aio: NngAio,
     ctx: NngCtx,
+    sender: Option<oneshot::Sender<Result<NngMsg>>>,
+    socket: NngSocket,
     state: RequestState,
-    sender: Option<oneshot::Sender<NngResult<NngMsg>>>,
 }
 
 impl RequestContextAioArg {
-    pub fn create(socket: NngSocket) -> NngResult<Box<Self>> {
-        let ctx = NngCtx::create(socket)?;
-        let arg = Self {
-            ctx,
-            state: RequestState::Ready,
-            sender: None,
-        };
-        NngAio::register_aio(arg, request_callback)
+    pub fn new(socket: NngSocket) -> Result<AioArg<Self>> {
+        let ctx = NngCtx::new(socket.clone())?;
+        NngAio::create(
+            |aio| Self {
+                aio,
+                ctx,
+                sender: None,
+                socket,
+                state: RequestState::Ready,
+            },
+            request_callback,
+        )
     }
-    pub fn send(&mut self, msg: NngMsg, sender: oneshot::Sender<NngResult<NngMsg>>) {
+    pub fn send(&mut self, msg: NngMsg, sender: oneshot::Sender<Result<NngMsg>>) {
         if self.state != RequestState::Ready {
             panic!();
         }
         self.sender = Some(sender);
         unsafe {
-            let aio = self.ctx.aio().nng_aio();
+            let aio = self.aio.nng_aio();
             let ctx = self.ctx.ctx();
             self.state = RequestState::Sending;
 
@@ -54,53 +54,54 @@ impl RequestContextAioArg {
 
 impl Aio for RequestContextAioArg {
     fn aio(&self) -> &NngAio {
-        self.ctx.aio()
+        &self.aio
     }
     fn aio_mut(&mut self) -> &mut NngAio {
-        self.ctx.aio_mut()
+        &mut self.aio
     }
 }
 
-/// Asynchronous context for request socket.
+/// Async request context for request/reply pattern.
+#[derive(Debug)]
 pub struct RequestAsyncHandle {
-    aio_arg: Box<RequestContextAioArg>,
+    aio_arg: AioArg<RequestContextAioArg>,
 }
 
 impl AsyncContext for RequestAsyncHandle {
-    fn create(socket: NngSocket) -> NngResult<Self> {
-        let aio_arg = RequestContextAioArg::create(socket)?;
+    fn new(socket: NngSocket) -> Result<Self> {
+        let aio_arg = RequestContextAioArg::new(socket)?;
         let ctx = Self { aio_arg };
         Ok(ctx)
     }
 }
 
-/// Trait for asynchronous contexts that can send a request and receive a reply.
+/// Trait for async contexts that can send a request and receive a reply.
 pub trait AsyncRequest {
     /// Asynchronously send a request and return a future for the reply.
-    fn send(&mut self, msg: NngMsg) -> oneshot::Receiver<NngResult<NngMsg>>;
+    fn send(&mut self, msg: NngMsg) -> oneshot::Receiver<Result<NngMsg>>;
 }
 
 impl AsyncRequest for RequestAsyncHandle {
-    fn send(&mut self, msg: NngMsg) -> oneshot::Receiver<NngResult<NngMsg>> {
-        let (sender, receiver) = oneshot::channel::<NngResult<NngMsg>>();
+    fn send(&mut self, msg: NngMsg) -> oneshot::Receiver<Result<NngMsg>> {
+        let (sender, receiver) = oneshot::channel::<Result<NngMsg>>();
         self.aio_arg.send(msg, sender);
         receiver
     }
 }
 
-unsafe extern "C" fn request_callback(arg: AioCallbackArg) {
+unsafe extern "C" fn request_callback(arg: AioArgPtr) {
     let ctx = &mut *(arg as *mut RequestContextAioArg);
-    let aionng = ctx.ctx.aio().nng_aio();
+    let aionng = ctx.aio.nng_aio();
     let ctxnng = ctx.ctx.ctx();
     trace!("callback Request:{:?}", ctx.state);
     match ctx.state {
         RequestState::Ready => panic!(),
         RequestState::Sending => {
-            let res = NngFail::from_i32(nng_aio_result(aionng));
+            let res = nng_int_to_result(nng_aio_result(aionng));
             match res {
                 Err(res) => {
                     // Nng requries we resume ownership of the message
-                    let _ = NngMsg::new_msg(nng_aio_get_msg(aionng));
+                    let _ = NngMsg::from_raw(nng_aio_get_msg(aionng));
 
                     ctx.state = RequestState::Ready;
                     let sender = ctx.sender.take().unwrap();
@@ -114,7 +115,7 @@ unsafe extern "C" fn request_callback(arg: AioCallbackArg) {
         }
         RequestState::Receiving => {
             let sender = ctx.sender.take().unwrap();
-            let res = NngFail::from_i32(nng_aio_result(aionng));
+            let res = nng_int_to_result(nng_aio_result(aionng));
             match res {
                 Err(res) => {
                     ctx.state = RequestState::Ready;
@@ -124,7 +125,7 @@ unsafe extern "C" fn request_callback(arg: AioCallbackArg) {
                     }
                 }
                 Ok(()) => {
-                    let msg = NngMsg::new_msg(nng_aio_get_msg(aionng));
+                    let msg = NngMsg::from_raw(nng_aio_get_msg(aionng));
 
                     ctx.state = RequestState::Ready;
                     let res = sender.send(Ok(msg));

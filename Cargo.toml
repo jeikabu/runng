@@ -1,11 +1,5 @@
 [workspace]
 members = [
-    "runng_sys",
-    "runng",
-    "runng_derive",
-]
-default-members = [
-    "runng_sys",
     "runng",
     "runng_derive",
 ]

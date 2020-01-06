@@ -1,25 +1,28 @@
 //#![cfg(feature = "stats")]
 
-use crate::common::init_logging;
+use crate::common::*;
 use log::debug;
-use runng::{stats::*, *};
+use runng::{factory::compat::ProtocolFactory, socket::*, stats::*};
 
-fn init_stats() -> NngResult<(runng::protocol::push0::Push0, runng::protocol::pull0::Pull0)> {
+fn init_stats() -> runng::Result<(protocol::pair0::Pair0, protocol::pair0::Pair0)> {
     init_logging();
     // FIXME: can remove this in NNG 1.1.2 or 1.2
     // https://github.com/nanomsg/nng/issues/841
-    let url = "inproc://test";
-    let factory = Latest::default();
-    let pusher = factory.pusher_open()?.listen(&url)?;
-    let puller = factory.puller_open()?.dial(&url)?;
-    Ok((pusher, puller))
+    let url = get_url();
+    let factory = ProtocolFactory::default();
+    let mut p0 = factory.pair_open()?;
+    p0.listen(&url)?;
+    let mut p1 = factory.pair_open()?;
+    p1.dial(&url)?;
+    Ok((p0, p1))
 }
 
 #[test]
-fn stats_example() -> NngResult<()> {
-    let (_pusher, _puller) = init_stats()?;
-
-    let stats = NngStatRoot::create()?;
+fn stats_example() -> runng::Result<()> {
+    let (_p0, _p1) = init_stats()?;
+    // NB: without a short sleep there's ~10% chance we get stuck reading socket stats
+    sleep_brief();
+    let stats = NngStatRoot::new()?;
     let child = stats.child().unwrap();
     for stat in child.iter() {
         debug!("{}", stat.name().unwrap());

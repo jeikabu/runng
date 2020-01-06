@@ -1,6 +1,6 @@
 [package]
 name = "runng"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Jake W <jeikabu@gmail.com>"]
 
 description = "High-level wrapper around nng (Nanomsg-Next-Generation) aka Nanomsg2"
@@ -23,23 +23,25 @@ pipes = []
 stats = []
 
 [dependencies]
-backtrace = "0.3"
-futures = "0.1"
+bitflags = "1.0"
+futures = { version = "0.3.0-alpha", package = "futures-preview" }
+futures_util = { version = "0.3.0-alpha", package = "futures-util-preview" }
 log = "0.4"
-runng_derive = { version = "0.1", path = "../runng_derive" }
-runng_sys = { version = "1.1.1-rc", path = "../runng_sys", package = "nng-sys" }
+rand = "0.6"
+runng_derive = { version = "0.2", path = "../runng_derive" }
+runng-sys = { version = "1.2.3-rc" }
+
+# To enable bindgen only when building for PC, I'd like to have:
+#[target.'cfg(target_arch = "x86_64")'.dependencies]
+#runng-sys = { version = "1.1.1-rc", path = "../runng_sys", package = "nng-sys", features = ["build-bindgen"] }
+#[target.'cfg(target_arch = "aarch64")'.dependencies]
+#runng-sys = { version = "1.1.1-rc", path = "../runng_sys", package = "nng-sys" }
+#
+# But that doesn't work, `features` are set regardless of target arch.  
+# Instead, could ignore the `build-bindgen` feature but that complicates everything:
+#cfg!(any(target_arch = "arm", target_arch = "aarch64"))
 
 [dev-dependencies]
-clap = "2.32"
-criterion = "0.2"
 env_logger = "0.6"
-futures-timer = "0.1"
-tokio = "0.1"
-
-[[bench]]
-name = "reqrep_bench"
-harness = false
-
-[[bench]]
-name = "pushpull_bench"
-harness = false
+failure = "0.1"
+futures-timer = "0.3"
