@@ -19,7 +19,6 @@ addons:
     packages:
       # To build nng
       - cmake
-      - ninja-build
       # To build kcov
       - libcurl4-openssl-dev
       - libelf-dev
@@ -27,10 +26,6 @@ addons:
       - gcc
       - binutils-dev
       - libiberty-dev
-
-before_install:
-  # Using `source` so can update PATH environment variable
-  - source ./scripts/install.sh
 
 before_script:
   - rustup component add clippy

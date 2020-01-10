@@ -4,7 +4,7 @@ version = "0.3.0"
 authors = ["Jake W <jeikabu@gmail.com>"]
 
 description = "High-level wrapper around nng (Nanomsg-Next-Generation) aka Nanomsg2"
-keywords = ["nng", "nanomsg", "zeromq"]
+keywords = ["nng", "nanomsg", "zeromq", "runng"]
 categories = ["network-programming"]
 license = "MIT"
 repository = "https://github.com/jeikabu/runng"
@@ -12,7 +12,6 @@ readme = "README.md"
 edition = "2018"
 
 [badges]
-appveyor = { repository = "jake-ruyi/runng", branch = "master", service = "github" }
 travis-ci = { repository = "jeikabu/runng", branch = "master" }
 codecov = { repository = "jeikabu/runng", branch = "master", service = "github" }
 
@@ -29,7 +28,7 @@ futures_util = { version = "0.3.0-alpha", package = "futures-util-preview" }
 log = "0.4"
 rand = "0.6"
 runng_derive = { version = "0.2", path = "../runng_derive" }
-runng-sys = { version = "1.2.3-rc" }
+runng-sys = { version = "1.2.3-rc", path = "../runng_sys", package = "nng-sys" }
 
 # To enable bindgen only when building for PC, I'd like to have:
 #[target.'cfg(target_arch = "x86_64")'.dependencies]
