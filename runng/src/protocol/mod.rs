@@ -1,4 +1,4 @@
-//! NNG protocols.  See [Section 7](https://nanomsg.github.io/nng/man/v1.1.0/index.html#_section_7_protocols_and_transports).
+//! NNG protocols.  See [Section 7](https://nng.nanomsg.org/man/v1.2.2/index.html#_section_7_protocols_and_transports).
 
 pub mod bus0;
 pub mod pair0;

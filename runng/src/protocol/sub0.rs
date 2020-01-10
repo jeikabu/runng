@@ -4,7 +4,7 @@ use super::*;
 use crate::{asyncio::*, *};
 use runng_sys::*;
 
-/// Subscribe half of publisher/subscriber pattern.  See [nng_sub](https://nanomsg.github.io/nng/man/v1.1.0/nng_sub.7).
+/// Subscribe half of publisher/subscriber pattern.  See [nng_sub](https://nng.nanomsg.org/man/v1.2.2/nng_sub.7).
 #[derive(Clone, Debug, NngGetOpts, NngSetOpts)]
 #[prefix = "nng_socket_"]
 pub struct Sub0 {
@@ -12,7 +12,7 @@ pub struct Sub0 {
 }
 
 impl Sub0 {
-    /// Create a sub socket.  See [nng_sub_open](https://nanomsg.github.io/nng/man/v1.1.0/nng_sub_open.3).
+    /// Create a sub socket.  See [nng_sub_open](https://nng.nanomsg.org/man/v1.2.2/nng_sub_open.3).
     pub fn open() -> Result<Self> {
         nng_open(
             |socket| unsafe { nng_sub0_open(socket) },

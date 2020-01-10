@@ -1,7 +1,7 @@
 use core::ffi::c_void;
 use runng_sys::*;
 
-/// Wraps memory allocated with `nng_alloc`.  See [nng_alloc](https://nanomsg.github.io/nng/man/v1.1.0/nng_alloc.3) and [nng_free](https://nanomsg.github.io/nng/man/v1.1.0/nng_free.3).
+/// Wraps memory allocated with `nng_alloc`.  See [nng_alloc](https://nng.nanomsg.org/man/v1.2.2/nng_alloc.3) and [nng_free](https://nng.nanomsg.org/man/v1.2.2/nng_free.3).
 #[derive(Debug)]
 pub struct Alloc {
     ptr: *mut c_void,

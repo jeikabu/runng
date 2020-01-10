@@ -4,7 +4,7 @@ use super::*;
 use crate::asyncio::*;
 use runng_sys::*;
 
-/// Push half of push/pull ("pipeline") pattern.  See [nng_push](https://nanomsg.github.io/nng/man/v1.1.0/nng_push.7).
+/// Push half of push/pull ("pipeline") pattern.  See [nng_push](https://nng.nanomsg.org/man/v1.2.2/nng_push.7).
 #[derive(Clone, Debug, NngGetOpts, NngSetOpts)]
 #[prefix = "nng_socket_"]
 pub struct Push0 {
@@ -12,7 +12,7 @@ pub struct Push0 {
 }
 
 impl Push0 {
-    /// Create a push socket.  See [nng_push_open](https://nanomsg.github.io/nng/man/v1.1.0/nng_push_open.3).
+    /// Create a push socket.  See [nng_push_open](https://nng.nanomsg.org/man/v1.2.2/nng_push_open.3).
     pub fn open() -> Result<Self> {
         nng_open(
             |socket| unsafe { nng_push0_open(socket) },

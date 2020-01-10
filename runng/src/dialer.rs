@@ -4,7 +4,7 @@ use crate::*;
 use runng_derive::{NngGetOpts, NngSetOpts};
 use runng_sys::*;
 
-/// Wraps `nng_dialer`.  See [nng_dialer](https://nanomsg.github.io/nng/man/v1.1.0/nng_dialer.5).
+/// Wraps `nng_dialer`.  See [nng_dialer](https://nng.nanomsg.org/man/v1.2.2/nng_dialer.5).
 #[derive(Debug, NngGetOpts, NngSetOpts)]
 #[prefix = "nng_dialer_"]
 pub struct NngDialer {
@@ -13,7 +13,7 @@ pub struct NngDialer {
 }
 
 impl NngDialer {
-    /// See [nng_dialer_create](https://nanomsg.github.io/nng/man/v1.1.0/nng_dialer_create.3).
+    /// See [nng_dialer_create](https://nng.nanomsg.org/man/v1.2.2/nng_dialer_create.3).
     pub(crate) fn new(socket: NngSocket, url: &str) -> Result<Self> {
         unsafe {
             let mut dialer = nng_dialer::default();

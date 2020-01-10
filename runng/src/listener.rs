@@ -4,7 +4,7 @@ use super::*;
 use runng_derive::{NngGetOpts, NngSetOpts};
 use runng_sys::*;
 
-/// Wraps `nng_listener`.  See [nng_listener](https://nanomsg.github.io/nng/man/v1.1.0/nng_listener.5).
+/// Wraps `nng_listener`.  See [nng_listener](https://nng.nanomsg.org/man/v1.2.2/nng_listener.5).
 #[derive(Debug, NngGetOpts, NngSetOpts)]
 #[prefix = "nng_listener_"]
 pub struct NngListener {
@@ -13,7 +13,7 @@ pub struct NngListener {
 }
 
 impl NngListener {
-    /// See [nng_listener_create](https://nanomsg.github.io/nng/man/v1.1.0/nng_listener_create.3).
+    /// See [nng_listener_create](https://nng.nanomsg.org/man/v1.2.2/nng_listener_create.3).
     pub(crate) fn new(socket: NngSocket, url: &str) -> Result<Self> {
         unsafe {
             let mut listener = nng_listener::default();
@@ -23,7 +23,7 @@ impl NngListener {
         }
     }
 
-    /// See [nng_listener_start](https://nanomsg.github.io/nng/man/v1.1.0/nng_listener_start.3).
+    /// See [nng_listener_start](https://nng.nanomsg.org/man/v1.2.2/nng_listener_start.3).
     pub fn start(&self) -> Result<()> {
         // TODO: Use different type for started vs non-started dialer?  According to nng docs options can generally only
         // be set before the dialer is started.
@@ -59,7 +59,7 @@ impl UnsafeListener {
         Self { listener }
     }
 
-    /// See [nng_listener_id](https://nanomsg.github.io/nng/man/v1.1.0/nng_listener_id.3).
+    /// See [nng_listener_id](https://nng.nanomsg.org/man/v1.2.2/nng_listener_id.3).
     pub fn id(&self) -> i32 {
         unsafe { nng_listener_id(self.listener) }
     }

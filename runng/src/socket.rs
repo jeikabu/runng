@@ -27,7 +27,7 @@ bitflags! {
     }
 }
 
-/// Wraps `nng_socket`.  See [nng_socket](https://nanomsg.github.io/nng/man/v1.1.0/nng_socket.5).
+/// Wraps `nng_socket`.  See [nng_socket](https://nng.nanomsg.org/man/v1.2.2/nng_socket.5).
 #[derive(Debug)]
 pub struct NngSocket {
     socket: Arc<InnerSocket>,
@@ -45,7 +45,7 @@ impl NngSocket {
         self.socket.socket
     }
 
-    /// Register pipe notification callback.  See [nng_pipe_notify](https://nanomsg.github.io/nng/man/v1.1.0/nng_pipe_notify.3).
+    /// Register pipe notification callback.  See [nng_pipe_notify](https://nng.nanomsg.org/man/v1.2.2/nng_pipe_notify.3).
     #[cfg(feature = "pipes")]
     pub fn notify(
         &self,
@@ -132,12 +132,12 @@ pub trait Socket: GetSocket + Sized {
 
 /// `Socket` that can accept connections from ("listen" to) other `Socket`s.
 pub trait Listen: Socket {
-    /// Listen for connections to specified URL.  See [nng_listen](https://nanomsg.github.io/nng/man/v1.1.0/nng_listen.3).
+    /// Listen for connections to specified URL.  See [nng_listen](https://nng.nanomsg.org/man/v1.2.2/nng_listen.3).
     fn listen(&mut self, url: &str) -> Result<&mut Self> {
         self.listen_flags(url, Default::default())
     }
 
-    /// Listen for connections to specified URL.  See [nng_listen](https://nanomsg.github.io/nng/man/v1.1.0/nng_listen.3).
+    /// Listen for connections to specified URL.  See [nng_listen](https://nng.nanomsg.org/man/v1.2.2/nng_listen.3).
     fn listen_flags(&mut self, url: &str, flags: SocketFlags) -> Result<&mut Self> {
         unsafe {
             let (_cstring, ptr) = to_cstr(url)?;
@@ -153,12 +153,12 @@ pub trait Listen: Socket {
 
 /// `Socket` that can connect to ("dial") another `Socket`.
 pub trait Dial: Socket {
-    /// Dial socket specified by URL.  See [nng_dial](https://nanomsg.github.io/nng/man/v1.1.0/nng_dial.3)
+    /// Dial socket specified by URL.  See [nng_dial](https://nng.nanomsg.org/man/v1.2.2/nng_dial.3)
     fn dial(&mut self, url: &str) -> Result<&mut Self> {
         self.dial_flags(url, Default::default())
     }
 
-    /// Dial socket specified by URL.  See [nng_dial](https://nanomsg.github.io/nng/man/v1.1.0/nng_dial.3)
+    /// Dial socket specified by URL.  See [nng_dial](https://nng.nanomsg.org/man/v1.2.2/nng_dial.3)
     fn dial_flags(&mut self, url: &str, flags: SocketFlags) -> Result<&mut Self> {
         unsafe {
             let (_cstring, ptr) = to_cstr(url)?;
@@ -194,12 +194,12 @@ impl<T: fmt::Debug> fmt::Display for SendError<T> {
 
 /// `Socket` that can send data.
 pub trait SendSocket: Socket {
-    /// Send data.  See [nng_send](https://nanomsg.github.io/nng/man/v1.1.0/nng_send.3).
+    /// Send data.  See [nng_send](https://nng.nanomsg.org/man/v1.2.2/nng_send.3).
     fn send(&self, data: &[u8]) -> Result<()> {
         self.send_flags(data, Default::default())
     }
 
-    /// Send data with [`Flags`](struct.Flags.html).  See [nng_send](https://nanomsg.github.io/nng/man/v1.1.0/nng_send.3).
+    /// Send data with [`Flags`](struct.Flags.html).  See [nng_send](https://nng.nanomsg.org/man/v1.2.2/nng_send.3).
     fn send_flags(&self, data: &[u8], flags: Flags) -> Result<()> {
         unsafe {
             let ptr = data.as_ptr() as *mut std::os::raw::c_void;
@@ -231,13 +231,13 @@ pub trait SendSocket: Socket {
         }
     }
 
-    /// Send a [`NngMsg`](../msg/struct.NngMsg.html).  See [nng_sendmsg](https://nanomsg.github.io/nng/man/v1.1.0/nng_sendmsg.3).
+    /// Send a [`NngMsg`](../msg/struct.NngMsg.html).  See [nng_sendmsg](https://nng.nanomsg.org/man/v1.2.2/nng_sendmsg.3).
     fn sendmsg(&self, msg: msg::NngMsg) -> Result<()> {
         let res = self.sendmsg_flags(msg, Default::default());
         res.map_err(|err| err.error)
     }
 
-    /// Send a [`NngMsg`](../msg/struct.NngMsg.html) with [`Flags`](struct.Flags.html).  See [nng_sendmsg](https://nanomsg.github.io/nng/man/v1.1.0/nng_sendmsg.3).
+    /// Send a [`NngMsg`](../msg/struct.NngMsg.html) with [`Flags`](struct.Flags.html).  See [nng_sendmsg](https://nng.nanomsg.org/man/v1.2.2/nng_sendmsg.3).
     fn sendmsg_flags(
         &self,
         msg: msg::NngMsg,
@@ -258,7 +258,7 @@ pub trait SendSocket: Socket {
 
 /// `Socket` that can receive data.
 pub trait RecvSocket: Socket {
-    /// Receive data.  See [nng_recv](https://nanomsg.github.io/nng/man/v1.1.0/nng_recv.3).
+    /// Receive data.  See [nng_recv](https://nng.nanomsg.org/man/v1.2.2/nng_recv.3).
     /// Lifetime of return value is same as input buffer.
     fn recv<'a>(&self, buffer: &'a mut [u8]) -> Result<&'a [u8]> {
         self.recv_flags(buffer, Default::default())
@@ -299,7 +299,7 @@ pub trait RecvSocket: Socket {
         self.recvmsg_flags(Default::default())
     }
 
-    /// Receive a [`NngMsg`](../msg/struct.NngMsg.html) with [`Flags`](struct.Flags.html).  See [nng_recvmsg](https://nanomsg.github.io/nng/man/v1.1.0/nng_recvmsg.3).
+    /// Receive a [`NngMsg`](../msg/struct.NngMsg.html) with [`Flags`](struct.Flags.html).  See [nng_recvmsg](https://nng.nanomsg.org/man/v1.2.2/nng_recvmsg.3).
     fn recvmsg_flags(&self, flags: Flags) -> Result<msg::NngMsg> {
         unsafe {
             let mut recv_ptr: *mut nng_msg = std::ptr::null_mut();
@@ -321,7 +321,7 @@ impl UnsafeSocket {
         Self { socket }
     }
 
-    /// See [nng_socket_id](https://nanomsg.github.io/nng/man/v1.1.0/nng_socket_id.3).
+    /// See [nng_socket_id](https://nng.nanomsg.org/man/v1.2.2/nng_socket_id.3).
     pub fn id(&self) -> i32 {
         unsafe { nng_socket_id(self.socket) }
     }

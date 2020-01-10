@@ -4,7 +4,7 @@ use crate::{mem::Alloc, *};
 use std::{ffi::CStr, ffi::CString, os::raw::c_char, result};
 
 /// Handle to an owned NNG string.
-/// See [nng_strfree](https://nanomsg.github.io/nng/man/v1.1.0/nng_strfree.3).
+/// See [nng_strfree](https://nng.nanomsg.org/man/v1.2.2/nng_strfree.3).
 #[derive(Debug)]
 pub struct NngString {
     pointer: *mut c_char,
@@ -25,13 +25,13 @@ impl NngString {
     ///
     /// # Safety
     ///
-    /// Takes ownership of `pointer` and calls [nng_strfree](https://nanomsg.github.io/nng/man/v1.1.0/nng_strfree.3) when dropped.
+    /// Takes ownership of `pointer` and calls [nng_strfree](https://nng.nanomsg.org/man/v1.2.2/nng_strfree.3) when dropped.
     pub unsafe fn from_raw(pointer: *mut c_char) -> NngString {
         NngString { pointer }
     }
 
     /// Duplicate string.
-    /// See [nng_strdup](https://nanomsg.github.io/nng/man/v1.1.0/nng_strdup.3)
+    /// See [nng_strdup](https://nng.nanomsg.org/man/v1.2.2/nng_strdup.3)
     pub fn dup(&self) -> NngString {
         unsafe { NngString::from_raw(nng_strdup(self.pointer)) }
     }

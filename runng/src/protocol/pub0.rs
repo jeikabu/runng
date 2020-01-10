@@ -4,7 +4,7 @@ use super::*;
 use crate::asyncio::*;
 use runng_sys::*;
 
-/// Publish half of publisher/subscriber pattern.  See [nng_pub](https://nanomsg.github.io/nng/man/v1.1.0/nng_pub.7).
+/// Publish half of publisher/subscriber pattern.  See [nng_pub](https://nng.nanomsg.org/man/v1.2.2/nng_pub.7).
 #[derive(Clone, Debug, NngGetOpts, NngSetOpts)]
 #[prefix = "nng_socket_"]
 pub struct Pub0 {
@@ -12,7 +12,7 @@ pub struct Pub0 {
 }
 
 impl Pub0 {
-    /// Create a pub socket.  See [nng_pub_open](https://nanomsg.github.io/nng/man/v1.1.0/nng_pub_open.3).
+    /// Create a pub socket.  See [nng_pub_open](https://nng.nanomsg.org/man/v1.2.2/nng_pub_open.3).
     pub fn open() -> Result<Self> {
         let open_func = |socket: &mut nng_socket| unsafe { nng_pub0_open(socket) };
         let socket_create_func = |socket| Pub0 { socket };
