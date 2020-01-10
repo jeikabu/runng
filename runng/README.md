@@ -60,4 +60,4 @@ fn async_reqrep() -> Result<(), runng::Error> {
 }
 ```
 
-Additional examples [in `examples/` folder](https://github.com/jeikabu/runng/tree/master/runng/examples) and [runng_examples](https://github.com/jeikabu/runng_examples).
+Additional examples [in `tests/` folder](https://github.com/jeikabu/runng/tree/master/runng/tests) and [runng_examples](https://github.com/jeikabu/runng_examples).
