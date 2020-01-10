@@ -48,9 +48,9 @@ use runng_sys::*;
 use std::{convert::TryFrom, convert::TryInto, ffi::CStr, marker, result};
 
 pub trait NngStat {
-    /// Obtain underlying [`nng_stat`](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat.5).
+    /// Obtain underlying [`nng_stat`](https://nng.nanomsg.org/man/v1.2.2/nng_stat.5).
     unsafe fn nng_stat(&self) -> *mut nng_stat;
-    /// Returns the first child statistic, if any.  See [nng_stat_child](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_child.3).
+    /// Returns the first child statistic, if any.  See [nng_stat_child](https://nng.nanomsg.org/man/v1.2.2/nng_stat_child.3).
     fn child(&self) -> Option<NngStatChild> {
         unsafe {
             let node = nng_stat_child(self.nng_stat());
@@ -72,7 +72,7 @@ pub struct NngStatRoot {
 }
 
 impl NngStatRoot {
-    /// Get statistics snapshot.  See [nng_stats_get](https://nanomsg.github.io/nng/man/v1.1.0/nng_stats_get.3).
+    /// Get statistics snapshot.  See [nng_stats_get](https://nng.nanomsg.org/man/v1.2.2/nng_stats_get.3).
     pub fn new() -> Result<NngStatRoot> {
         unsafe {
             let mut node: *mut nng_stat = std::ptr::null_mut();
@@ -116,7 +116,7 @@ impl<'root> NngStatChild<'root> {
         }
     }
 
-    /// See [nng_stat_name](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_name.3).
+    /// See [nng_stat_name](https://nng.nanomsg.org/man/v1.2.2/nng_stat_name.3).
     pub fn name(&self) -> result::Result<&str, std::str::Utf8Error> {
         unsafe {
             let ptr = nng_stat_name(self.nng_stat());
@@ -124,7 +124,7 @@ impl<'root> NngStatChild<'root> {
         }
     }
 
-    /// See [nng_stat_desc](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_desc.3).
+    /// See [nng_stat_desc](https://nng.nanomsg.org/man/v1.2.2/nng_stat_desc.3).
     pub fn desc(&self) -> result::Result<&str, std::str::Utf8Error> {
         unsafe {
             let ptr = nng_stat_desc(self.nng_stat());
@@ -132,7 +132,7 @@ impl<'root> NngStatChild<'root> {
         }
     }
 
-    /// See [nng_stat_type](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_type.3).
+    /// See [nng_stat_type](https://nng.nanomsg.org/man/v1.2.2/nng_stat_type.3).
     pub fn stat_type(&self) -> result::Result<nng_stat_type_enum, EnumFromIntError> {
         unsafe {
             let val = nng_stat_type(self.nng_stat());
@@ -140,14 +140,14 @@ impl<'root> NngStatChild<'root> {
         }
     }
 
-    /// See [nng_stat_value](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_timestamp.3).
+    /// See [nng_stat_value](https://nng.nanomsg.org/man/v1.2.2/nng_stat_timestamp.3).
     pub fn value(&self) -> u64 {
         unsafe { nng_stat_value(self.nng_stat()) }
     }
 
     /// If the statistic type is of type `NNG_STAT_STRING` returns the string value.
     /// Otherwise, `None` is returned.
-    /// See [nng_stat_string](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_string.3).
+    /// See [nng_stat_string](https://nng.nanomsg.org/man/v1.2.2/nng_stat_string.3).
     pub fn string(&self) -> Option<&str> {
         unsafe {
             let ptr = nng_stat_string(self.nng_stat());
@@ -158,7 +158,7 @@ impl<'root> NngStatChild<'root> {
         }
     }
 
-    /// See [nng_stat_unit](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_unit.3).
+    /// See [nng_stat_unit](https://nng.nanomsg.org/man/v1.2.2/nng_stat_unit.3).
     pub fn unit(&self) -> result::Result<nng_unit_enum, EnumFromIntError> {
         unsafe {
             let val = nng_stat_unit(self.nng_stat());
@@ -166,12 +166,12 @@ impl<'root> NngStatChild<'root> {
         }
     }
 
-    /// See [nng_stat_timestamp](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_timestamp.3).
+    /// See [nng_stat_timestamp](https://nng.nanomsg.org/man/v1.2.2/nng_stat_timestamp.3).
     pub fn timestamp(&self) -> u64 {
         unsafe { nng_stat_timestamp(self.nng_stat()) }
     }
 
-    /// Returns an iterator over self and sibling statistics.  See [nng_stat_next](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_next.3).
+    /// Returns an iterator over self and sibling statistics.  See [nng_stat_next](https://nng.nanomsg.org/man/v1.2.2/nng_stat_next.3).
     pub fn iter(&self) -> Iter {
         unsafe {
             let node = self.nng_stat();
@@ -183,7 +183,7 @@ impl<'root> NngStatChild<'root> {
 
     // The explicit `'root` lifetime is important here so the lifetime is the
     // top-level `NngStatRoot` rather than &self.
-    /// Get the next sibling statistic.  See [nng_stat_next](https://nanomsg.github.io/nng/man/v1.1.0/nng_stat_next.3).
+    /// Get the next sibling statistic.  See [nng_stat_next](https://nng.nanomsg.org/man/v1.2.2/nng_stat_next.3).
     pub fn next(&self) -> Option<NngStatChild<'root>> {
         unsafe {
             let node = self.nng_stat();

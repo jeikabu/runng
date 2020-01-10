@@ -10,7 +10,7 @@ pub trait Aio {
     fn aio_mut(&mut self) -> &mut NngAio;
 }
 
-/// Handle to `nng_aio`.  See [nng_aio](https://nanomsg.github.io/nng/man/v1.1.0/nng_aio.5).
+/// Handle to `nng_aio`.  See [nng_aio](https://nng.nanomsg.org/man/v1.2.2/nng_aio.5).
 ///
 /// # Safety
 ///
@@ -32,7 +32,7 @@ pub type AioCallback = unsafe extern "C" fn(arg1: AioArgPtr);
 
 impl NngAio {
     /// Create an `nng_aio` for asynchronous I/O operations.
-    /// See [nng_aio_alloc](https://nanomsg.github.io/nng/man/v1.1.0/nng_aio_alloc.3)
+    /// See [nng_aio_alloc](https://nng.nanomsg.org/man/v1.2.2/nng_aio_alloc.3)
     pub fn create<T, F>(func: F, callback: AioCallback) -> Result<AioArg<T>>
     where
         T: Aio,
@@ -63,7 +63,7 @@ impl NngAio {
 
     /// Set scatter/gather vector for vectored I/O.
     ///
-    /// See [nng_aio_set_iov](https://nanomsg.github.io/nng/man/v1.1.0/nng_aio_set_iov.3)
+    /// See [nng_aio_set_iov](https://nng.nanomsg.org/man/v1.2.2/nng_aio_set_iov.3)
     ///
     /// # Safety
     ///
@@ -73,7 +73,7 @@ impl NngAio {
         nng_int_to_result(res)
     }
 
-    /// See [nng_aio_count](https://nanomsg.github.io/nng/man/v1.1.0/nng_aio_count.3)
+    /// See [nng_aio_count](https://nng.nanomsg.org/man/v1.2.2/nng_aio_count.3)
     ///
     /// # Safety
     ///
@@ -82,7 +82,7 @@ impl NngAio {
         nng_aio_count(self.nng_aio())
     }
 
-    /// See [nng_aio_get_output](https://nanomsg.github.io/nng/man/v1.1.0/nng_aio_get_output.3)
+    /// See [nng_aio_get_output](https://nng.nanomsg.org/man/v1.2.2/nng_aio_get_output.3)
     ///
     /// # Safety
     ///
@@ -92,7 +92,7 @@ impl NngAio {
     }
 
     /// Cancel asynchronous I/O operation.
-    /// See [nng_aio_cancel](https://nanomsg.github.io/nng/man/v1.1.0/nng_aio_cancel.3)
+    /// See [nng_aio_cancel](https://nng.nanomsg.org/man/v1.2.2/nng_aio_cancel.3)
     ///
     /// # Safety
     ///
@@ -102,7 +102,7 @@ impl NngAio {
     }
 
     /// Cancel asynchronous I/O operation.
-    /// See [nng_aio_abort](https://nanomsg.github.io/nng/man/v1.1.0/nng_aio_abort.3)
+    /// See [nng_aio_abort](https://nng.nanomsg.org/man/v1.2.2/nng_aio_abort.3)
     ///
     /// # Safety
     ///
@@ -113,7 +113,7 @@ impl NngAio {
 
     /// Wait for an asynchronous I/O operation to complete.
     ///
-    /// See [nng_aio_wait](https://nanomsg.github.io/nng/man/v1.1.0/nng_aio_wait.3)
+    /// See [nng_aio_wait](https://nng.nanomsg.org/man/v1.2.2/nng_aio_wait.3)
     ///
     /// # Safety
     ///
@@ -124,7 +124,7 @@ impl NngAio {
 
     /// Get result of asynchronous operation.
     ///
-    /// See [nng_aio_result](https://nanomsg.github.io/nng/man/v1.1.0/nng_aio_result.3)
+    /// See [nng_aio_result](https://nng.nanomsg.org/man/v1.2.2/nng_aio_result.3)
     ///
     /// # Safety
     ///
@@ -135,7 +135,7 @@ impl NngAio {
     }
 
     /// Set timeout for operations.
-    /// See [nng_aio_set_timeout](https://nanomsg.github.io/nng/man/v1.1.0/nng_aio_set_timeout.3)
+    /// See [nng_aio_set_timeout](https://nng.nanomsg.org/man/v1.2.2/nng_aio_set_timeout.3)
     pub fn set_timeout(&self, timeout: nng_duration) {
         unsafe {
             nng_aio_set_timeout(self.nng_aio(), timeout);

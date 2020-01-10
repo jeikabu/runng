@@ -10,7 +10,7 @@ pub trait Ctx {
     fn ctx(&self) -> nng_ctx;
 }
 
-/// Handle to `nng_ctx`.  See [nng_ctx](https://nanomsg.github.io/nng/man/v1.1.0/nng_ctx.5).
+/// Handle to `nng_ctx`.  See [nng_ctx](https://nng.nanomsg.org/man/v1.2.2/nng_ctx.5).
 #[derive(Debug)]
 pub struct NngCtx {
     ctx: nng_ctx,
@@ -18,7 +18,7 @@ pub struct NngCtx {
 }
 
 impl NngCtx {
-    /// Creates a new context using the specified socket.  See [nng_ctx_open](https://nanomsg.github.io/nng/man/v1.1.0/nng_ctx_open.3).
+    /// Creates a new context using the specified socket.  See [nng_ctx_open](https://nng.nanomsg.org/man/v1.2.2/nng_ctx_open.3).
     pub fn new(socket: NngSocket) -> Result<Self> {
         let mut ctx = nng_ctx::default();
         let res = unsafe { nng_ctx_open(&mut ctx, socket.nng_socket()) };
@@ -27,7 +27,7 @@ impl NngCtx {
         Ok(ctx)
     }
 
-    /// See [nng_ctx_id](https://nanomsg.github.io/nng/man/v1.1.0/nng_ctx_id.3).
+    /// See [nng_ctx_id](https://nng.nanomsg.org/man/v1.2.2/nng_ctx_id.3).
     pub fn id(&self) -> i32 {
         unsafe { nng_ctx_id(self.ctx) }
     }

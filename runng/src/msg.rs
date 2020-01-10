@@ -5,19 +5,19 @@ use runng_derive::NngMsgOpts;
 use runng_sys::*;
 use std::{os::raw::c_void, ptr, slice};
 
-/// Wraps `nng_msg`.  See [nng_msg](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg.5).
+/// Wraps `nng_msg`.  See [nng_msg](https://nng.nanomsg.org/man/v1.2.2/nng_msg.5).
 #[derive(Debug, NngMsgOpts)]
 pub struct NngMsg {
     msg: *mut nng_msg,
 }
 
 impl NngMsg {
-    /// Create a message.  See [nng_msg_alloc](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg_alloc.3).
+    /// Create a message.  See [nng_msg_alloc](https://nng.nanomsg.org/man/v1.2.2/nng_msg_alloc.3).
     pub fn new() -> Result<Self> {
         NngMsg::with_capacity(0)
     }
 
-    /// Create a message with body length `size_bytes`.  See [nng_msg_alloc](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg_alloc.3).
+    /// Create a message with body length `size_bytes`.  See [nng_msg_alloc](https://nng.nanomsg.org/man/v1.2.2/nng_msg_alloc.3).
     pub fn with_capacity(size_bytes: usize) -> Result<Self> {
         unsafe {
             let mut msg: *mut nng_msg = ptr::null_mut();

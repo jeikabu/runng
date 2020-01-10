@@ -35,7 +35,7 @@ impl core::convert::TryFrom<nng_pipe_ev> for NngPipeEv {
     }
 }
 
-/// Wraps `nng_pipe`.  See [nng_pipe](https://nanomsg.github.io/nng/man/v1.1.0/nng_pipe.5).
+/// Wraps `nng_pipe`.  See [nng_pipe](https://nng.nanomsg.org/man/v1.2.2/nng_pipe.5).
 #[derive(Debug, NngGetOpts)] // Note: nng_pipe has no setopt() functions
 #[prefix = "nng_pipe_"]
 pub struct NngPipe {
@@ -43,7 +43,7 @@ pub struct NngPipe {
 }
 
 impl NngPipe {
-    /// Get pipe associated with a message, if one exists.  See [nng_msg_get_pipe](https://nanomsg.github.io/nng/man/v1.1.0/nng_msg_get_pipe.3).
+    /// Get pipe associated with a message, if one exists.  See [nng_msg_get_pipe](https://nng.nanomsg.org/man/v1.2.2/nng_msg_get_pipe.3).
     pub(crate) fn new(message: &NngMsg) -> Option<Self> {
         unsafe {
             let pipe = nng_msg_get_pipe(message.msg());
@@ -56,7 +56,7 @@ impl NngPipe {
         }
     }
 
-    /// See [nng_pipe_id](https://nanomsg.github.io/nng/man/v1.1.0/nng_pipe_id.3).
+    /// See [nng_pipe_id](https://nng.nanomsg.org/man/v1.2.2/nng_pipe_id.3).
     pub fn id(&self) -> i32 {
         unsafe { nng_pipe_id(self.pipe) }
     }
@@ -66,7 +66,7 @@ impl NngPipe {
         self.pipe
     }
 
-    /// Get socket that owns the pipe.  See [nng_pipe_socket](https://nanomsg.github.io/nng/man/v1.1.0/nng_pipe_socket.3).
+    /// Get socket that owns the pipe.  See [nng_pipe_socket](https://nng.nanomsg.org/man/v1.2.2/nng_pipe_socket.3).
     pub unsafe fn socket(&self) -> Option<UnsafeSocket> {
         let socket = UnsafeSocket::new(nng_pipe_socket(self.pipe));
         if socket.id() == -1 {
@@ -76,7 +76,7 @@ impl NngPipe {
         }
     }
 
-    /// Get dialer that created the pipe.  See [nng_pipe_dialer](https://nanomsg.github.io/nng/man/v1.1.0/nng_pipe_dialer.3).
+    /// Get dialer that created the pipe.  See [nng_pipe_dialer](https://nng.nanomsg.org/man/v1.2.2/nng_pipe_dialer.3).
     pub unsafe fn dialer(&self) -> Option<UnsafeDialer> {
         let dialer = UnsafeDialer::new(nng_pipe_dialer(self.pipe));
         if dialer.id() == -1 {
@@ -86,7 +86,7 @@ impl NngPipe {
         }
     }
 
-    /// Get listener that created the pipe.  See [nng_pipe_listener](https://nanomsg.github.io/nng/man/v1.1.0/nng_pipe_listener.3).
+    /// Get listener that created the pipe.  See [nng_pipe_listener](https://nng.nanomsg.org/man/v1.2.2/nng_pipe_listener.3).
     pub unsafe fn listener(&self) -> Option<UnsafeListener> {
         let listener = UnsafeListener::new(nng_pipe_listener(self.pipe));
         if listener.id() == -1 {
@@ -96,7 +96,7 @@ impl NngPipe {
         }
     }
 
-    /// Closes the pipe.  See [nng_pipe_close](https://nanomsg.github.io/nng/man/v1.1.0/nng_pipe_close.3).
+    /// Closes the pipe.  See [nng_pipe_close](https://nng.nanomsg.org/man/v1.2.2/nng_pipe_close.3).
     /// This will cause associated aio/ctx functions that were using the pipe to fail.
     pub unsafe fn close(self) -> Result<()> {
         nng_int_to_result(nng_pipe_close(self.pipe))

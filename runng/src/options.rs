@@ -31,7 +31,7 @@ pub trait SetOpts {
 }
 
 /// Wraps NNG option names for [GetOpts](trait.GetOpts.html) and [SetOpts](trait.SetOpts.html).
-/// See [nng_options](https://nanomsg.github.io/nng/man/v1.1.0/nng_options.5).
+/// See [nng_options](https://nng.nanomsg.org/man/v1.2.2/nng_options.5).
 #[derive(Debug, PartialEq)]
 pub struct NngOption(&'static [u8]);
 

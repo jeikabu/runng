@@ -4,7 +4,7 @@ use super::*;
 use crate::asyncio::*;
 use runng_sys::*;
 
-/// Half of pair pattern.  See [nng_pair](https://nanomsg.github.io/nng/man/v1.1.0/nng_pair.7).
+/// Half of pair pattern.  See [nng_pair](https://nng.nanomsg.org/man/v1.2.2/nng_pair.7).
 #[derive(Clone, Debug, NngGetOpts, NngSetOpts)]
 #[prefix = "nng_socket_"]
 pub struct Pair0 {
@@ -12,7 +12,7 @@ pub struct Pair0 {
 }
 
 impl Pair0 {
-    /// Create a new pair socket.  See [nng_pair_open](https://nanomsg.github.io/nng/man/v1.1.0/nng_pair_open.3).
+    /// Create a new pair socket.  See [nng_pair_open](https://nng.nanomsg.org/man/v1.2.2/nng_pair_open.3).
     pub fn open() -> Result<Self> {
         let socket_create_func = |socket| Pair0 { socket };
         nng_open(

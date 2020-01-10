@@ -4,7 +4,7 @@ use super::*;
 use crate::{asyncio::*, *};
 use runng_sys::*;
 
-/// Request half of request/reply pattern.  See [nng_req](https://nanomsg.github.io/nng/man/v1.1.0/nng_req.7).
+/// Request half of request/reply pattern.  See [nng_req](https://nng.nanomsg.org/man/v1.2.2/nng_req.7).
 #[derive(Clone, Debug, NngGetOpts, NngSetOpts)]
 #[prefix = "nng_socket_"]
 pub struct Req0 {
@@ -12,7 +12,7 @@ pub struct Req0 {
 }
 
 impl Req0 {
-    /// Create a new request socket.  See [nng_req_open](https://nanomsg.github.io/nng/man/v1.1.0/nng_req_open.3).
+    /// Create a new request socket.  See [nng_req_open](https://nng.nanomsg.org/man/v1.2.2/nng_req_open.3).
     pub fn open() -> Result<Self> {
         let open_func = |socket: &mut nng_socket| unsafe { nng_req0_open(socket) };
         let socket_create_func = |socket| Req0 { socket };
