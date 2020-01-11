@@ -113,7 +113,7 @@ where
         match res {
             Ok(_) => return,
             Err(Error::Errno(NngErrno::EAGAIN)) => sleep_fast(),
-            Err(err) => panic!(err),
+            Err(err) => panic!("{}", err),
         }
     }
     panic!("Timeout");
@@ -129,7 +129,7 @@ where
         match recv {
             Ok(_) => return,
             Err(Error::Errno(NngErrno::EAGAIN)) => sleep_fast(),
-            Err(err) => panic!(err),
+            Err(err) => panic!("{}", err),
         }
     }
     panic!("Timeout");

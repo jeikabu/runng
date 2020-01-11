@@ -83,6 +83,7 @@ pub enum NngErrno {
     ENOARG = runng_sys::NNG_ENOARG as i32,
     EAMBIGUOUS = runng_sys::NNG_EAMBIGUOUS as i32,
     EBADTYPE = runng_sys::NNG_EBADTYPE as i32,
+    ECONNSHUT = runng_sys::NNG_ECONNSHUT as i32,
     EINTERNAL = runng_sys::NNG_EINTERNAL as i32,
     // ESYSERR(int),
     // ETRANERR(int),
@@ -123,6 +124,7 @@ impl TryFrom<i32> for NngErrno {
             runng_sys::NNG_ENOARG => Ok(NngErrno::ENOARG),
             runng_sys::NNG_EAMBIGUOUS => Ok(NngErrno::EAMBIGUOUS),
             runng_sys::NNG_EBADTYPE => Ok(NngErrno::EBADTYPE),
+            runng_sys::NNG_ECONNSHUT => Ok(NngErrno::ECONNSHUT),
             runng_sys::NNG_EINTERNAL => Ok(NngErrno::EINTERNAL),
             _ => Err(EnumFromIntError(value)),
         }
