@@ -101,6 +101,17 @@ impl NngPipe {
     pub unsafe fn close(self) -> Result<()> {
         nng_int_to_result(nng_pipe_close(self.pipe))
     }
+
+    #[cfg(feature = "unstable")]
+    pub fn getopt_sockaddr(&self, option: NngOption) -> Result<nng_sockaddr> {
+        unsafe {
+            let mut sockaddr = nng_sockaddr::default();
+            Error::zero_map(
+                nng_pipe_getopt_sockaddr(self.pipe, option.as_cptr(), &mut sockaddr),
+                || sockaddr,
+            )
+        }
+    }
 }
 
 impl NngWrapper for NngPipe {

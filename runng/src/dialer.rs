@@ -30,6 +30,17 @@ impl NngDialer {
     pub fn start(&self) -> Result<()> {
         unsafe { nng_int_to_result(nng_dialer_start(self.dialer, 0)) }
     }
+
+    #[cfg(feature = "unstable")]
+    pub fn getopt_sockaddr(&self, option: NngOption) -> Result<nng_sockaddr> {
+        unsafe {
+            let mut sockaddr = nng_sockaddr::default();
+            Error::zero_map(
+                nng_dialer_getopt_sockaddr(self.dialer, option.as_cptr(), &mut sockaddr),
+                || sockaddr,
+            )
+        }
+    }
 }
 
 impl NngWrapper for NngDialer {

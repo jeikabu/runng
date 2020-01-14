@@ -29,6 +29,17 @@ impl NngListener {
         // be set before the dialer is started.
         unsafe { nng_int_to_result(nng_listener_start(self.listener, 0)) }
     }
+
+    #[cfg(feature = "unstable")]
+    pub fn getopt_sockaddr(&self, option: NngOption) -> Result<nng_sockaddr> {
+        unsafe {
+            let mut sockaddr = nng_sockaddr::default();
+            Error::zero_map(
+                nng_listener_getopt_sockaddr(self.listener, option.as_cptr(), &mut sockaddr),
+                || sockaddr,
+            )
+        }
+    }
 }
 
 impl NngWrapper for NngListener {

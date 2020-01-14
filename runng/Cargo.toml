@@ -1,6 +1,6 @@
 [package]
 name = "runng"
-version = "0.3.1"
+version = "0.3.2"
 authors = ["Jake W <jeikabu@gmail.com>"]
 
 description = "High-level wrapper around nng (Nanomsg-Next-Generation) aka Nanomsg2"
@@ -17,6 +17,8 @@ codecov = { repository = "jeikabu/runng", branch = "master", service = "github" 
 
 [features]
 default = ["pipes", "stats"]
+# Unstable features that will change without warning
+unstable = []
 # NngPipe/nng_pipe
 pipes = []
 stats = []
@@ -28,7 +30,7 @@ futures_util = { version = "0.3.0-alpha", package = "futures-util-preview" }
 log = "0.4"
 rand = "0.6"
 runng_derive = { version = "0.2", path = "../runng_derive" }
-runng-sys = { version = "1.2.3-rc", path = "../runng_sys", package = "nng-sys" }
+runng-sys = { version = "1.2.4-rc" }
 
 # To enable bindgen only when building for PC, I'd like to have:
 #[target.'cfg(target_arch = "x86_64")'.dependencies]

@@ -26,12 +26,6 @@ use runng::{
 
 #[test]
 fn stats_example() -> Result<()> {
-    // https://github.com/nanomsg/nng/issues/841
-    let url = "inproc://test";
-    let factory = ProtocolFactory::default();
-    let _pusher = factory.pusher_open()?.listen(&url)?;
-    let _puller = factory.puller_open()?.dial(&url)?;
-
     let stats = NngStatRoot::new()?;
     let child = stats.child().unwrap();
     for stat in child.iter() {
@@ -59,7 +53,7 @@ pub trait NngStat {
     }
 }
 
-/* Root of tree of statistics snapshot.
+/** Root of tree of statistics snapshot.
 ## Examples
 ```rust
 # use runng::stats::*;
