@@ -142,6 +142,7 @@ pub enum Error {
     NulError(std::ffi::NulError),
     Unit,
     Canceled(oneshot::Canceled),
+    TryFromError(i32),
 }
 
 impl Error {
@@ -184,6 +185,7 @@ impl fmt::Display for Error {
             NulError(ref err) => err.fmt(f),
             Unit => write!(f, "()"),
             Canceled(ref err) => err.fmt(f),
+            TryFromError(value) => write!(f, "EnumFromIntError({})", value),
         }
     }
 }
@@ -203,5 +205,11 @@ impl From<()> for Error {
 impl From<oneshot::Canceled> for Error {
     fn from(err: oneshot::Canceled) -> Error {
         Error::Canceled(err)
+    }
+}
+
+impl From<EnumFromIntError> for Error {
+    fn from(err: EnumFromIntError) -> Error {
+        Error::TryFromError(err.0)
     }
 }

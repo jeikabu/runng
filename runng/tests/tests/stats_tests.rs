@@ -6,8 +6,6 @@ use runng::{factory::compat::ProtocolFactory, socket::*, stats::*};
 
 fn init_stats() -> runng::Result<(protocol::pair0::Pair0, protocol::pair0::Pair0)> {
     init_logging();
-    // FIXME: can remove this in NNG 1.1.2 or 1.2
-    // https://github.com/nanomsg/nng/issues/841
     let url = get_url();
     let factory = ProtocolFactory::default();
     let mut p0 = factory.pair_open()?;
