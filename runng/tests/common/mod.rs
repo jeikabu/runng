@@ -26,6 +26,15 @@ pub fn get_url() -> String {
     String::from("inproc://test") + &val.to_string()
 }
 
+pub fn get_urls() -> impl Iterator<Item = String> {
+    init_logging();
+    vec![
+        "ws://localhost:0".to_owned(),
+        "tcp://localhost:0".to_owned(),
+    ]
+    .into_iter()
+}
+
 pub fn create_stop_message() -> NngMsg {
     NngMsg::new().unwrap()
 }

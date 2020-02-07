@@ -23,3 +23,23 @@ fn names() -> runng::Result<()> {
     assert_ne!(NngOption::SOCKNAME, NngOption::PROTONAME);
     Ok(())
 }
+
+#[test]
+fn sockaddr() -> runng::Result<()> {
+    for url in get_urls() {
+        let factory = ProtocolFactory::default();
+        let sock = factory.pair_open()?;
+        let listener = sock.listener_create(&url)?;
+        listener.start()?;
+        let sockaddr = listener.get_sockaddr(NngOption::LOCADDR)?;
+        use SockAddr::*;
+        match sockaddr {
+            Inproc(_) => assert!(url.starts_with("inproc://")),
+            Ipc(_) => assert!(url.starts_with("ipc://")),
+            In(_) | In6(_) => assert!(url.starts_with("tcp://") || url.starts_with("ws://")),
+            Zt(_) => assert!(url.starts_with("zt://")),
+            _ => panic!(),
+        }
+    }
+    Ok(())
+}

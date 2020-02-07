@@ -102,14 +102,15 @@ impl NngPipe {
         nng_int_to_result(nng_pipe_close(self.pipe))
     }
 
-    #[cfg(feature = "unstable")]
-    pub fn getopt_sockaddr(&self, option: NngOption) -> Result<nng_sockaddr> {
+    pub fn get_sockaddr(&self, option: NngOption) -> Result<SockAddr> {
         unsafe {
             let mut sockaddr = nng_sockaddr::default();
-            Error::zero_map(
-                nng_pipe_getopt_sockaddr(self.pipe, option.as_cptr(), &mut sockaddr),
-                || sockaddr,
-            )
+            nng_int_to_result(nng_pipe_getopt_sockaddr(
+                self.pipe,
+                option.as_cptr(),
+                &mut sockaddr,
+            ))
+            .and_then(|_| SockAddr::try_from(sockaddr))
         }
     }
 }

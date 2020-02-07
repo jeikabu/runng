@@ -7,6 +7,7 @@
 
 use crate::{dialer::NngDialer, listener::NngListener, *};
 use bitflags::bitflags;
+use core::convert::TryFrom;
 use runng_sys::*;
 use std::{fmt, result, sync::Arc};
 
@@ -24,6 +25,41 @@ bitflags! {
     #[derive(Default)]
     pub struct SocketFlags: i32 {
         const NONBLOCK = NNG_FLAG_NONBLOCK as i32;
+    }
+}
+
+/// See [nng_sockaddr](https://nng.nanomsg.org/man/v1.2.2/nng_sockaddr.5.html).
+pub enum SockAddr {
+    Unspec,
+    /// See [nng_sockaddr_inproc](https://nng.nanomsg.org/man/v1.2.2/nng_sockaddr_inproc.5.html)
+    Inproc(nng_sockaddr_inproc),
+    /// See [nng_sockaddr_ipc](https://nng.nanomsg.org/man/v1.2.2/nng_sockaddr_ipc.5.html)
+    Ipc(nng_sockaddr_ipc),
+    /// See [nng_sockaddr_in](https://nng.nanomsg.org/man/v1.2.2/nng_sockaddr_in.5.html)
+    In(nng_sockaddr_in),
+    /// See [nng_sockaddr_in6](https://nng.nanomsg.org/man/v1.2.2/nng_sockaddr_in6.5.html)
+    In6(nng_sockaddr_in6),
+    /// See [nng_sockaddr_zt](https://nng.nanomsg.org/man/v1.2.2/nng_sockaddr_zt.5.html)
+    Zt(nng_sockaddr_zt),
+}
+
+impl SockAddr {
+    /// Converts Result<nng_sockaddr> to Result<SockAddr>
+    pub(crate) fn try_from(sockaddr: nng_sockaddr) -> Result<SockAddr> {
+        use nng_sockaddr_family::*;
+        use SockAddr::*;
+        unsafe {
+            // Convert nng_sockaddr into SockAddr
+            match nng_sockaddr_family::try_from(sockaddr.s_family as i32) {
+                Ok(NNG_AF_UNSPEC) => Ok(Unspec),
+                Ok(NNG_AF_INPROC) => Ok(Inproc(sockaddr.s_inproc)),
+                Ok(NNG_AF_IPC) => Ok(Ipc(sockaddr.s_ipc)),
+                Ok(NNG_AF_INET) => Ok(In(sockaddr.s_in)),
+                Ok(NNG_AF_INET6) => Ok(In6(sockaddr.s_in6)),
+                Ok(NNG_AF_ZT) => Ok(Zt(sockaddr.s_zt)),
+                _ => Err(Error::TryFromError(sockaddr.s_family as i32)),
+            }
+        }
     }
 }
 

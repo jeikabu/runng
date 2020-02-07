@@ -5,9 +5,7 @@ use runng::{
     options::{NngOption, SetOpts},
     socket::*,
 };
-use runng_sys::nng_sockaddr_family;
 use std::{
-    convert::TryFrom,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc,
@@ -83,21 +81,6 @@ fn create_peer_sync(
 
         Ok(())
     })
-}
-
-#[cfg(feature = "unstable")]
-#[test]
-fn get_loc_addr() -> runng::Result<()> {
-    let mut socket = protocol::Bus0::open()?;
-    let listener = socket.listener_create("tcp://localhost:0")?;
-    let sockaddr = listener.getopt_sockaddr(NngOption::LOCADDR)?;
-    let family = unsafe { nng_sockaddr_family::try_from(sockaddr.s_family as i32) }?;
-    assert!(
-        family == nng_sockaddr_family::NNG_AF_INET || family == nng_sockaddr_family::NNG_AF_INET6,
-        "{:?}",
-        family
-    );
-    Ok(())
 }
 
 #[test]
