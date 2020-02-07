@@ -1,8 +1,8 @@
 //! Return values and error handling
 
+use core::convert::TryFrom;
 use futures::channel::oneshot;
 use runng_sys::*;
-use std::convert::TryFrom;
 use std::{error, fmt, result};
 
 pub type Result<T> = result::Result<T, Error>;
@@ -93,39 +93,41 @@ impl TryFrom<i32> for NngErrno {
     type Error = EnumFromIntError;
 
     fn try_from(value: i32) -> result::Result<Self, Self::Error> {
+        use runng_sys::*;
+        use NngErrno::*;
         match value as u32 {
-            runng_sys::NNG_EINTR => Ok(NngErrno::EINTR),
-            runng_sys::NNG_ENOMEM => Ok(NngErrno::ENOMEM),
-            runng_sys::NNG_EINVAL => Ok(NngErrno::EINVAL),
-            runng_sys::NNG_EBUSY => Ok(NngErrno::EBUSY),
-            runng_sys::NNG_ETIMEDOUT => Ok(NngErrno::ETIMEDOUT),
-            runng_sys::NNG_ECONNREFUSED => Ok(NngErrno::ECONNREFUSED),
-            runng_sys::NNG_ECLOSED => Ok(NngErrno::ECLOSED),
-            runng_sys::NNG_EAGAIN => Ok(NngErrno::EAGAIN),
-            runng_sys::NNG_ENOTSUP => Ok(NngErrno::ENOTSUP),
-            runng_sys::NNG_EADDRINUSE => Ok(NngErrno::EADDRINUSE),
-            runng_sys::NNG_ESTATE => Ok(NngErrno::ESTATE),
-            runng_sys::NNG_ENOENT => Ok(NngErrno::ENOENT),
-            runng_sys::NNG_EPROTO => Ok(NngErrno::EPROTO),
-            runng_sys::NNG_EUNREACHABLE => Ok(NngErrno::EUNREACHABLE),
-            runng_sys::NNG_EADDRINVAL => Ok(NngErrno::EADDRINVAL),
-            runng_sys::NNG_EPERM => Ok(NngErrno::EPERM),
-            runng_sys::NNG_EMSGSIZE => Ok(NngErrno::EMSGSIZE),
-            runng_sys::NNG_ECONNABORTED => Ok(NngErrno::ECONNABORTED),
-            runng_sys::NNG_ECONNRESET => Ok(NngErrno::ECONNRESET),
-            runng_sys::NNG_ECANCELED => Ok(NngErrno::ECANCELED),
-            runng_sys::NNG_ENOFILES => Ok(NngErrno::ENOFILES),
-            runng_sys::NNG_ENOSPC => Ok(NngErrno::ENOSPC),
-            runng_sys::NNG_EEXIST => Ok(NngErrno::EEXIST),
-            runng_sys::NNG_EREADONLY => Ok(NngErrno::EREADONLY),
-            runng_sys::NNG_EWRITEONLY => Ok(NngErrno::EWRITEONLY),
-            runng_sys::NNG_ECRYPTO => Ok(NngErrno::ECRYPTO),
-            runng_sys::NNG_EPEERAUTH => Ok(NngErrno::EPEERAUTH),
-            runng_sys::NNG_ENOARG => Ok(NngErrno::ENOARG),
-            runng_sys::NNG_EAMBIGUOUS => Ok(NngErrno::EAMBIGUOUS),
-            runng_sys::NNG_EBADTYPE => Ok(NngErrno::EBADTYPE),
-            runng_sys::NNG_ECONNSHUT => Ok(NngErrno::ECONNSHUT),
-            runng_sys::NNG_EINTERNAL => Ok(NngErrno::EINTERNAL),
+            NNG_EINTR => Ok(EINTR),
+            NNG_ENOMEM => Ok(ENOMEM),
+            NNG_EINVAL => Ok(EINVAL),
+            NNG_EBUSY => Ok(EBUSY),
+            NNG_ETIMEDOUT => Ok(ETIMEDOUT),
+            NNG_ECONNREFUSED => Ok(ECONNREFUSED),
+            NNG_ECLOSED => Ok(ECLOSED),
+            NNG_EAGAIN => Ok(EAGAIN),
+            NNG_ENOTSUP => Ok(ENOTSUP),
+            NNG_EADDRINUSE => Ok(EADDRINUSE),
+            NNG_ESTATE => Ok(ESTATE),
+            NNG_ENOENT => Ok(ENOENT),
+            NNG_EPROTO => Ok(EPROTO),
+            NNG_EUNREACHABLE => Ok(EUNREACHABLE),
+            NNG_EADDRINVAL => Ok(EADDRINVAL),
+            NNG_EPERM => Ok(EPERM),
+            NNG_EMSGSIZE => Ok(EMSGSIZE),
+            NNG_ECONNABORTED => Ok(ECONNABORTED),
+            NNG_ECONNRESET => Ok(ECONNRESET),
+            NNG_ECANCELED => Ok(ECANCELED),
+            NNG_ENOFILES => Ok(ENOFILES),
+            NNG_ENOSPC => Ok(ENOSPC),
+            NNG_EEXIST => Ok(EEXIST),
+            NNG_EREADONLY => Ok(EREADONLY),
+            NNG_EWRITEONLY => Ok(EWRITEONLY),
+            NNG_ECRYPTO => Ok(ECRYPTO),
+            NNG_EPEERAUTH => Ok(EPEERAUTH),
+            NNG_ENOARG => Ok(ENOARG),
+            NNG_EAMBIGUOUS => Ok(EAMBIGUOUS),
+            NNG_EBADTYPE => Ok(EBADTYPE),
+            NNG_ECONNSHUT => Ok(ECONNSHUT),
+            NNG_EINTERNAL => Ok(EINTERNAL),
             _ => Err(EnumFromIntError(value)),
         }
     }
