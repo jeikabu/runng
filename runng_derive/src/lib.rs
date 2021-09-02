@@ -70,7 +70,8 @@ fn gen_get_impl(name: &syn::Ident, prefix: &str) -> TokenStream {
             fn get_bool(&self, option: NngOption) -> Result<bool> {
                 unsafe {
                     let mut value: bool = Default::default();
-                    Error::zero_map( #get_bool (self.get_nng_type(), option.as_cptr(), &mut value), || value)
+                    let res = #get_bool (self.get_nng_type(), option.as_cptr(), &mut value);
+                    nng_int_to_result(res).map(|_| value)
                 }
             }
             /// Get `i32` option.
@@ -78,7 +79,8 @@ fn gen_get_impl(name: &syn::Ident, prefix: &str) -> TokenStream {
             fn get_int(&self, option: NngOption) -> Result<i32> {
                 unsafe {
                     let mut value: i32 = Default::default();
-                    Error::zero_map( #get_int (self.get_nng_type(), option.as_cptr(), &mut value), || value)
+                    let res = #get_int (self.get_nng_type(), option.as_cptr(), &mut value);
+                    nng_int_to_result(res).map(|_| value)
                 }
             }
             /// Get `nng_duration` option.
@@ -86,7 +88,8 @@ fn gen_get_impl(name: &syn::Ident, prefix: &str) -> TokenStream {
             fn get_ms(&self, option: NngOption) -> Result<i32> {
                 unsafe {
                     let mut value: i32 = Default::default();
-                    Error::zero_map( #get_ms (self.get_nng_type(), option.as_cptr(), &mut value), || value)
+                    let res = #get_ms (self.get_nng_type(), option.as_cptr(), &mut value);
+                    nng_int_to_result(res).map(|_| value)
                 }
             }
             /// Get `usize` option.
@@ -95,7 +98,8 @@ fn gen_get_impl(name: &syn::Ident, prefix: &str) -> TokenStream {
             {
                 unsafe {
                     let mut value: usize = Default::default();
-                    Error::zero_map( #get_size (self.get_nng_type(), option.as_cptr(), &mut value), || value)
+                    let res = #get_size (self.get_nng_type(), option.as_cptr(), &mut value);
+                    nng_int_to_result(res).map(|_| value)
                 }
             }
             /// Get `u64` option.
@@ -103,7 +107,8 @@ fn gen_get_impl(name: &syn::Ident, prefix: &str) -> TokenStream {
             fn get_uint64(&self, option: NngOption) -> Result<u64> {
                 unsafe {
                     let mut value: u64 = Default::default();
-                    Error::zero_map( #get_uint64 (self.get_nng_type(), option.as_cptr(), &mut value), || value)
+                    let res = #get_uint64 (self.get_nng_type(), option.as_cptr(), &mut value);
+                    nng_int_to_result(res).map(|_| value)
                 }
             }
             /// Get `NngString` option.
@@ -143,35 +148,35 @@ fn gen_set_impl(name: &syn::Ident, prefix: &str) -> TokenStream {
                 let res = unsafe {
                     #set_bool(self.get_nng_type(), option.as_cptr(), value)
                 };
-                Error::zero_map(res, || self)
+                nng_int_to_result(res).map(|_| self)
             }
             /// See #set_int
             fn set_int(&mut self, option: NngOption, value: i32) -> Result<&mut Self> {
                 let res = unsafe {
                     #set_int(self.get_nng_type(), option.as_cptr(), value)
                 };
-                Error::zero_map(res, || self)
+                nng_int_to_result(res).map(|_| self)
             }
             /// See #set_ms
             fn set_ms(&mut self, option: NngOption, value: i32) -> Result<&mut Self> {
                 let res = unsafe {
                     #set_ms(self.get_nng_type(), option.as_cptr(), value)
                 };
-                Error::zero_map(res, || self)
+                nng_int_to_result(res).map(|_| self)
             }
             /// See #set_size
             fn set_size(&mut self, option: NngOption, value: usize) -> Result<&mut Self> {
                 let res = unsafe {
                     #set_size(self.get_nng_type(), option.as_cptr(), value)
                 };
-                Error::zero_map(res, || self)
+                nng_int_to_result(res).map(|_| self)
             }
             /// See #set_uint64
             fn set_uint64(&mut self, option: NngOption, value: u64) -> Result<&mut Self> {
                 let res = unsafe {
                     #set_uint64(self.get_nng_type(), option.as_cptr(), value)
                 };
-                Error::zero_map(res, || self)
+                nng_int_to_result(res).map(|_| self)
             }
             /// See #set_string
             fn set_string(&mut self, option: NngOption, value: &str) -> Result<&mut Self> {
@@ -179,7 +184,7 @@ fn gen_set_impl(name: &syn::Ident, prefix: &str) -> TokenStream {
                     let (_, value) = to_cstr(value)?;
                     #set_string(self.get_nng_type(), option.as_cptr(), value)
                 };
-                Error::zero_map(res, || self)
+                nng_int_to_result(res).map(|_| self)
             }
         }
     };
@@ -191,7 +196,10 @@ fn _derive_nng_msg() -> TokenStream {
     let add_methods = methods.map(|(member, method, utype)| {
         quote! {
             pub fn #member(&mut self, data: #utype) -> Result<()> {
-                unsafe { nng_int_to_result(#method(self.msg(), data)) }
+                let res = unsafe {
+                    #method(self.msg(), data)
+                };
+                nng_int_to_result(res)
             }
         }
     });
@@ -201,7 +209,10 @@ fn _derive_nng_msg() -> TokenStream {
         quote! {
             pub fn #member(&mut self) -> Result<#utype> {
                 let mut val: #utype = 0;
-                unsafe { Error::zero_map(#method(self.msg(), &mut val), || val) }
+                let res = unsafe {
+                    #method(self.msg(), &mut val)
+                };
+                nng_int_to_result(res).map(|_| val)
             }
         }
     });

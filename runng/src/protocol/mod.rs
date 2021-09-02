@@ -47,7 +47,7 @@ where
 {
     let mut socket = nng_socket::default();
     let res = open_func(&mut socket);
-    Error::zero_map(res, || {
+    nng_int_to_result(res).map(|_| {
         let socket = NngSocket::new(socket);
         socket_create_func(socket)
     })

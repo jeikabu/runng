@@ -149,6 +149,7 @@ pub enum Error {
 
 impl Error {
     /// If `value` is zero returns `Ok(result())`.  Otherwise converts `value` to an `Error` and returns that.
+    #[deprecated(since = "0.3.3", note = "Use `nng_int_to_result(value).map(X)` instead")]
     pub fn zero_map<T, F: FnOnce() -> T>(value: i32, result: F) -> Result<T> {
         nng_int_to_result(value).map(|_| result())
     }

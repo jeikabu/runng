@@ -71,7 +71,7 @@ impl NngStatRoot {
         unsafe {
             let mut node: *mut nng_stat = std::ptr::null_mut();
             let res = nng_stats_get(&mut node);
-            Error::zero_map(res, || NngStatRoot { node })
+            nng_int_to_result(res).map(|_| NngStatRoot { node })
         }
     }
 }

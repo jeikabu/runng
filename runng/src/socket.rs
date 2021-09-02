@@ -178,7 +178,7 @@ pub trait Listen: Socket {
         unsafe {
             let (_cstring, ptr) = to_cstr(url)?;
             let res = nng_listen(self.nng_socket(), ptr, std::ptr::null_mut(), flags.bits());
-            Error::zero_map(res, || self)
+            nng_int_to_result(res).map(|_| self)
         }
     }
 
@@ -199,7 +199,7 @@ pub trait Dial: Socket {
         unsafe {
             let (_cstring, ptr) = to_cstr(url)?;
             let res = nng_dial(self.nng_socket(), ptr, std::ptr::null_mut(), flags.bits());
-            Error::zero_map(res, || self)
+            nng_int_to_result(res).map(|_| self)
         }
     }
 
@@ -322,8 +322,8 @@ pub trait RecvSocket: Socket {
         let flags = (flags | Flags::ALLOC).bits();
         unsafe {
             let mut ptr: *mut core::ffi::c_void = std::ptr::null_mut();
-            let mut size: usize = 0;
             let ptr_ptr = (&mut ptr) as *mut _ as *mut core::ffi::c_void;
+            let mut size: usize = 0;
             let res = nng_recv(self.nng_socket(), ptr_ptr, &mut size, flags);
             let res = nng_int_to_result(res);
             res.map(|_| mem::Alloc::from_raw_parts(ptr, size))
@@ -340,7 +340,7 @@ pub trait RecvSocket: Socket {
         unsafe {
             let mut recv_ptr: *mut nng_msg = std::ptr::null_mut();
             let res = nng_recvmsg(self.nng_socket(), &mut recv_ptr, flags.bits());
-            Error::zero_map(res, || msg::NngMsg::from_raw(recv_ptr))
+            nng_int_to_result(res).map(|_| msg::NngMsg::from_raw(recv_ptr))
         }
     }
 }

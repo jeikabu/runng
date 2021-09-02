@@ -18,10 +18,8 @@ impl NngDialer {
         unsafe {
             let mut dialer = nng_dialer::default();
             let (_cstring, url) = to_cstr(url)?;
-            Error::zero_map(
-                nng_dialer_create(&mut dialer, socket.nng_socket(), url),
-                || NngDialer { dialer, socket },
-            )
+            let res = nng_dialer_create(&mut dialer, socket.nng_socket(), url);
+            nng_int_to_result(res).map(|_| NngDialer { dialer, socket })
         }
     }
 

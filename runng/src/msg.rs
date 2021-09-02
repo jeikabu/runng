@@ -22,7 +22,7 @@ impl NngMsg {
         unsafe {
             let mut msg: *mut nng_msg = ptr::null_mut();
             let res = nng_msg_alloc(&mut msg, size_bytes);
-            Error::zero_map(res, || NngMsg::from_raw(msg))
+            nng_int_to_result(res).map(|_| NngMsg::from_raw(msg))
         }
     }
 
@@ -150,7 +150,7 @@ impl NngMsg {
         unsafe {
             let mut msg: *mut nng_msg = ptr::null_mut();
             let res = nng_msg_dup(&mut msg, self.msg());
-            Error::zero_map(res, || NngMsg::from_raw(msg))
+            nng_int_to_result(res).map(|_| NngMsg::from_raw(msg))
         }
     }
 

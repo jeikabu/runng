@@ -19,7 +19,7 @@ impl NngListener {
             let mut listener = nng_listener::default();
             let (_cstring, url) = to_cstr(url)?;
             let res = nng_listener_create(&mut listener, socket.nng_socket(), url);
-            Error::zero_map(res, || NngListener { listener, socket })
+            nng_int_to_result(res).map(|_| NngListener { listener, socket })
         }
     }
 
