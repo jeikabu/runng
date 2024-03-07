@@ -164,7 +164,11 @@ unsafe extern "C" fn reply_callback(arg: AioArgPtr) {
             // not yet ready for receive() to be called.
             ctx.state = ReplyState::Idle;
             ctx.receive();
-            sender.send(res).unwrap();
+            // Unwrapping here may cause a panic. This might fail because the requester timed out
+            // and decided to drop. That will cascade all the way back to this callback which
+            // shouldn't care — if the replier needs to send something and nobody is listening, it
+            // should probably just ignore any problems.
+            let _ = sender.send(res);
         }
     }
 }
